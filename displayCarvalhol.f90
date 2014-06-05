@@ -4,10 +4,17 @@ module displayCarvalhol
 
 contains
 
-    subroutine Disp1D(matrix1D)
+    subroutine Disp1D(matrix1D, name)
         ! Displays 1D Matrix (Vector)
-        integer :: j
+
+        !INPUT
+        character (len=*), optional, intent(in) :: name
         double precision, dimension(:), intent(in) :: matrix1D
+
+        !LOCAL VARIABLES
+        integer :: j
+
+		if(present(name)) write(*,*) name;
 
         write(*,*)
         do j=1,size(matrix1D)
@@ -16,11 +23,26 @@ contains
         write(*,*)
     end subroutine Disp1D
 
-    subroutine Disp2D(matrix2D)
+    subroutine Disp2D(matrix2D, name, nColumns, tolerance)
         ! Displays 2D Matrix, "div" columns at a time
-        integer :: k, j, div=4;
-        double precision :: tol = 1E-10;
+
+		!INPUT
         double precision, dimension(:, :), intent(in) :: matrix2D
+        character (len=*), optional, intent(in) :: name
+        integer, optional, intent(in) :: nColumns
+        double precision, optional, intent(in) :: tolerance;
+
+        !LOCAL VARIABLES
+        integer :: k, j, div;
+        double precision :: tol;
+
+
+		if(present(name)) write(*,*) name;
+		if(present(nColumns).and.nColumns.gt.0) div = nColumns;
+		if(present(tolerance).and.tolerance.gt.0d0) tol = tolerance;
+
+		if(.not.present(nColumns)) div = 4;
+		if(.not.present(tolerance)) tol = 1E-10;
 
         write(*,*)
         do k=1, size(matrix2D,2)/div
