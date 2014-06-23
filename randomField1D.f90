@@ -5,51 +5,86 @@ module randomField1D
 
 contains
 
-!----------------------------------------------------------------------------------------------------------------------
-    subroutine createRandomField1D (Nmc, randInit, xMax, kMax, xNStep, kNStep, corrL, corrMod, randField)
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    subroutine createRandomField1D (Nmc, randInit, corrMod, corrL, xMax, xPeriod, &
+    								kMax, xNStep, kNStep, randField);
+
         implicit none
 
         !INPUT
-        integer, intent(in) :: Nmc;
-        logical, intent(in) :: randInit;
-        double precision, dimension(:), allocatable, intent(in) :: xMax, kMax, corrL;
-        integer, dimension(:), allocatable, intent(in) :: xNStep, kNStep;
-        character (len=20), intent(in) :: corrMod;
+        integer,                             intent(in) :: Nmc;
+        logical,                             intent(in) :: randInit;
+        character (len=*),  dimension(:),    intent(in) :: corrMod;
+        double precision,   dimension(:, :), intent(in) :: corrL, xMax, xPeriod;
 
         !OUTPUT
+        double precision, dimension(:, :), allocatable, intent(out) :: kMax;
+        integer,          dimension(:, :), allocatable, intent(out) :: xNStep, kNStep;
         double precision, dimension(:, :), allocatable, intent(out) :: randField;
 
         !LOCAL VARIABLES
-        integer :: i, j;        !Counters
+        integer :: i, j, nDim;
         double precision :: zero = 0.0;
         double precision, dimension(:,:), allocatable :: xVec, kVec;
         double precision :: pi = 3.1415926535898;
 
         write(*,*) "------------START randomField1D-----------------------------------------";
 
+		nDim = 1;
+
+		!Allocating
+		allocate(kMax  (Nmc, nDim));
+		allocate(xNStep(Nmc, nDim));
+		allocate(kNStep(Nmc, nDim));
+
+		!Calculating kMax, kNStep and xNStep
+		call set_kMax1D(corrMod, corrL, kMax)
+		xNStep = ceiling(xMax/(pi/kMax))+1;
+		kNStep = ceiling(kMax/(2.0d0*pi/xPeriod))+1;
+
+		!ONLY FOR TESTS (Overwriting)
+		kMax  (:, 1) = (/(2*pi,  i=1, Nmc)/);
+	    xNStep(:, 1) = (/(10*i,  i=1, Nmc)/);
+	    kNStep(:, 1) = (/(10*i,    i=1, Nmc)/);
+
+		call Disp2D(corrL, "corrL");
+		call Disp2D(xMax, "xMax");
+		call Disp2D(xPeriod, "xPeriod");
+		call Disp2D(kMax, "kMax");
+		write(*,*) "xNStep", xNStep;
+		write(*,*) "kNStep", kNStep;
+
+		!Calculating
+        allocate(randField(int(maxval(xNStep(:,1))),Nmc))
+        randField = 0;
+        allocate(xVec(int(maxval(xNStep(:,1))),Nmc))
+        xVec = 0;
+        allocate(kVec(int(maxval(kNStep(:,1))),Nmc))
+        kVec = 0;
+
         if(randInit) then
             call random_seed() !Used for the random field generation
         endif
 
-        allocate(randField(int(maxval(xNStep)),Nmc))
-        randField = 0;
-        allocate(xVec(int(maxval(xNStep)),Nmc))
-        xVec = 0;
-        allocate(kVec(int(maxval(kNStep)),Nmc))
-        kVec = 0;
-
         do i=1, Nmc
-            if(randInit.eqv..FALSE.) then
+            if(.not.randInit) then
                 call random_seed() !Reinitialize rand in each step
             endif
 
-            xVec(:,i) = createLinearProg(zero, xMax(i), xNStep(i)) !Creating xVec
-            kVec(:,i) = createLinearProg(zero, kMax(i), kNStep(i)) !Creating kVec
-            randField(:,i) = make_RandField1D(xVec(:,i), kVec(:,i), corrL(i), corrMod);            !Random Field
+            xVec(:,i) = createLinearProg(zero, xMax(i,1), xNStep(i,1)) !Creating xVec
+            kVec(:,i) = createLinearProg(zero, kMax(i,1), kNStep(i,1)) !Creating kVec
 
-            call Disp2D(xVec, "xVec")
-            call Disp2D(kVec, "kVec")
-
+			call Disp2D(xVec, "xVec");
+			call Disp2D(kVec, "kVec");
+			call Disp2D(randField, "randField");
+            randField(1:xNStep(i,1),i) = make_RandField1D       &
+            							(xVec(1:xNStep(i,1),i), &
+            							 kVec(1:kNStep(i,1),i), &
+            							 corrL(i,1),            &
+            							 corrMod(i));            !Random Field
+            call Disp2D(randField, "randField");
         enddo
 
 		deallocate(kVec);
@@ -59,14 +94,16 @@ contains
 
 
 
-!----------------------------------------------------------------------------------------------------------------------
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
     function createLinearProg(qmin, qmax, nSteps) result (lpVec)
 
         implicit none
 
         !INPUT
         double precision, intent(in) :: qmin, qmax;
-        integer, intent(in) :: nSteps;
+        integer,          intent(in) :: nSteps;
 
         !OUTPUT
         double precision, dimension(:), allocatable :: lpVec;
@@ -82,25 +119,27 @@ contains
 
 
 
-!----------------------------------------------------------------------------------------------------------------------
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
     function make_RandField1D(xVec, kVec, corrL, corrMod) result (randField)
 
         implicit none
 
         !INPUT
         double precision, dimension(:), intent(in) :: xVec, kVec;
-        double precision, intent(in) :: corrL;
-        character (len=20), intent(in) :: corrMod;
+        double precision,               intent(in) :: corrL;
+        character (len=*),              intent(in) :: corrMod;
 
         !OUTPUT
 		double precision, dimension(:), allocatable :: randField;
 
 		!LOCAL VARIABLES
-        integer :: i, j;        !Counters
-        double precision :: kStepDelta;
+        integer                                       :: i, j;
+        double precision                              :: kStepDelta;
         double precision, dimension(:,:), allocatable :: phiN, angMat;
-        double precision, dimension(:), allocatable :: spectrum;
-        double precision :: pi = 3.1415926535898
+        double precision, dimension(:), allocatable   :: spectrum;
+        double precision                              :: pi = 3.1415926535898;
 
 		write(*,*) "------------IN make_RandField1D-----------------------";
 
@@ -130,7 +169,7 @@ contains
 
         !Random field generation!
         randField = 0;
-		randField = matmul(sqrt(2*kStepDelta*spectrum), cos(angMat+phiN));
+		randField = sqrt(2.0d0)*matmul(sqrt(2*kStepDelta*spectrum), cos(angMat+phiN));
 
 		call Disp2D(phiN, "phiN")
 		call Disp2D(angMat, "angMat")
