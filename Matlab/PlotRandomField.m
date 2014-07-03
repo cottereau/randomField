@@ -1,0 +1,2 @@
+clc
+plot(transpose(b))

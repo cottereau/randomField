@@ -5,61 +5,6 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    function make_Spectrum1D(kVector, corrMod, corrL) result (Sk)
-        ! Return Spectrum from a chosen correlation model
-        implicit none
-
-        !INPUT
-        double precision, dimension(:), intent(in) :: kVector;
-        character (len=*), intent(in) :: corrMod
-        double precision, intent(in) :: corrL;
-
-        !OUTPUT
-        double precision, dimension(:), allocatable :: Sk;
-
-        !LOCAL VARIABLES
-        integer :: j;
-        double precision :: eta;
-        double precision :: pi = 3.1415926535898
-
-        allocate (Sk(size(kVector)));
-        Sk = 0;
-
-        select case(corrMod)
-
-            case("gaussian")
-				eta = corrL/sqrt(pi)
-				Sk = ((1./(2.*pi)) * exp((-(eta**2)/4)*(kVector**2)));
-
-        end select
-    end
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-    subroutine set_kMax1D(corrMod, corrL, kMax);
-    	!INPUT
-        character (len=15), dimension(:),    intent(in) :: corrMod;
-        double precision,   dimension(:, :), intent(in) :: corrL;
-
-        !OUTPUT
-        double precision, dimension(:, :), intent(out) :: kMax;
-
-        !LOCAL VARIABLES
-        integer:: i;
-        double precision :: pi = 3.1415926535898
-
-        do i = 1, size(corrMod)
-        	select case(corrMod(i))
-   				case("gaussian")
-					kMax(i,:) = 2*pi*corrL(i,:); !NOT REALLY IMPLEMENTED, CRITERIA TO BE DEFINED
-   			end select
-   		end do
-    end
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
     subroutine set_kMaxND(corrMod, corrL, kMax);
     	!INPUT
         character (len=15), dimension(:),    intent(in) :: corrMod;

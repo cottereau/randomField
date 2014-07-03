@@ -1,0 +1,10 @@
+/Debug
+
+.cproject
+*.prefs
+*.mod
+*.o
+Results/TestResult1DModel                       MATLAB
+Results/TestResult2DModel
+Results/TestResult2DModel                       MATLAB
+Results/TestResult1DModel
