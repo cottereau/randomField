@@ -24,13 +24,14 @@ contains
         double precision, dimension(:, :), allocatable, intent(out) :: randField;
 
         !LOCAL VARIABLES
-        integer :: i, j, k, nDim, kNS, xNS;
-        double precision, dimension(:,:), allocatable :: xMin, kMin;
+        integer :: i, j, k, m, nDim, kNS, xNS;
+        double precision, dimension(:,:), allocatable :: xMin, kMin, kSign, phiN;
         integer,          dimension(:),   allocatable :: xNStepTotal, kNStepTotal;
-        double precision                              :: Sk, phiN;
-        double precision, dimension(:),   allocatable :: xVec, kVec; !Allocated in function
+        double precision                              :: Sk;
+        double precision, dimension(:),   allocatable :: xVec, kVec, kVecUnsigned; !Allocated in function
         double precision, dimension(:),   allocatable :: deltaK, randLoc;
         double precision                              :: pi = 3.1415926535898, zero = 0d0;
+        integer                                       :: testDim; !Only for tests
 
 		write(*,*) "";
         write(*,*) "------------START randomFieldND-----------------------------------------";
@@ -67,20 +68,23 @@ contains
 !		write(*,*) "kNStep = ", kNStep*1
 
 		!ONLY FOR TESTS (Overwriting)----------------------
-		kMax  (1, :) = (/(2*pi, i=1, Nmc)/);
-	    xNStep(1, :) = (/(50,  i=1, Nmc)/);
-	    kNStep(1, :) = (/(50,  i=1, Nmc)/);
+
+		testDim = 100;
+
+		kMax  (1, :) = 2*pi*corrL(1,:);
+	    xNStep(1, :) = (/(testDim,  i=1, Nmc)/);
+	    kNStep(1, :) = (/(testDim,  i=1, Nmc)/);
 
 		if(nDim > 1) then
-			kMax  (2, :) = (/(2*pi, i=1, Nmc)/);
-		    xNStep(2, :) = (/(50,    i=1, Nmc)/);
-			kNStep(2, :) = (/(50,    i=1, Nmc)/);
+			kMax  (2, :) = 2*pi*corrL(2,:);
+		    xNStep(2, :) = (/(testDim,    i=1, Nmc)/);
+			kNStep(2, :) = (/(testDim,    i=1, Nmc)/);
 		end if
 
 		if(nDim > 2) then
-			kMax  (3, :) = (/(2*pi, i=1, Nmc)/);
-		    xNStep(3, :) = (/(50,    i=1, Nmc)/);
-			kNStep(3, :) = (/(50,    i=1, Nmc)/);
+			kMax  (3, :) = 2*pi*corrL(3,:);
+		    xNStep(3, :) = (/(testDim,    i=1, Nmc)/);
+			kNStep(3, :) = (/(testDim,    i=1, Nmc)/);
 		end if
 		!---------------------------------------------------
 
@@ -99,12 +103,15 @@ contains
 
 
 		!Random Field
-		allocate(randField(int(maxval(xNStepTotal)),Nmc));
-		allocate(randLoc  (int(maxval(xNStepTotal))    ));
-		allocate(deltaK   (nDim                        ));
+		allocate(randField(int(maxval(xNStepTotal)),Nmc  ));
+		allocate(randLoc  (int(maxval(xNStepTotal))));
+		allocate(deltaK   (nDim));
+		allocate(kSign    (2**(nDim-1), nDim));
+		allocate(phiN     (size(kSign,1), int(maxval(kNStepTotal))));
 		randField = 0;
 		randLoc   = 0;
 		deltaK    = 0;
+		call set_kSign(kSign)
 
 		write(*,*) "";
 		write(*,*) ">>>>>>>>> Random Field Creation";
@@ -115,35 +122,34 @@ contains
 		write(*,*) "Number k points      = ", maxval(kNStepTotal);
 		write(*,*) "";
 
-
 		do k = 1, Nmc
-            if(.not.randInit) call random_seed() !Reinitialize rand for each Monte-Carlo event
 		    deltaK = (kMax(:,k)-kMin(:,k))/(kNStep(:,k)-1); !Defines deltaK
 		    kNS    = kNStepTotal(k);
 		    xNS    = xNStepTotal(k);
-		    !call disp1D(deltaK, "deltaK")
+            if(.not.randInit) call random_seed() !Reinitialize rand for each Monte-Carlo event
+		    call random_number(phiN(:,1:kNS))
 
 			do j = 1, kNS
-				call random_number(phiN)
-				!write(*,*) "phiN", phiN
-			    kVec           = get_Permutation(j, kMin(:,k), kMax(:,k), kNStep(:,k));
-				Sk             = get_SpectrumND(kVec, corrMod(k), corrL(:,k));
-				randLoc        = 0;
-				randLoc(1:xNS) = 2*pi*phiN !Random part of the angle matrix for this k permutation
-
-				do i = 1, xNS
-					xVec       = get_Permutation(i, xMin(:,k), xMax(:,k), xNStep(:,k));
-					randLoc(i) = randLoc(i) + dot_product(kVec, xVec); !Not-random part of the angle matrix
+			    kVecUnsigned = get_Permutation(j, kMin(:,k), kMax(:,k), kNStep(:,k));
+			    do m = 1, size(kSign,1)
+			    	kVec           = kVecUnsigned * kSign(m, :)
+					Sk             = get_SpectrumND(kVec, corrMod(k), corrL(:,k));
+					randLoc        = 0;
+					randLoc(1:xNS) = 2*pi*phiN(m, j) !Random part of the angle matrix for this k permutation
+					do i = 1, xNS
+						xVec       = get_Permutation(i, xMin(:,k), xMax(:,k), xNStep(:,k));
+						randLoc(i) = randLoc(i) + dot_product(kVec, xVec); !Not-random part of the angle matrix
+					end do
+					randLoc  (1:xNS)   = sqrt(Sk*2*product(deltaK)) &
+										 *cos(randLoc(1:xNS))
+					randField(1:xNS,k) = randField(1:xNS,k) + randLoc(1:xNS)
 				end do
-
-				randLoc  (1:xNS)   = (2*Sk*product(deltaK))**(0.5d0)*cos(randLoc(1:xNS))
-
-				randField(1:xNS,k) = randField(1:xNS,k) + randLoc(1:xNS)
 			end do
+			randField(1:xNS,k) = product(corrL(:,k))*randField(1:xNS,k)
 			write(*,*) "Event ",k, "of", Nmc, "completed"
 		end do
 
-		randField(:,:) = 2d0**(0.5d0+(nDim-1.0d0))*randField(:,:)
+		randField(:,:) = sqrt(2d0)*randField(:,:)
 
 		!Only printing------------------------------------------
 !		call Disp2Dint(xNStep, "xNStep");
@@ -174,6 +180,9 @@ contains
 		deallocate(xNStepTotal);
 		deallocate(kNStepTotal);
 		deallocate(deltaK);
+		deallocate(kVecUnsigned);
+		deallocate(kVec);
+		deallocate(xVec)
 
 		write(*,*) "";
         write(*,*) "------------END randomFieldND-----------------------------------------";

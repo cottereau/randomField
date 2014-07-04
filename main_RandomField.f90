@@ -34,10 +34,10 @@ program main_RandomField
 
 	!todo Read File --------------------------------------------------------------------------------------
 
-	Nmc = 100; !number of Monte-Carlo experiments
-	modelDimension = 3; !Number of dimensions
+	Nmc = 10000; !number of Monte-Carlo experiments
+	modelDimension = 1; !Number of dimensions
 	randInit = .TRUE. !if it's set to false each event will have the same random numbers
-	fileName = "TestResult3DModel"
+	fileName = "TestResult1DModel"
 
     !Allocating
 	allocate(corrMod(Nmc));
@@ -50,7 +50,7 @@ program main_RandomField
 	!ONLY FOR TESTS (should disapear once turned all tests an "Read File" made)----------------------
 	    corrMod(:)   = "gaussian";
 
-	    corrL  (1, :) = (/(1,       i=1, Nmc)/);
+	    corrL  (1, :) = (/(3,       i=1, Nmc)/);
 	    xMax   (1, :) = (/(2*pi,    i=1, Nmc)/);
 	    xPeriod(1, :) = 10*corrL(1, :);
 

@@ -1,2 +1,0 @@
-clc
-plot(transpose(b))
