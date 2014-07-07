@@ -1,84 +1,50 @@
-################################################################################
-# Automatically-generated file. Do not edit!
-################################################################################
+#### PATH TO HDF5 LIBRARY - to be modified by user (to be completed)
+LIBHDF5 = 
 
--include ../makefile.init
+EXECUTABLE = randomField.x
 
 RM := rm -rf
 
-# All of the sources participating in the build are defined here
-
-F90_SRCS += \
-../displayCarvalhol.f90 \
-../main_RandomField.f90 \
-../randomField1D.f90 \
-../randomField2D.f90 \
-../randomField3D.f90 \
-../readInputFile_RF.f90 \
-../spectra_RF.f90 \
-../statistics_RF.f90 \
-../writeResultFile_RF.f90 
-
-OBJS += \
-./displayCarvalhol.o \
+OBJS += displayCarvalhol.o \
 ./main_RandomField.o \
-./randomField1D.o \
-./randomField2D.o \
-./randomField3D.o \
+./math_RF.o \
+./randomFieldND.o \
 ./readInputFile_RF.o \
 ./spectra_RF.o \
 ./statistics_RF.o \
-./writeResultFile_RF.o 
+./writeResultFile_RF.o
 
+LIBS = $(LIBHDF5) 
 
 # Each subdirectory must supply rules for building sources it contributes
-%.o: ../%.f90
+%.o: ../randomField/%.f90
 	@echo 'Building file: $<'
 	@echo 'Invoking: GNU Fortran Compiler'
 	gfortran -funderscoring -O0 -g -Wall -c -fmessage-length=0 -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
-displayCarvalhol.o: ../displayCarvalhol.f90
+main_RandomField.o: randomFieldND.o statistics_RF.o writeResultFile_RF.o
 
-main_RandomField.o: ../main_RandomField.f90 randomField1D.o statistics_RF.o
+randomFieldND.o: displayCarvalhol.o spectra_RF.o math_RF.o
 
-randomField1D.o: ../randomField1D.f90 displayCarvalhol.o spectra_RF.o
-
-randomField2D.o: ../randomField2D.f90
-
-randomField3D.o: ../randomField3D.f90
-
-readInputFile_RF.o: ../readInputFile_RF.f90
-
-spectra_RF.o: ../spectra_RF.f90
-
-statistics_RF.o: ../statistics_RF.f90
-
-writeResultFile_RF.o: ../writeResultFile_RF.f90
-
-
--include ../makefile.defs
-
-# Add inputs and outputs from these tool invocations to the build variables 
+spectra_RF.o: displayCarvalhol.o math_RF.o
 
 # All Target
 all: randomField
 
 # Tool invocations
-randomField: $(OBJS) $(USER_OBJS)
+randomField: $(OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GNU Fortran Linker'
-	gfortran  -o "randomField" $(OBJS) $(USER_OBJS) $(LIBS)
+	gfortran -o $(EXECUTABLE) $(OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) randomField
+	-$(RM) $(EXECUTABLE) $(OBJS) *.mod
 	-@echo ' '
 
 .PHONY: all clean dependents
 .SECONDARY:
-
--include ../makefile.targets
