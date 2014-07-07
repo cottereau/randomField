@@ -34,10 +34,10 @@ program main_RandomField
 
 	!todo Read File --------------------------------------------------------------------------------------
 
-	Nmc = 10000; !number of Monte-Carlo experiments
-	modelDimension = 1; !Number of dimensions
+	Nmc = 1000; !number of Monte-Carlo experiments
+	modelDimension = 2; !Number of dimensions
 	randInit = .TRUE. !if it's set to false each event will have the same random numbers
-	fileName = "TestResult1DModel"
+	fileName = "TestResult2DModel"
 
     !Allocating
 	allocate(corrMod(Nmc));

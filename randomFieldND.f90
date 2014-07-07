@@ -69,7 +69,7 @@ contains
 
 		!ONLY FOR TESTS (Overwriting)----------------------
 
-		testDim = 100;
+		testDim = 50;
 
 		kMax  (1, :) = 2*pi*corrL(1,:);
 	    xNStep(1, :) = (/(testDim,  i=1, Nmc)/);

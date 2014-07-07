@@ -153,6 +153,7 @@ contains
 				end do
 				averageCorrL(i) = averageCorrL(i) / dble(nPlanes)
 			end do
+			averageCorrL = 2*averageCorrL !Symmetry
 		end if
 
 	end subroutine
