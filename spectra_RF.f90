@@ -8,23 +8,21 @@ contains
 
     subroutine set_kMaxND(corrMod, corrL, kMax);
     	!INPUT
-        character (len=15), dimension(:),    intent(in) :: corrMod;
-        double precision,   dimension(:, :), intent(in) :: corrL;
+        character (len=15),                intent(in) :: corrMod;
+        double precision,   dimension(:),  intent(in) :: corrL;
 
         !OUTPUT
-        double precision, dimension(:, :), intent(out) :: kMax;
+        double precision, dimension(:),   intent(out) :: kMax;
 
         !LOCAL VARIABLES
-        integer:: i;
         double precision :: pi = 3.1415926535898
 
-        do i = 1, size(corrMod)
-        	select case(corrMod(i))
+    	select case(corrMod)
    				case("gaussian")
-					kMax(:, i) = 2*pi*corrL(:, i); !NOT REALLY IMPLEMENTED, CRITERIA TO BE DEFINED
-   			end select
-   		end do
-    end
+				kMax = 2*pi*corrL(:); !NOT REALLY IMPLEMENTED, CRITERIA TO BE DEFINED
+   		end select
+
+    end subroutine set_kMaxND
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -47,7 +45,7 @@ contains
 				if (mod(pos,2) == 1) kSign(j,i) = -1d0
 			end do
 		end do
-    end
+    end subroutine set_kSign
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -80,6 +78,6 @@ contains
         end select
 
         deallocate (eta)
-    end
+    end function get_SpectrumND
 
 end module spectra_RF

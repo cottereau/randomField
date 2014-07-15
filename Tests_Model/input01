@@ -1,0 +1,10 @@
+!$$ For scalar entries!
+!$  For vector entries!
+!   Comments are in between two exclamation points !
+
+$$Nmc     1000
+$$corrMod gaussian
+$corrL     $xMax   $xPeriod
+   1.0      6.0      60.0
+!   2.0     12.0     120.0 !
+!   3.0     18.0     180.0 !
