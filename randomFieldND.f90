@@ -51,7 +51,7 @@ contains
 
 		!ONLY FOR TESTS (Overwriting)----------------------
 
-		testDim = 50;
+		testDim = 10;
 
 		kMax  (1) = 2*pi*corrL(1);
 	    xNStep(1) = testDim;

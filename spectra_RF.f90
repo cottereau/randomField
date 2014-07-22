@@ -16,10 +16,19 @@ contains
 
         !LOCAL VARIABLES
         double precision :: pi = 3.1415926535898
+        integer          :: i
+
+!        do i = 1, 100
+!        	kMax = i/10.0 * corrL(:)
+!        	write(*,*) "kMax = ", kMax
+!        	write(*,*) "Spectrum = ", get_SpectrumND(kMax, corrMod, corrL)
+!        	call DispCarvalhol (kMax, "kMax")
+!        	call DispCarvalhol (get_SpectrumND(kMax, corrMod, corrL), "Spectrum")
+!        end do
 
     	select case(corrMod)
    				case("gaussian")
-				kMax = 2*pi*corrL(:); !NOT REALLY IMPLEMENTED, CRITERIA TO BE DEFINED
+				kMax = 2*pi*corrL(:); !CRITERIA STILL TO BE TESTED
    		end select
 
     end subroutine set_kMaxND

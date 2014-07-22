@@ -109,6 +109,8 @@ contains
 
         close(file)
 
+        deallocate(eventLabel)
+
         write(*,*) "";
         write(*,*) "------------END Writing result file-----------------------";
         write(*,*) "";
@@ -139,6 +141,8 @@ contains
 		!LOCAL VARIABLES
         double precision, dimension(:,:), allocatable ::grid_data
         integer :: nDim, Nmc, nPoints, i
+        character (len=35) :: eventName;
+        character (len=12) :: numberStr;
 
         write(*,*) "";
         write(*,*) "------------START Writing result HDF5 file-----------------------";
@@ -153,6 +157,68 @@ contains
 
         if (nDim > 3) then
         	write(*,*) "Dimension exceeds 3, HDF file won't be created"
+
+! START - TO BE MADE VERSION (for every Nmc > 1)
+!        else
+!
+!			write(*,*) ">>>>>>>>> Opening file";
+!	        call h5open_f(error) ! Initialize FORTRAN interface.
+!	        call h5fcreate_f(fileHDF5Name, H5F_ACC_TRUNC_F, file_id, error) ! Create a new file using default properties.
+!
+!			write(*,*) ">>>>>>>>> Creating Coordinates dataset 'XYZ table'";
+!
+!			allocate (grid_data(3, nPoints)) !3 lines to put X, Y and Z
+!	        grid_data = 0D0
+!
+!	        dims = shape(grid_data)
+!	        write(*,*) "dims   = ", dims
+!
+!	        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
+!	        call h5dcreate_f(file_id, dsetXYZ, H5T_NATIVE_DOUBLE,  &
+!	                         dspace_id, dset_id, error) ! Create the dataset with default properties (dset_id).
+!
+!
+!
+!			do i = 1, nPoints
+!				call get_Permutation(i, xMax, xNStep, grid_data(1:nDim,i));
+!			end do
+!
+!	 		call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, grid_data, dims, error) ! Write the dataset.
+!	        call h5dclose_f(dset_id, error) ! End access to the dataset and release resources used by it.
+!	        call h5sclose_f(dspace_id, error) ! Terminate access to the data space.
+!
+!			deallocate (grid_data)
+!
+!			write(*,*) ">>>>>>>>> Creating Quantities dataset 'random field'";
+!	        dims(1) = size(randField,1)
+!	        dims(2) = 1 !One random field in each dataset
+!			write(*,*) "dims   = ", dims;
+!
+!			do i = 1, Nmc
+!				write(numberStr,'(I)'  ) i
+!				numberStr = adjustL(numberStr)
+!				write(eventName,'(A,A)') "RF_", numberStr
+!				write(*,*) eventName
+!
+!		        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
+!		        call h5dcreate_f(file_id, eventName, H5T_NATIVE_DOUBLE,  &
+!		                         dspace_id, dset_id, error) ! Create the dataset with default properties (dset_id).
+!		        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, randField(:,i), dims, error) ! Write the dataset.
+!		        call h5dclose_f(dset_id, error) ! End access to the dataset and release resources used by it.
+!		        call h5sclose_f(dspace_id, error) ! Terminate access to the data space.
+!		        write(*,*) "error = ", error
+!		    end do
+!
+!			write(*,*) ">>>>>>>>> Closing file";
+!	        call h5fclose_f(file_id, error) ! Close the file.
+!	        call h5close_f(error) ! Close FORTRAN interface.
+!
+!	        call writeXMF_RF(randField, fileHDF5Name, fileName)
+!
+!        end if
+! END - TO BE MADE VERSION (for every Nmc > 1)
+
+! START - VERSION TESTED FOR Nmc = 1
         else
 
 			write(*,*) ">>>>>>>>> Opening file";
@@ -160,14 +226,19 @@ contains
 	        call h5fcreate_f(fileHDF5Name, H5F_ACC_TRUNC_F, file_id, error) ! Create a new file using default properties.
 
 			write(*,*) ">>>>>>>>> Creating Coordinates dataset 'XYZ table'";
-	        dims(1) = 3 !3 columns to put X, Y and Z
-	        dims(2) = nPoints
+
+			allocate (grid_data(3, nPoints)) !3 lines to put X, Y and Z
+	        grid_data = 0D0
+
+	        dims = shape(grid_data)
+	        write(*,*) "dims   = ", dims
 
 	        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
 	        call h5dcreate_f(file_id, dsetXYZ, H5T_NATIVE_DOUBLE,  &
 	                         dspace_id, dset_id, error) ! Create the dataset with default properties (dset_id).
-	        allocate (grid_data(dims(1), dims(2)))
-	        grid_data = 0D0
+
+
+
 			do i = 1, nPoints
 				call get_Permutation(i, xMax, xNStep, grid_data(1:nDim,i));
 			end do
@@ -176,8 +247,12 @@ contains
 	        call h5dclose_f(dset_id, error) ! End access to the dataset and release resources used by it.
 	        call h5sclose_f(dspace_id, error) ! Terminate access to the data space.
 
-			write(*,*) ">>>>>>>>> Creating Coordinates dataset 'random field'";
+			deallocate (grid_data)
+
+			write(*,*) ">>>>>>>>> Creating Quantities dataset 'random field'";
 	        dims = shape(randField)
+
+			write(*,*) "dims   = ", dims;
 
 	        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
 	        call h5dcreate_f(file_id, dsetRF, H5T_NATIVE_DOUBLE,  &
@@ -193,6 +268,7 @@ contains
 	        call writeXMF_RF(randField, fileHDF5Name, fileName)
 
         end if
+! END - VERSION TESTED FOR Nmc = 1
 
         write(*,*) "";
         write(*,*) "------------END Writing result HDF5 file-----------------------";
@@ -213,6 +289,8 @@ contains
 		!LOCAL VARIABLES
         integer            :: Nmc, i, file, nElem
         character (len=35) :: fileXMFName;
+        character (len=35) :: eventName;
+        character (len=12) :: numberStr, nElemStr, NmcStr;
 
         write(*,*) "";
         write(*,*) "------------START Writing result XMF file-----------------------";
@@ -221,34 +299,77 @@ contains
 		fileXMFName = trim(fileName)//".xmf"
         Nmc     = size(randField, 2)
         nElem   = size(randField, 1)
+        write(NmcStr,'(I)'  ) Nmc
+		write(nElemStr,'(I)') nElem
+		NmcStr   = adjustL(NmcStr)
+		nElemStr = adjustL(nElemStr)
 
+		write(*,*) "Nmc   = ", NmcStr
+        write(*,*) "nElem = ", nElemStr
         write(*,*) "fileXMFName", fileXMFName
 
         file=21;
+
+! START - TO BE MADE VERSION (for every Nmc > 1)
+!        open (unit = file , file = trim(fileXMFName), action = 'write')
+!
+!			write (file,'(A)'    )'<?xml version="1.0" ?>'
+!			write (file,'(A)'    )'<Xdmf Version="2.0">'
+!			write (file,'(A)'    )' <Domain>'
+!			write (file,'(A)'    )'  <Grid Name="meshRF" GridType="Uniform">'
+!			write (file,'(A,A,A)')'   <Topology Type="Polyvertex" NodesPerElements="1" NumberOfElements="',trim(nElemStr),'">'
+!			write (file,'(A)'    )'   </Topology>'
+!			write (file,'(A)'    )'    <Geometry GeometryType="XYZ">'
+!			write (file,'(A,A,A)')'     <DataItem Name="Coordinates" Format="HDF" DataType="Float" Precision="8" Dimensions="',trim(nElemStr), ' 3">'
+!			write (file,'(A,A,A)')'     	 ',trim(fileHDF5Name),':/XYZ'
+!			write (file,'(A)'    )'     </DataItem>'
+!			write (file,'(A)'    )'    </Geometry>'
+!			write (file,'(A)'    )'    <Attribute Name="randomField" Center="Node" AttributeType="Scalar">'
+!			write (file,'(A)'    )'     <DataItem Name="Random Field Tree" ItemType="Tree">'
+!			do i = 1, Nmc
+!				write(numberStr,'(I)'  ) i
+!				numberStr = adjustL(numberStr)
+!
+!				write(eventName,'(A,A)') ":/RF_", numberStr
+!				write (file,'(A,A,A)')'      <DataItem Dimensions="',trim(nElemStr),'" Format="HDF" DataType="Float" Precision="8">'
+!				write (file,'(A,A,A)')'         ',trim(fileHDF5Name), eventName
+!				write (file,'(A)'    )'      </DataItem>'
+!			end do
+!			write (file,'(A)'    )'     </DataItem>'
+!
+!			write (file,'(A)'    )'    </Attribute>'
+!			write (file,'(A)'    )'  </Grid>'
+!			write (file,'(A)'    )' </Domain>'
+!			write (file,'(A)'    )'</Xdmf>'
+!
+!        close(file)
+! END - TO BE MADE VERSION (for every Nmc > 1)
+
+! START - VERSION TESTED FOR Nmc = 1
         open (unit = file , file = trim(fileXMFName), action = 'write')
 
-			write (file,*)        '<?xml version="1.0" ?>'
-			write (file,*)        '<Xdmf Version="2.0">'
-			write (file,*)        ' <Domain>'
-			write (file,*)        '  <Grid Name="meshRF" GridType="Uniform">'
+			write (file,'(A)'    )'<?xml version="1.0" ?>'
+			write (file,'(A)'    )'<Xdmf Version="2.0">'
+			write (file,'(A)'    )' <Domain>'
+			write (file,'(A)'    )'  <Grid Name="meshRF" GridType="Uniform">'
 			write (file,'(A,I,A)')'   <Topology Type="Polyvertex" NodesPerElements="1" NumberOfElements="',nElem,'">'
-			write (file,*)        '   </Topology>'
-			write (file,*)        '    <Geometry GeometryType="XYZ">'
-			write (file,'(A,I,A)')'     <DataItem Name="Coordinates" Format="HDF" DataType="Float" Precision="8" Dimensions="',nElem, '3">'
-			write (file,*)        '     	 ',trim(fileHDF5Name),':/XYZ'
-			write (file,*)        '     </DataItem>'
-			write (file,*)        '    </Geometry>'
-			write (file,*)        '    <Attribute Name="randomField" Center="Node" AttributeType="Scalar">'
+			write (file,'(A)'    )'   </Topology>'
+			write (file,'(A)'    )'    <Geometry GeometryType="XYZ">'
+			write (file,'(A,I,A)')'     <DataItem Name="Coordinates" Format="HDF" DataType="Float" Precision="8" Dimensions="',nElem, ' 3">'
+			write (file,'(A,A,A)')'     	 ',trim(fileHDF5Name),':/XYZ'
+			write (file,'(A)'    )'     </DataItem>'
+			write (file,'(A)'    )'    </Geometry>'
+			write (file,'(A)'    )'    <Attribute Name="randomField" Center="Node" AttributeType="Scalar">'
 			write (file,'(A,I,A)')'     <DataItem Dimensions="',nElem,'" Format="HDF" DataType="Float" Precision="8">'
-			write (file,*)        '        ',trim(fileHDF5Name),':/RF'
-			write (file,*)        '     </DataItem>'
-			write (file,*)        '    </Attribute>'
-			write (file,*)        '  </Grid>'
-			write (file,*)        ' </Domain>'
-			write (file,*)        '</Xdmf>'
+			write (file,'(A,A,A)')'        ',trim(fileHDF5Name),':/RF'
+			write (file,'(A)'    )'     </DataItem>'
+			write (file,'(A)'    )'    </Attribute>'
+			write (file,'(A)'    )'  </Grid>'
+			write (file,'(A)'    )' </Domain>'
+			write (file,'(A)'    )'</Xdmf>'
 
         close(file)
-
+! END - VERSION TESTED FOR Nmc = 1
 
         write(*,*) "";
         write(*,*) "------------END Writing result XMF file-----------------------";

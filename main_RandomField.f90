@@ -11,7 +11,7 @@ program main_RandomField
 
     !INPUTS
     integer                                        :: Nmc, modelDimension;
-    character (len=30)                             :: inputName, outputName;
+    character (len=30)                            :: inputName, outputName;
     character (len=15)                             :: corrMod;
     double precision,   dimension(:),  allocatable :: corrL, xMax, xPeriod;
 
@@ -38,7 +38,6 @@ program main_RandomField
 	inputName  = "input01"
 	outputName = "Test1"
 
-
 	call set_DataTable(inputName, dataTable)
 	call Disp2Dchar (dataTable, "dataTable");
 
@@ -53,7 +52,7 @@ program main_RandomField
 	modelDimension = size(xMax)
 
 	write(*,*) ">>>>>>>>INPUT Data"
-	write(*,*) "Nmc            = ", Nmc
+	write(*,*) "Nmc            = ", Nmc !number of Monte-Carlo experiments
 	write(*,*) "corrMod        = ", corrMod
 	write(*,*) "corrL          = ", corrL
 	write(*,*) "xMax           = ", xMax
@@ -63,46 +62,6 @@ program main_RandomField
 
 	if(Nmc < 1) stop "Number of events should be a positive integer"
 	if(modelDimension < 1) stop "modelDimension should be a positive integer"
-
-	!START todo Read File --------------------------------------------------------------------------------------
-!
-!	Nmc = 1; !number of Monte-Carlo experiments
-!	modelDimension = 3; !Number of dimensions
-!	randInit = .TRUE. !if it's set to false each event will have the same random numbers
-!	fileName = "TestResult2DModel"
-!
-!	if(Nmc < 1) stop "Number of events should be a positive integer"
-!	if(modelDimension < 1) stop "modelDimension should be a positive integer"
-!
-!    !Allocating
-!	allocate(corrMod(Nmc));	allocate(corrL  (modelDimension, Nmc));
-!	allocate(xMax   (modelDimension, Nmc));
-!	allocate(xPeriod(modelDimension, Nmc));
-!
-!
-!	write(*,*) ">>>>>>>>> Variables initialization: corrL, xMax and xPeriod";
-!	!ONLY FOR TESTS (should disapear once turned all tests an "Read File" made)----------------------
-!	    corrMod(:)   = "gaussian";
-!
-!	    corrL  (1, :) = (/(3,  i=1, Nmc)/);
-!	    xMax   (1, :) = (/(3,  i=1, Nmc)/);
-!	    xPeriod(1, :) = 10*corrL(1, :);
-!
-!	if(modelDimension > 1) then
-!	    corrL  (2, :) = (/(1,    i=1, Nmc)/);
-!	    xMax   (2, :) = (/(3,    i=1, Nmc)/);
-!		xPeriod(2, :) = 10*corrL(2, :);
-!	end if
-!
-!	if(modelDimension > 2) then
-!	    corrL  (3, :) = (/(1,     i=1, Nmc)/);
-!	    xMax   (3, :) = (/(2*pi,  i=1, Nmc)/);
-!		xPeriod(3, :) = 10*corrL(3, :);
-!	end if
-!
-!	if(modelDimension > 3) then
-!	    stop "model dimension not accepted"
-!	end if
 
 !	call Disp2D(corrL,   "corrL"  );
 !	call Disp2D(xMax,    "xMax"   );

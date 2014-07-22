@@ -2,15 +2,39 @@ module displayCarvalhol
 
     !All display routines
     interface DispCarvalhol
-		module procedure Disp1Ddble,  &
-		                 Disp2Ddble,  &
-		                 Disp1Dint,   &
-		                 Disp2Dint,   &
-		                 Disp1Dchar,  &
+		module procedure Disp1Ddble,   &
+		                 Disp2Ddble,   &
+		                 DispScalDble, &
+		                 Disp1Dint,    &
+		                 Disp2Dint,    &
+		                 Disp1Dchar,   &
 		                 Disp2Dchar
 	end interface DispCarvalhol
 
 contains
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    subroutine DispScalDble(scalar, title, format, nColumns)
+        ! Displays Scalar
+
+		implicit none
+
+        !INPUT
+        double precision,            intent(in) :: scalar
+        character (len=*), optional, intent(in) :: title, format
+        integer,           optional, intent(in) :: nColumns
+
+        !LOCAL VARIABLES
+        double precision, dimension(:,:), allocatable :: matrix2d
+
+		allocate(matrix2D(1,1));
+		matrix2d = scalar;
+		call Disp2Ddble(matrix2D, title, format, nColumns);
+		deallocate(matrix2D);
+
+    end subroutine DispScalDble
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
