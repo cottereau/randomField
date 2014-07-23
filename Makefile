@@ -2,13 +2,14 @@
 #		>>Build
 #		>>randomField  !(This is the git repository)
 #			-Source
-#			>>Tests
-#		>>Results
+#		>>Tests !(Where the output will be written)
 #
 
-#### PATH TO HDF5 LIBRARY - to be modified by user (to be completed)
-LIBHDF5 = -L/opt/san/bibliotheques/hdf5/1.8.12/lib/ -lhdf5 -lhdf5_hl -lhdf5_fortran #-lhdf5hl_fortran
+#### PATH TO HDF5 AND MPI LIBRARY AND INCLUDES - to be modified by user (to be completed)
+LIBHDF5 = -L/opt/san/bibliotheques/hdf5/1.8.12/lib/ -lhdf5 -lhdf5_hl -lhdf5_fortran
 INCLUDEHDF5 = -I/opt/san/bibliotheques/hdf5/1.8.12/include
+LIBMPI = -L/opt/san/intel/impi/4.0.0.028/lib64 
+INCLUDEMPI = -I/opt/san/intel/impi/4.0.0.028/include64 
 
 EXEC = randomField.exe
 FC   = ifort
@@ -38,8 +39,8 @@ OBJS += ./displayCarvalhol.o \
 ./statistics_RF.o \
 ./writeResultFile_RF.o
 
-LIBS = $(LIBHDF5) 
-INCLUDE = $(INCLUDEHDF5)
+LIBS = $(LIBHDF5) $(LIBMPI) 
+INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI)
 
 # Making all the ".o" from the ".f90"
 %.o: ../randomField/%.f90
@@ -51,7 +52,7 @@ INCLUDE = $(INCLUDEHDF5)
 
 #Dependencies
 main_RandomField.o   : statistics_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o
-writeResultFile_RF.o : displayCarvalhol.o statistics_RF.o math_RF.o
+writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o
 randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o    
 statistics_RF.o      : displayCarvalhol.o math_RF.o
 spectra_RF.o         : displayCarvalhol.o math_RF.o

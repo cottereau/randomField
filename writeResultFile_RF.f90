@@ -172,6 +172,7 @@ contains
 
 	        dims = shape(grid_data)
 	        write(*,*) "dims   = ", dims
+	        write(*,*) dsetXYZ
 
 	        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
 	        call h5dcreate_f(file_id, dsetXYZ, H5T_NATIVE_DOUBLE,  &
@@ -206,7 +207,6 @@ contains
 		        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, randField(:,i), dims, error) ! Write the dataset.
 		        call h5dclose_f(dset_id, error) ! End access to the dataset and release resources used by it.
 		        call h5sclose_f(dspace_id, error) ! Terminate access to the data space.
-		        write(*,*) "error = ", error
 		    end do
 
 			write(*,*) ">>>>>>>>> Closing file";
@@ -217,6 +217,117 @@ contains
 
         end if
 
+
+
+        write(*,*) "";
+        write(*,*) "------------END Writing result HDF5 file-----------------------";
+        write(*,*) "";
+
+    end subroutine writeResultHDF5
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    subroutine writeXMF_RF(randField, fileHDF5Name, fileName)
+        implicit none
+
+        !INPUTS
+        double precision,  dimension(:,:), intent(in) :: randField;
+        character (len=*),                 intent(in) :: filename;
+        character (len=*),                 intent(in) :: fileHDF5Name;
+
+		!LOCAL VARIABLES
+        integer            :: Nmc, i, file, nElem
+        character (len=35) :: fileXMFName;
+        character (len=35) :: eventName;
+        character (len=12) :: numberStr, nElemStr, NmcStr;
+
+        write(*,*) "";
+        write(*,*) "------------START Writing result XMF file-----------------------";
+        write(*,*) "";
+
+		fileXMFName = trim(fileName)//".xmf"
+        Nmc     = size(randField, 2)
+        nElem   = size(randField, 1)
+        write(NmcStr,'(I)'  ) Nmc
+		write(nElemStr,'(I)') nElem
+		NmcStr   = adjustL(NmcStr)
+		nElemStr = adjustL(nElemStr)
+
+        write(*,*) "fileXMFName", fileXMFName
+        write(*,*) "nElem = ", nElemStr
+		write(*,*) "Nmc   = ", NmcStr
+
+        file=21;
+
+        open (unit = file , file = trim(fileXMFName), action = 'write')
+
+			write (file,'(A)'    )'<?xml version="1.0" ?>'
+			write (file,'(A)'    )'<Xdmf Version="2.0">'
+			write (file,'(A)'    )' <Domain>'
+			write (file,'(A)'    )'  <Grid Name="meshRF" GridType="Uniform">'
+			write (file,'(A,A,A)')'   <Topology Type="Polyvertex" NodesPerElements="1" NumberOfElements="',trim(nElemStr),'">'
+			write (file,'(A)'    )'   </Topology>'
+			write (file,'(A)'    )'    <Geometry GeometryType="XYZ">'
+			write (file,'(A,A,A)')'     <DataItem Name="Coordinates" Format="HDF" DataType="Float" Precision="8" Dimensions="',trim(nElemStr), ' 3">'
+			write (file,'(A,A,A)')'     	 ',trim(fileHDF5Name),':/XYZ'
+			write (file,'(A)'    )'     </DataItem>'
+			write (file,'(A)'    )'    </Geometry>'
+			do i = 1, Nmc
+				write(numberStr,'(I)'  ) i
+				numberStr = adjustL(numberStr)
+				write(eventName,'(A,A)') "RF_", numberStr
+
+				write (file,'(A,A,A)'  )'    <Attribute Name="',trim(eventName),'" Center="Node" AttributeType="Scalar">'
+				write (file,'(A,A,A)'  )'      <DataItem Dimensions="',trim(nElemStr),'" Format="HDF" DataType="Float" Precision="8">'
+				write (file,'(A,A,A,A)')'         ',trim(fileHDF5Name),":/", eventName
+				write (file,'(A)'      )'      </DataItem>'
+				write (file,'(A)'      )'    </Attribute>'
+			end do
+
+			write (file,'(A)'    )'  </Grid>'
+			write (file,'(A)'    )' </Domain>'
+			write (file,'(A)'    )'</Xdmf>'
+
+        close(file)
+
+
+
+        write(*,*) "";
+        write(*,*) "------------END Writing result XMF file-----------------------";
+        write(*,*) "";
+
+    end subroutine writeXMF_RF
+
+!TRASH
+
+!iN "writeXMF_RF"
+! START - VERSION TESTED FOR Nmc = 1
+!        open (unit = file , file = trim(fileXMFName), action = 'write')
+!
+!			write (file,'(A)'    )'<?xml version="1.0" ?>'
+!			write (file,'(A)'    )'<Xdmf Version="2.0">'
+!			write (file,'(A)'    )' <Domain>'
+!			write (file,'(A)'    )'  <Grid Name="meshRF" GridType="Uniform">'
+!			write (file,'(A,I,A)')'   <Topology Type="Polyvertex" NodesPerElements="1" NumberOfElements="',nElem,'">'
+!			write (file,'(A)'    )'   </Topology>'
+!			write (file,'(A)'    )'    <Geometry GeometryType="XYZ">'
+!			write (file,'(A,I,A)')'     <DataItem Name="Coordinates" Format="HDF" DataType="Float" Precision="8" Dimensions="',nElem, ' 3">'
+!			write (file,'(A,A,A)')'     	 ',trim(fileHDF5Name),':/XYZ'
+!			write (file,'(A)'    )'     </DataItem>'
+!			write (file,'(A)'    )'    </Geometry>'
+!			write (file,'(A)'    )'    <Attribute Name="randomField" Center="Node" AttributeType="Scalar">'
+!			write (file,'(A,I,A)')'     <DataItem Dimensions="',nElem,'" Format="HDF" DataType="Float" Precision="8">'
+!			write (file,'(A,A,A)')'        ',trim(fileHDF5Name),':/RF'
+!			write (file,'(A)'    )'     </DataItem>'
+!			write (file,'(A)'    )'    </Attribute>'
+!			write (file,'(A)'    )'  </Grid>'
+!			write (file,'(A)'    )' </Domain>'
+!			write (file,'(A)'    )'</Xdmf>'
+!
+!        close(file)
+! END - VERSION TESTED FOR Nmc = 1
+
+!iN "writeRsultHDF5"
 ! START - VERSION TESTED FOR Nmc = 1
 !		if (nDim > 3) then
 !        	write(*,*) "Dimension exceeds 3, HDF file won't be created"
@@ -272,109 +383,5 @@ contains
 !        end if
 ! END - VERSION TESTED FOR Nmc = 1
 
-        write(*,*) "";
-        write(*,*) "------------END Writing result HDF5 file-----------------------";
-        write(*,*) "";
-
-    end subroutine writeResultHDF5
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    subroutine writeXMF_RF(randField, fileHDF5Name, fileName)
-        implicit none
-
-        !INPUTS
-        double precision,  dimension(:,:), intent(in) :: randField;
-        character (len=*),                 intent(in) :: filename;
-        character (len=*),                 intent(in) :: fileHDF5Name;
-
-		!LOCAL VARIABLES
-        integer            :: Nmc, i, file, nElem
-        character (len=35) :: fileXMFName;
-        character (len=35) :: eventName;
-        character (len=12) :: numberStr, nElemStr, NmcStr;
-
-        write(*,*) "";
-        write(*,*) "------------START Writing result XMF file-----------------------";
-        write(*,*) "";
-
-		fileXMFName = trim(fileName)//".xmf"
-        Nmc     = size(randField, 2)
-        nElem   = size(randField, 1)
-        write(NmcStr,'(I)'  ) Nmc
-		write(nElemStr,'(I)') nElem
-		NmcStr   = adjustL(NmcStr)
-		nElemStr = adjustL(nElemStr)
-
-		write(*,*) "Nmc   = ", NmcStr
-        write(*,*) "nElem = ", nElemStr
-        write(*,*) "fileXMFName", fileXMFName
-
-        file=21;
-
-        open (unit = file , file = trim(fileXMFName), action = 'write')
-
-			write (file,'(A)'    )'<?xml version="1.0" ?>'
-			write (file,'(A)'    )'<Xdmf Version="2.0">'
-			write (file,'(A)'    )' <Domain>'
-			write (file,'(A)'    )'  <Grid Name="meshRF" GridType="Uniform">'
-			write (file,'(A,A,A)')'   <Topology Type="Polyvertex" NodesPerElements="1" NumberOfElements="',trim(nElemStr),'">'
-			write (file,'(A)'    )'   </Topology>'
-			write (file,'(A)'    )'    <Geometry GeometryType="XYZ">'
-			write (file,'(A,A,A)')'     <DataItem Name="Coordinates" Format="HDF" DataType="Float" Precision="8" Dimensions="',trim(nElemStr), ' 3">'
-			write (file,'(A,A,A)')'     	 ',trim(fileHDF5Name),':/XYZ'
-			write (file,'(A)'    )'     </DataItem>'
-			write (file,'(A)'    )'    </Geometry>'
-			do i = 1, Nmc
-				write(numberStr,'(I)'  ) i
-				numberStr = adjustL(numberStr)
-				write(eventName,'(A,A)') "RF_", numberStr
-
-				write (file,'(A, A, A)')'    <Attribute Name="',trim(eventName),'" Center="Node" AttributeType="Scalar">'
-				!write (file,'(A)'    )'     <DataItem Name="Random Field Tree" ItemType="Tree">'
-				write (file,'(A,A,A)')'      <DataItem Dimensions="',trim(nElemStr),'" Format="HDF" DataType="Float" Precision="8">'
-				write (file,'(A,A,A,A)')'         ',trim(fileHDF5Name),":/", eventName
-				write (file,'(A)'    )'      </DataItem>'
-				!write (file,'(A)'    )'     </DataItem>'
-				write (file,'(A)'    )'    </Attribute>'
-			end do
-
-			write (file,'(A)'    )'  </Grid>'
-			write (file,'(A)'    )' </Domain>'
-			write (file,'(A)'    )'</Xdmf>'
-
-        close(file)
-
-! START - VERSION TESTED FOR Nmc = 1
-!        open (unit = file , file = trim(fileXMFName), action = 'write')
-!
-!			write (file,'(A)'    )'<?xml version="1.0" ?>'
-!			write (file,'(A)'    )'<Xdmf Version="2.0">'
-!			write (file,'(A)'    )' <Domain>'
-!			write (file,'(A)'    )'  <Grid Name="meshRF" GridType="Uniform">'
-!			write (file,'(A,I,A)')'   <Topology Type="Polyvertex" NodesPerElements="1" NumberOfElements="',nElem,'">'
-!			write (file,'(A)'    )'   </Topology>'
-!			write (file,'(A)'    )'    <Geometry GeometryType="XYZ">'
-!			write (file,'(A,I,A)')'     <DataItem Name="Coordinates" Format="HDF" DataType="Float" Precision="8" Dimensions="',nElem, ' 3">'
-!			write (file,'(A,A,A)')'     	 ',trim(fileHDF5Name),':/XYZ'
-!			write (file,'(A)'    )'     </DataItem>'
-!			write (file,'(A)'    )'    </Geometry>'
-!			write (file,'(A)'    )'    <Attribute Name="randomField" Center="Node" AttributeType="Scalar">'
-!			write (file,'(A,I,A)')'     <DataItem Dimensions="',nElem,'" Format="HDF" DataType="Float" Precision="8">'
-!			write (file,'(A,A,A)')'        ',trim(fileHDF5Name),':/RF'
-!			write (file,'(A)'    )'     </DataItem>'
-!			write (file,'(A)'    )'    </Attribute>'
-!			write (file,'(A)'    )'  </Grid>'
-!			write (file,'(A)'    )' </Domain>'
-!			write (file,'(A)'    )'</Xdmf>'
-!
-!        close(file)
-! END - VERSION TESTED FOR Nmc = 1
-
-        write(*,*) "";
-        write(*,*) "------------END Writing result XMF file-----------------------";
-        write(*,*) "";
-
-    end subroutine writeXMF_RF
 
 end module writeResultFile_RF

@@ -4,6 +4,7 @@ program main_RandomField
 	use statistics_RF
 	use writeResultFile_RF
 	use readFile_RF
+	use mpi
 
     implicit none
 
@@ -11,7 +12,7 @@ program main_RandomField
 
     !INPUTS
     integer                                        :: Nmc, modelDimension;
-    character (len=30)                            :: inputName, outputName;
+    character (len=30)                             :: inputName, outputName;
     character (len=15)                             :: corrMod;
     double precision,   dimension(:),  allocatable :: corrL, xMax, xPeriod;
 
@@ -66,8 +67,6 @@ program main_RandomField
 !	call Disp2D(corrL,   "corrL"  );
 !	call Disp2D(xMax,    "xMax"   );
 !	call Disp2D(xPeriod, "xPeriod");
-
-	!END todo Read File -----------------------------------------------------
 
 	call createRandomFieldND(Nmc, corrMod, corrL, xMax, xPeriod, &
     						     kMax, xNStep, kNStep, randField);
