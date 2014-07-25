@@ -147,7 +147,7 @@ contains
             stop "ERROR! In set_DataTable, no tags and/or data bad conditioned ";
         else if(mod((dataTotal-unitTags),(tagTotal-unitTags)) == 0) then
             ratioTagData = (dataTotal-unitTags)/(tagTotal-unitTags);
-            write(*,*) "ratioTagData         = ", ratioTagData;
+            !write(*,*) "ratioTagData         = ", ratioTagData;
         else
         	write(*,*) "ERROR! In set_DataTable, Tags and data dimensions don't match "
             stop "ERROR! In set_DataTable, Tags and data dimensions don't match ";
