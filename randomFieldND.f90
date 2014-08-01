@@ -41,8 +41,6 @@ contains
         if(rang == 0) write(*,*) "------------START randomFieldND (proc = ", rang, ")---------";
 		if(rang == 0) write(*,*) "";
 
-
-
 		nDim = size(xMax,1);
 
 		if(rang == 0) write(*,*) ">>>>>>>>> Variables initialization: kMax, xNStep and kNStep";
@@ -58,7 +56,7 @@ contains
 
 		!ONLY FOR TESTS (Overwriting)----------------------
 
-		testDim = 20;
+		testDim = 5;
 
 		kMax  (1) = 2*pi*corrL(1);
 	    xNStep(1) = testDim;
@@ -80,17 +78,10 @@ contains
 		xNStepTotal = product(xNStep);
 		kNStepTotal = product(kNStep);
 
-		!Sharing xNStepTotal among the processors
-		if(rang == nb_procs-1) then
-			xStart = (nb_procs-1)*ceiling(dble(xNStepTotal)/dble(nb_procs)) + 1
-			xEnd   = xNStepTotal
-		else
-			xStart = rang*ceiling(dble(xNStepTotal)/dble(nb_procs)) + 1
-			xEnd   = (rang+1)*ceiling(dble(xNStepTotal)/dble(nb_procs))
-		end if
+		call get_sizes_MPI(xNStep, sizeLoc, sizeUnif, xStart, xEnd)
 
-		sizeUnif = ceiling(dble(xNStepTotal)/dble(nb_procs)) !Used to allow the MPI_GATHER afterwards
-		sizeLoc  = xEnd - xStart + 1 !Used to escape the not-used places of sizeUnif
+	    write(*,*) "Proc ", rang, " xStart = ", xStart, "   xEnd = ", xEnd, &
+	    	       "sizeUnif"  , sizeUnif, "sizeLoc"   , sizeLoc
 
 		!Random Field
 		allocate(randField((sizeUnif),Nmc));
@@ -139,7 +130,7 @@ contains
 				end do
 			end do
 			randField(1:sizeLoc,k) = product(corrL)*randField(1:sizeLoc,k)
-			if(rang == 0) write(*,*) "Event ",k, "of", Nmc, "completed (proc = ", rang, ")";
+			if(rang == 0) write(*,*) "Event ",k, "of", Nmc, "completed (counting only in proc 0)";
 		end do
 
 		randField(1:sizeLoc,:) = sqrt(2d0)*randField(1:sizeLoc,:)
@@ -184,5 +175,50 @@ contains
         if(rang == 0) write(*,*) "------------END randomFieldND (proc = ", rang, "---------";
 		if(rang == 0) write(*,*) "";
     end subroutine createRandomFieldND
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    subroutine gather_RF_MPI(randField, totalRandField, xNStepTotal, rang)
+    	implicit none
+    	!INPUT
+    	double precision, dimension(:, :), intent(in) :: randField
+    	integer                          , intent(in) :: rang, xNStepTotal
+
+    	!OUTPUT
+    	double precision, dimension(:, :), allocatable, intent(out) :: totalRandField;
+
+    	!LOCAL VARIABLES
+    	integer :: nb_procs, code, Nmc;
+    	integer :: type_RF, type_Temp, dblBitSize, newExtent;
+    	double precision, dimension(:, :), allocatable :: tempRandField;
+
+		Nmc = size(randField, 2);
+    	call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
+    	if(rang == 0) then
+			allocate (tempRandField(nb_procs*size(randField,1), size(randField,2)))
+			tempRandField = 0.0d0
+		end if
+
+		!Assembling all the fields in one matrix";
+		call MPI_TYPE_VECTOR(size(randField,2), size(randField,1), size(randField,1)*nb_procs, &
+		                     MPI_DOUBLE_PRECISION, type_Temp, code) !type_Temp and code are outputs
+		call MPI_TYPE_SIZE(MPI_DOUBLE_PRECISION, dblBitSize, code)
+		newExtent = size(randField,1)*dblBitSize
+		call MPI_TYPE_CREATE_RESIZED(type_Temp, 0, newExtent, type_RF, code) !Changing the starting point to the next "slice"
+		call MPI_TYPE_COMMIT(type_RF, code)
+		call MPI_GATHER(randField,     size(randField), MPI_DOUBLE_PRECISION, &
+		                tempRandField, 1,               type_RF,               &
+		                0,             MPI_COMM_WORLD,  code)
+		call MPI_TYPE_FREE(type_RF, code)
+
+		!Puting the unused spaces in the trash
+		if(rang == 0) then
+			allocate (totalRandField(xNStepTotal, Nmc))
+			totalRandField = 0.0d0
+			totalRandField = tempRandField(1:xNStepTotal,:)
+			deallocate(tempRandField)
+		end if
+
+    end subroutine gather_RF_MPI
 
 end module randomFieldND

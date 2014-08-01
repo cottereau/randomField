@@ -58,7 +58,7 @@ INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI)
 	@echo ' '
 
 #Dependencies
-main_RandomField.o   : statistics_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o
+main_RandomField.o   : displayCarvalhol.o statistics_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o
 writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o
 randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o    
 statistics_RF.o      : displayCarvalhol.o math_RF.o

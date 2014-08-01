@@ -4,56 +4,51 @@ program main_RandomField
 	use statistics_RF
 	use writeResultFile_RF
 	use readFile_RF
+	use displayCarvalhol
+	use mpi
 
     implicit none
 
     !In each quantity above we have: quantity (number of Monte Carlo Experiments, dimension)
 
     !INPUTS
-    integer                                        :: Nmc, modelDimension;
-    character (len=30)                             :: inputName, outputName;
+    integer                                        :: Nmc, nDim;
+    character (len=30), parameter                  :: inputName = "input01", outputName = "Test1";
     character (len=15)                             :: corrMod;
     double precision,   dimension(:),  allocatable :: corrL, xMax, xPeriod;
 
 	!OUTPUTS (in this case variables to be filled in in the proces)
 	double precision, dimension(:),    allocatable :: kMax;
-	integer, dimension(:),             allocatable :: xNStep, kNStep;
-    double precision, dimension(:, :), allocatable :: randField, totalRandField, tempRandField;
-    double precision, dimension(:),    allocatable :: average, stdDeviation, averageCorrL;
+	integer         , dimension(:),    allocatable :: xNStep, kNStep;
+    double precision, dimension(:, :), allocatable :: randField, totalRandField;
+    double precision, dimension(:),    allocatable :: evntAvg, evntStdDev, procCorrL;
+    double precision, dimension(:),    allocatable :: ptAvg, ptStdDev, globalCorrL;
+    double precision                               :: globalAvg, globalStdDev;
+    double precision, dimension(:),    allocatable :: compAvg, compStdDev, compCorrL;
 
 	!Local variables
+    integer          :: i, xNStepTotal;
+    integer          :: code, rang, error, nb_procs;
     double precision :: pi = 3.1415926535898;
-    double precision :: startTime = 0, endTime = 0;
-    integer :: i, xTotalnStep;
-    integer :: code, rang, error, nb_procs, dblBitSize, newExtent;
-    integer :: nombre_bloc, longueur_bloc, pas, ancien_type, type_RF, type_Temp
     character(len=30), dimension(:,:), allocatable :: dataTable
-
-    !Test variables (to be deleted)
-!    integer, parameter :: nb_valeurs=64, sqrtNb = 8;
-!    integer            :: longueur_tranche, j, k
-!    double precision, dimension(sqrtNb,sqrtNb) :: donnees
-!    double precision, dimension(:,:), allocatable :: valeurs
-
-	call CPU_TIME(startTime)
+    double precision , dimension(:)  , allocatable :: sumRF, sumRFsquare, &
+                                                      totalSumRF, totalSumRFsquare;
 
 	call MPI_INIT(code)
+
 	call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
 	call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
 
 	if(rang == 0) then
+	    write(*,*) "------------START MPI processing-----------------------------------------";
 		write(*,*) "";
 	    write(*,*) "------------START main-----------------------------------------";
 	    write(*,*) "";
-
 		write(*,*) "Number of procs = ", nb_procs
-
 		write(*,*) ">>>>>>>>> Reading file input";
 	end if
 
-	inputName  = "input01"
-	outputName = "Test1"
-
+	!Reading Input
 	call set_DataTable(inputName, dataTable)
 	if(rang == 0) call Disp2Dchar (dataTable, "dataTable");
 
@@ -65,16 +60,16 @@ program main_RandomField
 
 	deallocate(dataTable)
 
-	modelDimension = size(xMax)
+	nDim        = size(xMax)
 
 	if(rang == 0) then
-		write(*,*) ">>>>>>>>INPUT Data"
+		write(*,*) ">>>>>>>>INPUT Read Data"
 		write(*,*) "Nmc            = ", Nmc !number of Monte-Carlo experiments
 		write(*,*) "corrMod        = ", corrMod
 		write(*,*) "corrL          = ", corrL
 		write(*,*) "xMax           = ", xMax
 		write(*,*) "xPeriod        = ", xPeriod
-		write(*,*) "modelDimension = ", modelDimension
+		write(*,*) "nDim           = ", nDim
 	end if
 
 
@@ -82,115 +77,58 @@ program main_RandomField
 		write(*,*) "Number of events should be a positive integer"
 		call MPI_ABORT(MPI_COMM_WORLD, error, code)
 	end if
-	if(modelDimension < 1) then
-		write(*,*) "modelDimension should be a positive integer"
+	if(nDim < 1) then
+		write(*,*) "nDim should be a positive integer"
 		call MPI_ABORT(MPI_COMM_WORLD, error, code)
 	end if
 
-!	call Disp2D(corrL,   "corrL"  );
-!	call Disp2D(xMax,    "xMax"   );
-!	call Disp2D(xPeriod, "xPeriod");
-
-	call createRandomFieldND(Nmc, corrMod, corrL, xMax, xPeriod, &
+	!Calculating a part of the random field in each processor
+	if(rang == 0) write(*,*) ">>>>>>>>> Calculating Random field";
+	call createRandomFieldND(Nmc, corrMod, corrL, xMax, xPeriod,   &
     						     kMax, xNStep, kNStep, randField);
 
-!	    write(*,*) "Proc ", rang, " xStart = ", xStart
-!		write(*,*) "Proc ", rang, "   xEnd = ", xEnd
-!	    write(*,*) "Proc ", rang, "sizeUnif", sizeUnif
-!	    write(*,*) "Proc ", rang, "sizeLoc", sizeLoc
-!		call DispCarvalhol(randField, "randField")
+	xNStepTotal = product(xNStep) !should be after "createRandomFieldND"
+
+	write (*,*) "Proc = ", rang
+	!call DispCarvalhol(randField, "randField")
+
+	!Calculating Statistics
+	if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics";
+	call set_StatisticsND_MPI(randField, xNStep, xMax, rang,                  &
+							  sumRF, sumRFsquare, ptAvg, ptStdDev, procCorrL, &
+							  totalSumRF, totalSumRFsquare,                   &
+							  evntAvg, evntStdDev,                            &
+							  globalAvg, globalStdDev, globalCorrL)
+
+	!Writing results and comparison statistics (the whole random field in one processor)
+	call gather_RF_MPI(randField, totalRandField, xNStepTotal, rang) !Gathering all random fields in proc 0
 
 	if(rang == 0) then
-		allocate (tempRandField(nb_procs*size(randField,1), size(randField,2)))
-		totalRandField = 0d0
-	end if
+		!call DispCarvalhol(totalRandField, "totalRandField")
+!		call set_StatisticsND(totalRandField, xNStep, xMax,        &
+!					          compAvg, compStdDev, compCorrL)
 
-	nombre_bloc = size(randField,2)
-	longueur_bloc = size(randField,1)
-	pas = size(randField,1)*nb_procs
-	ancien_type = MPI_DOUBLE_PRECISION
+		!call DispCarvalhol(totalRandField, "totalRandField")
 
-!	if(rang == 0) then
-!		write(*,*) "nombre_bloc = ",nombre_bloc
-!		write(*,*) "longueur_bloc = ",longueur_bloc
-!		write(*,*) "pas = ",pas
-!	end if
+!		call writeResultFileND(corrMod, corrL, xMax, xPeriod,   &
+!						 kMax, xNStep, kNStep, totalRandField, &
+!						 compAvg, compStdDev, compCorrL, outputName)
 
-	call MPI_TYPE_VECTOR(nombre_bloc, longueur_bloc, pas, ancien_type, type_Temp, code) !type_Temp and code are outputs
-	call MPI_TYPE_SIZE(MPI_DOUBLE_PRECISION, dblBitSize, code)
-	newExtent = size(randField,1)*dblBitSize
-	call MPI_TYPE_CREATE_RESIZED(type_Temp, 0, newExtent, type_RF, code) !Changing the starting point to the next "slice"
-	call MPI_TYPE_COMMIT(type_RF, code)
-
-!    write(*,*) "Proc ", rang, "of", nb_procs
-!	call DispCarvalhol(randField, "randField")
-
-
-	call MPI_GATHER(randField,      size(randField), MPI_DOUBLE_PRECISION, &
-	                tempRandField, 1,              type_RF,               &
-	                0,              MPI_COMM_WORLD,  code)
-
-	!if(rang == 0) call DispCarvalhol(tempRandField, "tempRandField")
-
-	call MPI_TYPE_FREE(type_RF, code)
-
-	!START Test Gather--------------------------------------------------------
-
-!	call MPI_TYPE_VECTOR(4, 4, 8, MPI_DOUBLE_PRECISION, type_Temp, code)
-!	call MPI_TYPE_SIZE(MPI_DOUBLE_PRECISION, dblBitSize, code)
-!	newExtent = 4*dblBitSize
-!	call MPI_TYPE_CREATE_RESIZED(type_Temp, 0, newExtent, type_RF, code)
-!	call MPI_TYPE_COMMIT(type_RF, code)
+!		call writeResultFileND(corrMod, corrL, xMax, xPeriod,   &
+!	    						 kMax, xNStep, kNStep, totalRandField, &
+!	    						 compAvg, compStdDev, compCorrL, outputName)
 !
-!	longueur_tranche = nb_valeurs/(nb_procs)
-!	k = longueur_tranche/4
-!	allocate(valeurs(k, k))
-!	do j = 1, k
-!		valeurs(:, j) = (/((i+j), i=1, k)/)
-!	end do
-!	write(*,*) "Proc ", rang, "of", nb_procs
-!	call DispCarvalhol(valeurs, "valeurs")
-!	!call MPI_BARRIER(MPI_COMM_WORLD, code)
-!	call MPI_GATHER(valeurs, longueur_tranche, MPI_DOUBLE_PRECISION,    &
-!	                donnees, 1, type_RF, &
-!	                0, MPI_COMM_WORLD, code)
-!	if(rang == 0) call DispCarvalhol(donnees, "donnees")
-!	call MPI_TYPE_FREE(type_RF, code)
+!	    call writeResultHDF5(xMax, kMax, xNStep, totalRandField, outputName)
 
-	!END Test Gather--------------------------------------------------------
 
-	if(rang == 0) then
-		!STILL TO PARALELIZE
-		xTotalnStep = product(xNStep)
-		allocate (totalRandField(xTotalnStep, Nmc))
-		totalRandField = tempRandField(1:xTotalnStep,:)
-		deallocate(tempRandField)
 
-		!call DispCarvalhol(totalRandField)
-
-		call writeResultFileND(corrMod, corrL, xMax, xPeriod,   &
-						 kMax, xNStep, kNStep, totalRandField, &
-						 average, stdDeviation, averageCorrL, outputName, endTime - startTime)
-
-		call set_StatisticsND(totalRandField, xNStep, xMax, average, stdDeviation, averageCorrL)
-
-		call CPU_TIME(endTime)
-
-		call writeResultFileND(corrMod, corrL, xMax, xPeriod,   &
-	    						 kMax, xNStep, kNStep, randField, &
-	    						 average, stdDeviation, averageCorrL, outputName, endTime - startTime)
-
-	    call writeResultHDF5(xMax, kMax, xNStep, totalRandField, outputName)
-
-		call CPU_TIME(endTime)
-
-		write(*,*) ">>>>>>>>> Showing Results";
-		write(*,*) "";
-		write(*,*) "     Global Average = ", calculateAverage(average);
-		write(*,*) "Global StdDeviation = ", calculateAverage(stdDeviation);
-		if (Nmc == 1) write(*,*) " Correlation Length not computed (Nmc = 1) = ", averageCorrL;
-		if (Nmc >  1) write(*,*) " Correlation Length = ", averageCorrL;
-		write(*,*) "     Total Time (s) = ", endTime - startTime;
+!		write(*,*) ">>>>>>>>> Showing Results";
+!		write(*,*) "";
+!		write(*,*) "     Global Average = ", calculateAverage(average);
+!		write(*,*) "Global StdDeviation = ", calculateAverage(stdDeviation);
+!		if (Nmc == 1) write(*,*) " Correlation Length not computed (Nmc = 1) = ", averageCorrL;
+!		if (Nmc >  1) write(*,*) " Correlation Length = ", averageCorrL;
+!		write(*,*) "     Total Time (s) = ", endTime - startTime;
 	end if
 
 	!Deallocating
@@ -203,9 +141,17 @@ program main_RandomField
 		if(allocated(kNStep))    deallocate(kNStep);
 		if(allocated(randField)) deallocate(randField);
 
-		if(allocated(average))      deallocate(average);
-		if(allocated(stdDeviation)) deallocate(stdDeviation);
-		if(allocated(averageCorrL)) deallocate(averageCorrL);
+		if(allocated(evntAvg))      deallocate(evntAvg);
+		if(allocated(evntStdDev))   deallocate(evntStdDev);
+		if(allocated(procCorrL))    deallocate(procCorrL);
+		if(allocated(ptAvg))        deallocate(ptAvg);
+		if(allocated(ptStdDev))     deallocate(ptStdDev);
+		if(allocated(globalCorrL))  deallocate(globalCorrL);
+		if(allocated(sumRF))        deallocate(sumRF)
+		if(allocated(sumRFsquare))  deallocate(sumRFsquare)
+		if(allocated(totalSumRF))        deallocate(totalSumRF)
+		if(allocated(totalSumRFsquare))  deallocate(totalSumRFsquare)
+		if(allocated(totalRandField))    deallocate(totalRandField);
 
 	if(rang == 0) then
 		write(*,*) "";

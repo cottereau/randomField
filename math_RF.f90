@@ -1,5 +1,6 @@
 module math_RF
 
+	use mpi
     !All logic and math routines
 
 contains
@@ -57,5 +58,40 @@ contains
 		end if
 
     end subroutine get_Permutation
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    subroutine get_sizes_MPI(xNStep, sizeLoc, sizeUnif, start, end)
+
+    	!INPUT
+    	integer, dimension(:), intent(in) :: xNStep;
+    	!OUTPUT
+        integer, intent(out), optional :: sizeLoc, sizeUnif;
+        integer, intent(out), optional :: start, end;
+
+        !LOCAL VARIABLES
+        integer :: rang, nb_procs, code;
+        integer :: xStart, xEnd, xNStepTotal;
+
+    	call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
+		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
+
+		xNStepTotal = product(xNStep)
+
+    	if(rang == nb_procs-1) then
+			xStart = (nb_procs-1)*ceiling(dble(xNStepTotal)/dble(nb_procs)) + 1
+			xEnd   = xNStepTotal
+		else
+			xStart = rang*ceiling(dble(xNStepTotal)/dble(nb_procs)) + 1
+			xEnd   = (rang+1)*ceiling(dble(xNStepTotal)/dble(nb_procs))
+		end if
+
+		if(present(sizeLoc))  sizeLoc  = xEnd - xStart + 1 !Used to escape the not-used places of sizeUnif
+		if(present(sizeUnif)) sizeUnif = ceiling(dble(xNStepTotal)/dble(nb_procs)) !Used to allow the MPI_GATHER afterwards
+		if(present(start))    start    = xStart
+		if(present(end))      end      = xEnd
+
+	end subroutine get_sizes_MPI
 
 end module math_RF
