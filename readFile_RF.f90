@@ -98,7 +98,7 @@ contains
         	end if
         end do
         if (mod(commentCount,2) == 1) contentVector(conStart:) = "" !Treating final comment
-       ! write(*,*) "contentVector = ", contentVector
+!        write(*,*) "contentVector = ", contentVector
 
 		!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Starting data treatment
         blankTotal  = 0;
@@ -126,13 +126,13 @@ contains
                     posTaken = .TRUE.
                 endif
                 if (contentVector(i)(2:2) == tagID) unitTags = unitTags + 1
-                !write(*,*) nLines, "tag = ", tagTotal;
+!                !write(*,*) nLines, "tag = ", tagTotal;
             else if (.not.((contentVector(i)(1:1) == comment) .or. (contentVector(i)(1:1) == empty))) then
                 dataTotal = dataTotal+1
-                !write(*,*) nLines, "data = ", dataTotal;
+!                !write(*,*) nLines, "data = ", dataTotal;
             else
                 blankTotal = blankTotal+1
-                !write(*,*) nLines, "Comment or blank";
+!                !write(*,*) nLines, "Comment or blank";
             endif
             read(fileID,'(A)',IOSTAT = stat) contentVector(i)
         enddo
@@ -141,10 +141,12 @@ contains
 !        write(*,*) "tagTotal             = ", tagTotal;
 !        write(*,*) "blank/comment Total  = ", blankTotal;
 
-		if(dataTotal == 0 .or. tagTotal == 0 &
-		   .or. (dataTotal-unitTags) == 0 .or. (tagTotal-unitTags) == 0) then
+		if(dataTotal == 0 .or. tagTotal == 0) then
         	write(*,*) "ERROR! In set_DataTable, no tags and/or data bad conditioned "
             stop "ERROR! In set_DataTable, no tags and/or data bad conditioned ";
+        else if((tagTotal-unitTags) == 0) then
+!        	write(*,*) "Only unit data"
+        	ratioTagData = 1;
         else if(mod((dataTotal-unitTags),(tagTotal-unitTags)) == 0) then
             ratioTagData = (dataTotal-unitTags)/(tagTotal-unitTags);
             !write(*,*) "ratioTagData         = ", ratioTagData;
@@ -165,7 +167,7 @@ contains
         dataColumn     = 0;
         dataCount      = 0;
         dataPassed     = .FALSE.;
-        dataTable      = "notUsed";
+        dataTable      = "    ---";
         labelPassed    = .FALSE.;
         lastLine       = 1; !To take into account the headers
         tagCount       = 0;

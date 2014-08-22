@@ -28,7 +28,7 @@ contains
 
     	select case(corrMod)
    				case("gaussian")
-				kMax = 2*pi*corrL(:); !CRITERIA STILL TO BE TESTED
+				kMax(:) = 2*pi*corrL(:); !CRITERIA STILL TO BE TESTED
    		end select
 
     end subroutine set_kMaxND

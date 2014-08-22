@@ -4,99 +4,47 @@ module statistics_RF
 	use math_RF
 	use mpi
 
+    interface set_Statistics_MPI
+		module procedure set_StatisticsStructured_MPI,   &
+		                 set_StatisticsUnstruct_MPI
+	end interface set_Statistics_MPI
+
 contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine set_StatisticsND(totalRandField, xNStep, xMax, &
-					 			totalAverage, totalStdDeviation, totalAverageCorrL)
-
+	subroutine set_StatisticsUnstruct_MPI(randField, xPoints, rang, &
+							 	           evntAvg, evntStdDev, procCorrL,             &
+							 	           globalAvg, globalStdDev, globalCorrL)
 		implicit none
+
 		!INPUT
-		double precision, dimension(:, :),           intent(in) :: totalRandField;
-		double precision, dimension(:),              intent(in) :: xMax;
-		integer,          dimension(:),              intent(in) :: xNStep;
-		!OUTPUT
-		double precision, dimension(:), allocatable, intent(out) :: totalAverage, totalStdDeviation, &
-																	totalAverageCorrL;
-		!LOCAL VARIABLES
-		integer :: i, Nmc, nPermut,  nDim;
-
-		write(*,*) "";
-		write(*,*) "------------START set_StatisticsND-----------------------------------------";
-		write(*,*) "";
-
-		nPermut = size(totalRandField, 1);
-		Nmc     = size(totalRandField, 2);
-		nDim    = size(xNStep   , 1)
-
-		allocate(totalAverage(nPermut));
-		allocate(totalStdDeviation(nPermut));
-		allocate(totalAverageCorrL(nDim   ));
-		totalAverage = -1
-		totalStdDeviation = -1
-		totalAverageCorrL = -1
-		write(*,*) ">>>>>>>>> Calculating Average and Stantard Deviation";
-		do i = 1, nPermut
-			totalAverage(i)      = calculateAverage(totalRandField(i,:));
-			totalStdDeviation(i) = calculateStdDeviation(totalRandField(i,:), totalAverage(i));
-		end do
-
-		if(Nmc > 1) then
-			write(*,*) ">>>>>>>>> Calculating Correlation Length";
-			call calculateAverageCorrL(totalRandField, xMax, xNStep, totalAverage, totalStdDeviation, totalAverageCorrL)
-		else
-			write(*,*) ">>>>>>>>> WARNING! Correlation Length coudn't be computed (only one event)";
-		end if
-
-		write(*,*) "";
-		write(*,*) "------------END set_StatisticsND-----------------------------------------";
-		write(*,*) "";
-
-	end subroutine set_StatisticsND
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine set_StatisticsND_MPI(randField, xNStep, xMax, rang,                  &
-									sumRF, sumRFsquare, ptAvg, ptStdDev, procCorrL, &
-									totalSumRF, totalSumRFsquare,                   &
-									evntAvg, evntStdDev,                            &
-									globalAvg, globalStdDev, globalCorrL)
-
-		implicit none
-		!INPUT
+		double precision, dimension(:, :), intent(in) :: randField, xPoints;
 		integer                          , intent(in) :: rang;
-		integer         , dimension(:)   , intent(in) :: xNStep;
-		double precision, dimension(:, :), intent(in) :: randField;
-		double precision, dimension(:)   , intent(in) :: xMax;
+
 		!OUTPUT
-		double precision, dimension(:), allocatable, intent(out) :: sumRF, sumRFsquare, totalSumRF, totalSumRFsquare;
-		double precision, dimension(:), allocatable, intent(out) :: evntAvg, evntStdDev, procCorrL;
-    	double precision, dimension(:), allocatable, intent(out) :: ptAvg, ptStdDev, globalCorrL;
+		double precision, dimension(:), allocatable, intent(out) :: evntAvg, evntStdDev, procCorrL, globalCorrL;
     	double precision                           , intent(out) :: globalAvg, globalStdDev;
 
 		!LOCAL VARIABLES
-		integer :: i, Nmc, nPermut,  nDim;
-		integer :: sizeLoc;
-		integer :: code, xNStepTotal;
+		double precision, dimension(:)   , allocatable :: avg;
+		double precision, dimension(:),    allocatable :: sumRF, sumRFsquare, &
+		                                                  totalSumRF, totalSumRFsquare;
+		integer :: Nmc, nPoints, nDim, xNTotal;
+		integer :: i, j, code, nb_procs;
 
-		write(*,*) "";
-		write(*,*) "------------START set_StatisticsNDmpi (proc = ", rang, ")-----------------------------------------";
-		write(*,*) "";
+		Nmc          = size(randField, 2)
+		nPoints      = size(randField, 1)
+		nDim         = size(xPoints, 2)
+		xNTotal  	 = size(xPoints, 1)
+		globalAvg    = -1.0d0
+		globalStdDev = -1.0d0
 
-		write (*,*) ">>>>get_sizes_MPI Proc = ", rang
-		call get_sizes_MPI (xNStep, sizeLoc)
-		nDim        = size(xNStep)
-		xNStepTotal = product(xNStep)
-		Nmc         = size(randField,2)
-
-		write (*,*) ">>>>Allocating Proc = ", rang
+		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
 
 		!Allocating
 		allocate(sumRF(Nmc))
 		allocate(sumRFsquare(Nmc))
-		allocate(ptAvg(sizeLoc))
-		allocate(ptStdDev(sizeLoc))
 		allocate(procCorrL(nDim));
 		if(rang == 0) then
 			allocate (totalSumRF(Nmc))
@@ -105,265 +53,290 @@ contains
 			totalSumRFsquare = -1.0d0
 			allocate (evntAvg(Nmc))
 			allocate (evntStdDev(Nmc))
+			allocate(globalCorrL(nDim));
 		end if
 
+		!Calculating Correlation Length (should be reformulated to take advantage of matrix symmetry)
+		call set_CorrelationLengthUnstruct(randField, xPoints, procCorrL)
 
-		!write (*,*) ">>>>sizeLoc = ", sizeLoc, " Proc = ", rang
-
-		sumRF(:)       = sum( randField(1:sizeLoc, :)    , dim = 1)
-		sumRFsquare(:) = sum((randField(1:sizeLoc, :))**2, dim = 1)
-
-		!call DispCarvalhol(sumRF, "sumRF");
-		!call DispCarvalhol(sumRFsquare, "sumRFsquare", "F15.8");
-
-		!Calculating events statistics
-		!write (*,*) ">>>>MPI_REDUCE Proc = ", rang
+		!Setting variables to calculate Average and Standard Deviation (by event and global)
+		sumRF(:)       = sum( randField    , dim = 1)
+		sumRFsquare(:) = sum((randField)**2, dim = 1)
 
 		call MPI_REDUCE(sumRF, totalSumRF, Nmc, MPI_DOUBLE_PRECISION, &
 					    MPI_SUM, 0, MPI_COMM_WORLD, code)
 		call MPI_REDUCE(sumRFsquare, totalSumRFsquare, Nmc, MPI_DOUBLE_PRECISION, &
-					MPI_SUM, 0, MPI_COMM_WORLD, code)
-
-		!write (*,*) ">>>>after MPI_REDUCE Proc = ", rang
+					    MPI_SUM, 0, MPI_COMM_WORLD, code)
+		call MPI_REDUCE(procCorrL, globalCorrL, nDim, MPI_DOUBLE_PRECISION, &
+					    MPI_SUM, 0, MPI_COMM_WORLD, code)
 
 		if(rang == 0) then
-			evntAvg      = totalSumRF/dble(xNStepTotal);
-			evntStdDev   = sqrt(totalSumRFsquare/dble(xNStepTotal) &
-		             	   - (totalSumRF/dble(xNStepTotal))**2)
-			globalAvg    = sum(totalSumRF)/dble(xNStepTotal*Nmc);
-			globalStdDev = sqrt(sum(totalSumRFsquare)/dble(xNStepTotal*Nmc) &
-		              	   - (sum(totalSumRF)/dble(xNStepTotal*Nmc))**2)
-!
-		    call DispCarvalhol(evntAvg, "evntAvg")
-		    call DispCarvalhol(evntStdDev, "evntStdDev")
-		    write(*,*) "globalAvg    = ", globalAvg
-		    write(*,*) "globalStdDev = ", globalStdDev
+			!by Event
+			evntAvg      = totalSumRF/dble(xNTotal*nb_procs);
+			evntStdDev   = sqrt(totalSumRFsquare/dble(xNTotal*nb_procs) &
+		             	   - (evntAvg)**2)
+		    !Global
+			globalAvg    = sum(totalSumRF)/dble(xNTotal*nb_procs*Nmc);
+			globalStdDev = sqrt(sum(totalSumRFsquare)/dble(xNTotal*Nmc*nb_procs) &
+		              	   - (globalAvg)**2)
+		    globalCorrL  = globalCorrL / nb_procs
 
-!		write(*,*) ">>>>>>>>> Showing Statistics of each event";
-!		write(*,*) "totalSumRF = ", totalSumRF;
-!		write(*,*) "totalSumRFsquare = ", totalSumRFsquare;
-!		write(*,*) " Average = ", totalSumRF/dble(xNStepTotal);
-!		write(*,*) "Variance = ", totalSumRFsquare/dble(xNStepTotal) - (totalSumRF/dble(xNStepTotal))**2;
-!		write(*,*) " Std Dev = ", sqrt(totalSumRFsquare/dble(xNStepTotal) - (totalSumRF/dble(xNStepTotal))**2)
-!		write(*,*) ">>>>>>>>> Showing Global Statistics (all events)";
-!		write(*,*) " Average = ", sum(totalSumRF)/dble(xNStepTotal*Nmc);
-!		write(*,*) "Variance = ", sum(totalSumRFsquare)/dble(xNStepTotal*Nmc) - (sum(totalSumRF)/dble(xNStepTotal*Nmc))**2;
-!		write(*,*) " Std Dev = ", sqrt(sum(totalSumRFsquare)/dble(xNStepTotal*Nmc) - (sum(totalSumRF)/dble(xNStepTotal*Nmc))**2)
+		    !call DispCarvalhol(evntAvg   , "evntAvg")
+		    !call DispCarvalhol(evntStdDev, "evntStdDev")
+		    !write(*,*) "globalAvg    = ", globalAvg
+		    !write(*,*) "globalStdDev = ", globalStdDev
+
 		end if
 
-		do i = 1, sizeLoc
-			ptAvg(i)    = calculateAverage(randField(i,:));
-			ptStdDev(i) = calculateStdDeviation(randField(i,:), ptAvg(i));
-		end do
+		if(allocated(sumRF))       deallocate(sumRF)
+		if(allocated(sumRFsquare)) deallocate(sumRFsquare)
+		if(allocated(totalSumRF))       deallocate (totalSumRF)
+		if(allocated(totalSumRFsquare)) deallocate (totalSumRFsquare)
 
-		!write (*,*) "Rang = ", rang
-		!call DispCarvalhol(ptAvg, "ptAvg")
-		!if(rang == 0) call DispCarvalhol(ptStdDev, "ptStdDev")
-
-		call calculateAverageCorrL_MPI(randField, xMax, xNStep, ptAvg, ptStdDev, procCorrL)
-
-		!write(*,*) "      sumRF = ", sumRF
-		!write(*,*) "sumRFsquare = ", sumRFsquare
-
-		!write(*,*) "";
-		!write(*,*) "------------END set_StatisticsNDmpi (proc = ", rang, ")-----------------------------------------";
-		!write(*,*) "";
-
-	end subroutine set_StatisticsND_MPI
+	end subroutine set_StatisticsUnstruct_MPI
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	function calculateAverage(vector) result(average)
-
+	subroutine set_CorrelationLengthUnstruct(randField, xPoints, procCorrL)
 		implicit none
 		!INPUT
-		double precision, dimension(:), intent(in) :: vector;
+		double precision, dimension(:, :), intent(in)  :: randField, xPoints;
 		!OUTPUT
-		double precision :: average;
+		double precision, dimension(:), intent(out) :: procCorrL;
 		!LOCAL VARIABLES
-		integer :: i;
+		double precision, dimension(:, :)   , allocatable :: covMatrix, sumOthers;
+		double precision, dimension(:, :)   , allocatable :: deltaMatrix;
+		double precision, dimension(:, :, :), allocatable :: distMatrix;
+		integer          :: Nmc, nPoints, nDim, i, j, nFactors;
+		double precision :: tolerance = 1.0d-6;
 
+		Nmc     = size(randField, 2)
+		nPoints = size(xPoints, 1)
+		nDim    = size(xPoints, 2)
 
-		average = 0d0;
+		allocate(covMatrix(nPoints, nPoints))
+		allocate(sumOthers(nPoints, nPoints))
+		allocate(deltaMatrix(nPoints, nDim))
+		allocate(distMatrix(nPoints, nPoints, nDim))
 
-		do i = 1, size(vector)
-			average = average + vector(i);
+		call set_CovMatrix(randField, covMatrix)
+		call set_DeltaMatrix(xPoints, deltaMatrix)
+		call set_DistMatrix(xPoints, distMatrix)
+
+		!call DispCarvalhol(xPoints,"xPoints")
+		!call DispCarvalhol(covMatrix,"covMatrix", nColumns = 15)
+		!call DispCarvalhol(distMatrix,"distMatrix 1", nColumns = 15)
+		!call DispCarvalhol(deltaMatrix,"deltaMatrix 1", nColumns = 15)
+
+		do i = 1, nDim
+			!write(*,*) "nDim = ", i, "-------------------------"
+			sumOthers = sum(distMatrix, 3) - distMatrix(:,:,i)
+			!call DispCarvalhol(sumOthers,"sumOthers BEFORE")
+			nFactors = count(sumOthers < tolerance); !- size(..) to take into account the diagonal
+			!write(*,*) "nFactors = ", nFactors
+			where(sumOthers < tolerance)
+				sumOthers(:,:) = covMatrix (:,:)
+			elsewhere
+				sumOthers(:,:) = 0
+			end where
+
+			!call DispCarvalhol(sumOthers,"sumOthers BEFORE")
+			do j = 1, nPoints
+				sumOthers(:,j) = deltaMatrix(j, i) * sumOthers(:,j)
+			end do
+			!call DispCarvalhol(sumOthers,"sumOthers AFTER")
+
+			procCorrL(i) = sum(sumOthers)/nFactors
 		end do
 
-		average = average/dble(size(vector))
+		!call DispCarvalhol(procCorrL,"procCorrL")
 
-	end function calculateAverage
+		deallocate(distMatrix)
+		deallocate(covMatrix)
+		deallocate(deltaMatrix)
+		deallocate(sumOthers)
+
+	end subroutine set_CorrelationLengthUnstruct
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	function calculateStdDeviation(vector, average) result(stdDeviation)
+	subroutine set_StatisticsStructured_MPI(randField, xMin, xMax, xNStep, rang, &
+							 	    		evntAvg, evntStdDev, procCorrL,      &
+							 	    		globalAvg, globalStdDev, globalCorrL)
 		implicit none
+
 		!INPUT
-		double precision, dimension(:), intent(in) :: vector;
-		double precision, intent(in), optional :: average;
+		double precision, dimension(:, :), intent(in) :: randField;
+		double precision, dimension(:)   , intent(in) :: xMin,xMax;
+		integer         , dimension(:)   , intent(in) :: xNStep;
+		integer                          , intent(in) :: rang;
+
 		!OUTPUT
-		double precision :: stdDeviation;
+		double precision, dimension(:), allocatable, intent(out) :: evntAvg, evntStdDev, procCorrL, globalCorrL;
+    	double precision                           , intent(out) :: globalAvg, globalStdDev;
+
 		!LOCAL VARIABLES
-		integer :: i;
-		double precision :: avg;
+		double precision, dimension(:)   , allocatable :: avg;
+		double precision, dimension(:),    allocatable :: sumRF, sumRFsquare, &
+		                                                  totalSumRF, totalSumRFsquare;
+		integer :: Nmc, nPoints, nDim, xNTotal;
+		integer :: i, j, code, nb_procs;
 
+		Nmc          = size(randField, 2)
+		nPoints      = size(randField, 1)
+		nDim         = size(xNStep)
+		xNTotal  = product(xNStep)
+		globalAvg    = -1.0d0
+		globalStdDev = -1.0d0
 
-		if(present(average)) then
-			avg = average;
-		else
-			avg = calculateAverage(vector);
-		endif
+		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
 
-		stdDeviation = (calculateAverage(vector**2d0) - avg**2d0)**(0.5d0);
+		!Allocating
+		allocate(sumRF(Nmc))
+		allocate(sumRFsquare(Nmc))
+		allocate(procCorrL(nDim));
+		if(rang == 0) then
+			allocate (totalSumRF(Nmc))
+			allocate (totalSumRFsquare(Nmc))
+			totalSumRF = -1.0d0
+			totalSumRFsquare = -1.0d0
+			allocate (evntAvg(Nmc))
+			allocate (evntStdDev(Nmc))
+			allocate(globalCorrL(nDim));
+		end if
 
-	end function calculateStdDeviation
+		!Calculating Correlation Length (should be reformulated to take advantage of matrix symmetry)
+		call set_CorrelationLengthStructured(randField, xMin, xMax, xNStep, procCorrL)
+
+		!Setting variables to calculate Average and Standard Deviation (by event and global)
+		sumRF(:)       = sum( randField    , dim = 1)
+		sumRFsquare(:) = sum((randField)**2, dim = 1)
+
+		call MPI_REDUCE(sumRF, totalSumRF, Nmc, MPI_DOUBLE_PRECISION, &
+					    MPI_SUM, 0, MPI_COMM_WORLD, code)
+		call MPI_REDUCE(sumRFsquare, totalSumRFsquare, Nmc, MPI_DOUBLE_PRECISION, &
+					    MPI_SUM, 0, MPI_COMM_WORLD, code)
+		call MPI_REDUCE(procCorrL, globalCorrL, nDim, MPI_DOUBLE_PRECISION, &
+					    MPI_SUM, 0, MPI_COMM_WORLD, code)
+
+		if(rang == 0) then
+			!by Event
+			evntAvg      = totalSumRF/dble(xNTotal*nb_procs);
+			evntStdDev   = sqrt(totalSumRFsquare/dble(xNTotal*nb_procs) &
+		             	   - (evntAvg)**2)
+		    !Global
+			globalAvg    = sum(totalSumRF)/dble(xNTotal*nb_procs*Nmc);
+			globalStdDev = sqrt(sum(totalSumRFsquare)/dble(xNTotal*Nmc*nb_procs) &
+		              	   - (globalAvg)**2)
+		    globalCorrL  = globalCorrL / nb_procs
+
+		    !call DispCarvalhol(evntAvg   , "evntAvg")
+		    !call DispCarvalhol(evntStdDev, "evntStdDev")
+		    !write(*,*) "globalAvg    = ", globalAvg
+		    !write(*,*) "globalStdDev = ", globalStdDev
+
+		end if
+
+		if(allocated(sumRF))       deallocate(sumRF)
+		if(allocated(sumRFsquare)) deallocate(sumRFsquare)
+		if(allocated(totalSumRF))       deallocate (totalSumRF)
+		if(allocated(totalSumRFsquare)) deallocate (totalSumRFsquare)
+
+	end subroutine set_StatisticsStructured_MPI
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine calculateAverageCorrL(randField, xMax, xNStep, ptAvg, ptStdDev, averageCorrL)
+	subroutine set_CorrelationLengthStructured(randField, xMin, xMax, xNStep, procCorrL)
 		implicit none
 		!INPUT
 		double precision, dimension(:, :), intent(in) :: randField;
-		double precision, dimension(:),    intent(in) :: xMax;
-		double precision, dimension(:),    intent(in) :: ptAvg, ptStdDev;
-		integer,          dimension(:),    intent(in) :: xNStep;
+		double precision, dimension(:)   , intent(in) :: xMin,xMax;
+		integer         , dimension(:)   , intent(in) :: xNStep;
 		!OUTPUT
-		double precision, dimension(:),    intent(out) :: averageCorrL;
+		double precision, dimension(:), intent(out) :: procCorrL;
 		!LOCAL VARIABLES
-		integer :: i, j, k, Nmc, nPermut, nPlanes, nDim, &
-				   beg, step, end;
-		!double precision, dimension(:), allocatable :: Ra, Rb, Rc, R
-		double precision :: corrL
+		double precision, dimension(:, :), allocatable :: covMatrix;
+		integer :: Nmc, nPoints, nDim, xNTotal;
+		integer :: beg, step, end, plane, radius, rStart, rEnd, elemStep, patternStep;
+		integer :: i, j, code, nb_procs;
 
-		nPermut      = product(xNStep);
-		Nmc          = size(randField, 2);
-		nDim         = size(xNStep);
-		averageCorrL = 0;
+		Nmc     = size(randField, 2)
+		nPoints = size(randField, 1)
+		nDim    = size(xNStep)
 
+		allocate(covMatrix(nPoints, nPoints))
+
+		call set_CovMatrix(randField, covMatrix)
 
 		do i = 1, nDim
-			nPlanes = nPermut/xNStep(i)
-			do j = 1, nPlanes
-				call get_SequenceParam(i, j, xNStep, beg, step, end)
+			!if (rang == 0) write(*,*) "Dim = ",   i,"----------------------"
+			!nPlanes = xNTotal/xNStep(i)
+			call get_SequenceParam(i, 1, xNStep, beg, elemStep, end) !establishing some reference parameters
+			patternStep = end - beg + elemStep
+			do j = 1, xNTotal
+				plane = cyclicMod(j, elemStep) +  int_roundDown(j, patternStep)*elemStep !Obs: j and patternRange are integers so we are rounding down
+				call get_SequenceParam(i, plane, xNStep, beg, step, end)
 
-				if(end > nPermut) end = nPermut
+				procCorrL(i) = procCorrL(i) +                   &
+				               sum(covMatrix(j, beg:end:step))
+				!Averaging the double terms
+				radius = min((j - beg)/step, (end - j)/step)*step
+				rStart = j - radius
+				rEnd   = j + radius
+				procCorrL(i) =   procCorrL(i)                                      &
+							   - sum(covMatrix(j, rStart:rEnd:step))/2 &
+							   + covMatrix(j,j)/2
 
-				averageCorrL(i) = sum(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) &
-				                      - (ptAvg(beg+step:end:step)    * ptAvg(beg)))                               &
-									  / (ptStdDev(beg+step:end:step) * ptStdDev(beg)))                            &
-								       + averageCorrL(i)
-
-
-
-!					Ra = 1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),&
-!											    randField(beg,:))
-!					Rb = average(beg+step:end:step)*average(beg)
-!					Rc = stdDeviation(beg+step:end:step)*stdDeviation(beg)
-!					R = (Ra - Rb) / Rc
-!					averageCorrL(i) = sum(R) * xMax(i,1)/xNStep(i,1) + averageCorrL(i)
-!
-!					call dispCarvalhol(1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),&
-!											    randField(beg,:)),"Ra")
-!					call dispCarvalhol(average(beg+step:end:step)*average(beg),"Rb")
-!					call dispCarvalhol(stdDeviation(beg+step:end:step)*stdDeviation(beg),"Rc")
-!					call dispCarvalhol(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) - &
-!										  (average(beg+step:end:step)*average(beg))) / &
-!										  (stdDeviation(beg+step:end:step)*stdDeviation(beg)),"R")
-!					write(*,*) "R"
-!					write(*,*)(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) - &
-!										  (average(beg+step:end:step)*average(beg))) / &
-!										  (stdDeviation(beg+step:end:step)*stdDeviation(beg)))
-!					write(*,*) "averageCorrL(",i,") = ", averageCorrL(i)
+				!if (rang == 0) write(*,*) ""
+				!if (rang == 0) write(*,*) "Plane = ", plane, "patternStep = ", patternStep
+				!if (rang == 0) write(*,*) j, ">> beg = ", beg, "step  = ", step, "end = ", end
+				!if (rang == 0) write(*,*) "radius ", radius, "Doubles from = ", rStart, "    to ", rEnd
 
 			end do
-			averageCorrL(i) = (xMax(i)/xNStep(i))*averageCorrL(i) / dble(nPlanes)
+			procCorrL(i) = ((xMax(i)-xMin(i))/xNStep(i))*procCorrL(i)/xNTotal
 		end do
-		averageCorrL = 2*averageCorrL !Symmetry
 
-	end subroutine calculateAverageCorrL
+	end subroutine set_CorrelationLengthStructured
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine calculateAverageCorrL_MPI(randField, xMax, xNStep, ptAvg, ptStdDev, procCorrL)
+	subroutine set_CovMatrix(randField, covMatrix)
+
 		implicit none
 		!INPUT
-		double precision, dimension(:, :), intent(in) :: randField;
-		double precision, dimension(:),    intent(in) :: xMax;
-		double precision, dimension(:),    intent(in) :: ptAvg, ptStdDev;
-		integer,          dimension(:),    intent(in) :: xNStep;
+		double precision, dimension(:, :), intent(in)  :: randField;
 		!OUTPUT
-		double precision, dimension(:),    intent(out) :: procCorrL;
+		double precision, dimension(:, :), intent(out) :: covMatrix;
 		!LOCAL VARIABLES
-		integer :: i, j, k, Nmc, nPermut, nPlanes, nDim, rang, code, &
-				   beg, step, end, supLim, infLim, spam;
-		!double precision, dimension(:), allocatable :: Ra, Rb, Rc, R
-		double precision :: corrL, countPlanes
+		double precision, dimension(:)   , allocatable :: avg;
+		double precision, dimension(:, :), allocatable :: centeredRF;
+		double precision :: diagStdDev
+		integer          :: Nmc, nPoints, i;
 
-		call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
+		Nmc     = size(randField, 2)
+		nPoints = size(randField, 1)
 
-		nPermut     = product(xNStep);
-		Nmc         = size(randField, 2);
-		nDim        = size(xNStep);
-		procCorrL   = 0.0d0;
-		countPlanes = 0.0d0
+		allocate(avg        (nPoints))
+		allocate(centeredRF (nPoints, Nmc))
 
-		call get_sizes_MPI(xNStep, start = infLim, end = supLim)
+		avg = sum(randField, 2) / Nmc
 
-		do i = 1, nDim
-			nPlanes = nPermut/xNStep(i)
-			countPlanes = 0.0d0
-			do j = 1, nPlanes
-				!Reasoning in global coordinates (the whole random field)
-				call get_SequenceParam(i, j, xNStep, beg, step, end)
-				spam = end - beg + 1
-				beg = step*(infLim/step) + beg !lower cut limitation
-				if(step*(infLim/step) /= infLim) beg = beg + step !Round up
-				if(end > supLim) end = supLim !upper cut limitation
-				if(beg + step < supLim) then
-					!Transformate the coordinates in local again
-					beg = beg - infLim + 1
-					end = end - infLim + 1
-					write(*,*) "Proc = ", rang, "Plane = ", j, "beg = ", beg, "end = ", end, "infLim = ", infLim, "supLim = ", supLim
-					countPlanes  = countPlanes + 1.0d0
-!					procCorrL(i) = sum(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) &
-!										- (ptAvg(beg+step:end:step)    * ptAvg(beg)))                                 &
-!										/ (ptStdDev(beg+step:end:step) * ptStdDev(beg)))                           &
-!									    + procCorrL(i)
-				end if
-			end do
-			if (countPlanes > 0.0d0) procCorrL(i) = (xMax(i)/xNStep(i))*procCorrL(i) / countPlanes
+		do i = 1, nPoints
+			centeredRF(i,:) = randField(i,:) - avg(i)
 		end do
-		procCorrL = 2*procCorrL !Symmetry
 
-	end subroutine calculateAverageCorrL_MPI
+		covMatrix = matmul(centeredRF, transpose(centeredRF)) / Nmc
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    subroutine get_SequenceParam(axis, nPlane, nStep, beg, step, end)
+		do i = 1, nPoints
+			!Normalising the Covariance Matrix
+			diagStdDev = sqrt(covMatrix(i, i))
+			covMatrix(i, :) = covMatrix(i, :)/diagStdDev
+			covMatrix(:, i) = covMatrix(:, i)/diagStdDev
+		end do
 
-        implicit none
+		deallocate(avg)
+		deallocate(centeredRF)
 
-        !INPUT
-        integer,               intent(in)    :: axis, nPlane
-        integer, dimension(:), intent(in) :: nStep;
-
-        !OUTPUT
-        integer, intent(out) :: beg, step, end;
-
-        !LOCAL VARIABLES
-        integer :: i, nDim, position, posPlane, gap;
-
-		beg  = 0
-		nDim = size(nStep)
-
-		step = product(nStep(axis+1:));
-		if (i == nDim) step = 1;
-		gap = step*nStep(axis)
-		beg = cyclicMod(nPlane, step) &
-			  + int((nPlane-0.9)/step)*gap
-
-		end = beg + step*(nStep(axis)-1)
-
-    end subroutine get_SequenceParam
+	end subroutine set_CovMatrix
 
 end module statistics_RF

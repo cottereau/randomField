@@ -1,9 +1,16 @@
 module writeResultFile_RF
 
     use displayCarvalhol
-    use statistics_RF, only : calculateAverage
+    use statistics_RF
     use math_RF
     use hdf5
+    use mpi
+
+    interface write_ResultHDF5
+		module procedure write_ResultHDF5Structured,   &
+		                 write_ResultHDF5Unstruct,     &
+		                 write_ResultHDF5Unstruct_MPI
+	end interface write_ResultHDF5
 
 contains
 
@@ -92,11 +99,11 @@ contains
             write (file,"("//titleFmt//","//"(t25,2F25.16)"//")") "", average(i), stdDeviation(i);
         end do
 
-        write (file, *) "STATISTICS - GLOBAL";
-        write (file, *) "";
-        write (file,"("//titleFmt//","//"(t25, F25.16)"//")") "average = ",   calculateAverage(average)
-        write (file,"("//titleFmt//","//"(t25, F25.16)"//")") "stdDeviation = ", calculateAverage(stdDeviation);
-        write (file,"("//titleFmt//","//dimFmt//")") "avgCorrL = ", averageCorrL;
+!        write (file, *) "STATISTICS - GLOBAL";
+!        write (file, *) "";
+!        write (file,"("//titleFmt//","//"(t25, F25.16)"//")") "average = ",   calculateAverage(average)
+!        write (file,"("//titleFmt//","//"(t25, F25.16)"//")") "stdDeviation = ", calculateAverage(stdDeviation);
+!        write (file,"("//titleFmt//","//dimFmt//")") "avgCorrL = ", averageCorrL;
 
         if(present(time)) write (file,"("//titleFmt//","//"(t25, F25.16)"//")") "Total time (s) = ", time;
         close(file)
@@ -119,11 +126,12 @@ contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    subroutine writeResultHDF5(xMax, kMax, xNStep, randField, fileName)
+    subroutine write_ResultHDF5Structured(xMin, xMax, xNStep, randField, fileName)
+
         implicit none
 
         !INPUTS
-        double precision,  dimension(:),   intent(in) :: xMax, kMax;
+        double precision,  dimension(:),   intent(in) :: xMax, xMin;
         integer,           dimension(:),   intent(in) :: xNStep;
         double precision,  dimension(:,:), intent(in) :: randField;
         character (len=*),                 intent(in) :: filename;
@@ -171,8 +179,8 @@ contains
 	        grid_data = 0D0
 
 	        dims = shape(grid_data)
-	        write(*,*) "dims   = ", dims
-	        write(*,*) dsetXYZ
+	        !write(*,*) "dims   = ", dims
+	        !write(*,*) dsetXYZ
 
 	        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
 	        call h5dcreate_f(file_id, dsetXYZ, H5T_NATIVE_DOUBLE,  &
@@ -181,7 +189,7 @@ contains
 
 
 			do i = 1, nPoints
-				call get_Permutation(i, xMax, xNStep, grid_data(1:nDim,i));
+				call get_Permutation(i, xMax, xNStep, grid_data(1:nDim,i), xMin);
 			end do
 
 	 		call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, grid_data, dims, error) ! Write the dataset.
@@ -193,13 +201,103 @@ contains
 			write(*,*) ">>>>>>>>> Creating Quantities dataset 'random field'";
 	        dims(1) = size(randField,1)
 	        dims(2) = 1 !One random field in each dataset
-			write(*,*) "dims   = ", dims;
 
 			do i = 1, Nmc
 				write(numberStr,'(I)'  ) i
 				numberStr = adjustL(numberStr)
 				write(eventName,'(A,A)') "RF_", numberStr
-				write(*,*) eventName
+
+		        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
+		        call h5dcreate_f(file_id, eventName, H5T_NATIVE_DOUBLE,  &
+		                         dspace_id, dset_id, error) ! Create the dataset with default properties (dset_id).
+		        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, randField(:,i), dims, error) ! Write the dataset.
+		        call h5dclose_f(dset_id, error) ! End access to the dataset and release resources used by it.
+		        call h5sclose_f(dspace_id, error) ! Terminate access to the data space.
+		    end do
+
+			write(*,*) ">>>>>>>>> Closing file";
+	        call h5fclose_f(file_id, error) ! Close the file.
+	        call h5close_f(error) ! Close FORTRAN interface.
+
+	        call writeXMF_RF(randField, fileHDF5Name, fileName)
+        end if
+
+        write(*,*) "";
+        write(*,*) "------------END Writing result HDF5 file-----------------------";
+        write(*,*) "";
+
+    end subroutine write_ResultHDF5Structured
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    subroutine write_ResultHDF5Unstruct(xPoints, randField, fileName)
+        implicit none
+
+        !INPUTS
+        double precision,  dimension(:,:), intent(in) :: randField, xPoints;
+        character (len=*),                 intent(in) :: filename;
+
+        !HDF5 VARIABLES
+        character(len=35)              :: fileHDF5Name !File name
+        character(len=4),  parameter   :: dsetXYZ = "XYZ", dsetRF  = "RF"  !Dataset name
+        integer(HID_T)                 :: file_id       !File identifier
+        integer(HID_T)                 :: dset_id       !Dataset identifier
+        integer(HID_T)                 :: dspace_id     !Dataspace identifier
+        integer                        :: rank = 2      !Dataset rank (number of dimensions)
+        integer(HSIZE_T), dimension(2) :: dims !Dataset dimensions
+        integer                        :: error !Error flag
+
+		!LOCAL VARIABLES
+        integer :: nDim, Nmc, nPoints, i
+        character (len=35) :: eventName;
+        character (len=12) :: numberStr;
+
+        write(*,*) "";
+        write(*,*) "------------START Writing result HDF5 file-----------------------";
+        write(*,*) "";
+
+        fileHDF5Name = trim(fileName)//".h5"
+        nDim         = size(xPoints , 2)
+        nPoints      = size(randField, 1)
+        Nmc          = size(randField, 2)
+
+        write(*,*) "fileHDF5Name", fileHDF5Name
+
+
+        if (nDim > 3) then
+        	write(*,*) "Dimension exceeds 3, HDF file won't be created"
+
+        else
+
+			write(*,*) ">>>>>>>>> Opening file";
+	        call h5open_f(error) ! Initialize FORTRAN interface.
+	        call h5fcreate_f(fileHDF5Name, H5F_ACC_TRUNC_F, file_id, error) ! Create a new file using default properties.
+
+			write(*,*) ">>>>>>>>> Creating Coordinates dataset 'XYZ table'";
+
+	        dims = shape(xPoints)
+	        !write(*,*) "dims   = ", dims
+	        !write(*,*) dsetXYZ
+
+	        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
+	        call h5dcreate_f(file_id, dsetXYZ, H5T_NATIVE_DOUBLE,  &
+	                         dspace_id, dset_id, error) ! Create the dataset with default properties (dset_id).
+
+
+
+	 		call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, transpose(xPoints), dims, error) ! Write the dataset.
+	        call h5dclose_f(dset_id, error) ! End access to the dataset and release resources used by it.
+	        call h5sclose_f(dspace_id, error) ! Terminate access to the data space.
+
+			write(*,*) ">>>>>>>>> Creating Quantities dataset 'random field'";
+	        dims(1) = size(randField,1)
+	        dims(2) = 1 !One random field in each dataset
+			!write(*,*) "dims   = ", dims;
+
+			do i = 1, Nmc
+				write(numberStr,'(I)'  ) i
+				numberStr = adjustL(numberStr)
+				write(eventName,'(A,A)') "RF_", numberStr
 
 		        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
 		        call h5dcreate_f(file_id, eventName, H5T_NATIVE_DOUBLE,  &
@@ -223,7 +321,110 @@ contains
         write(*,*) "------------END Writing result HDF5 file-----------------------";
         write(*,*) "";
 
-    end subroutine writeResultHDF5
+    end subroutine write_ResultHDF5Unstruct
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    subroutine write_ResultHDF5Unstruct_MPI(xPoints, randField, fileName, rang)
+        implicit none
+
+        !INPUTS
+        double precision,  dimension(:,:), intent(in) :: randField, xPoints;
+        character (len=*)                , intent(in) :: filename;
+        integer                          , intent(in) :: rang;
+
+        !HDF5 VARIABLES
+        character(len=35)              :: fileHDF5Name !File name
+        character(len=35)              :: eventName, coordName;  !Dataset names
+        integer(HID_T)                 :: file_id       !File identifier
+        integer(HID_T)                 :: dset_id       !Dataset identifier
+        integer(HID_T)                 :: dspace_id     !Dataspace identifier
+        integer                        :: rank = 2      !Dataset rank (number of dimensions)
+        integer(HSIZE_T), dimension(2) :: dims !Dataset dimensions
+        integer                        :: error !Error flag
+
+		!LOCAL VARIABLES
+        integer :: nDim, Nmc, nPoints, i
+
+        character (len=12) :: numberStr, rangStr;
+
+        write(*,*) "";
+        write(*,*) "------------START Writing result HDF5 file-----------------------";
+        write(*,*) "";
+
+		write(rangStr,'(I)'  ) rang
+		rangStr      = adjustL(rangStr)
+        fileHDF5Name = trim(fileName)//"-proc"//trim(rangStr)//".h5"
+        nDim         = size(xPoints , 2)
+        nPoints      = size(randField, 1)
+        Nmc          = size(randField, 2)
+
+        write(*,*) "fileHDF5Name", fileHDF5Name
+
+
+        if (nDim > 3) then
+        	write(*,*) "Dimension exceeds 3, HDF file won't be created"
+
+        else
+
+			write(*,*) ">>>>>>>>> Opening file";
+	        call h5open_f(error) ! Initialize FORTRAN interface.
+	        call h5fcreate_f(fileHDF5Name, H5F_ACC_TRUNC_F, file_id, error) ! Create a new file using default properties.
+
+
+
+			write(*,*) ">>>>>>>>> Creating Coordinates dataset 'XYZ table'";
+
+	        dims = shape(xPoints)
+	        !write(*,*) "dims   = ", dims
+	        !write(*,*) dsetXYZ
+
+			!write(coordName,'(2A)') "XYZ-proc_", trim(rangStr)
+			write(coordName,'(A)') "XYZ"
+			write(*,*) "coordName = ", coordName
+
+	        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
+	        call h5dcreate_f(file_id, coordName, H5T_NATIVE_DOUBLE,  &
+	                         dspace_id, dset_id, error) ! Create the dataset with default properties (dset_id).
+
+	 		call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, transpose(xPoints), dims, error) ! Write the dataset.
+	        call h5dclose_f(dset_id, error) ! End access to the dataset and release resources used by it.
+	        call h5sclose_f(dspace_id, error) ! Terminate access to the data space.
+
+			write(*,*) ">>>>>>>>> Creating Quantities dataset 'random field'";
+	        dims(1) = size(randField,1)
+	        dims(2) = 1 !One random field in each dataset
+			!write(*,*) "dims   = ", dims;
+
+			do i = 1, Nmc
+				write(numberStr,'(I)'  ) i
+				numberStr = adjustL(numberStr)
+				write(eventName,'(2A)') "RF_", trim(numberStr)
+				write(*,*) "eventName = ", eventName
+
+		        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
+		        call h5dcreate_f(file_id, eventName, H5T_NATIVE_DOUBLE,  &
+		                         dspace_id, dset_id, error) ! Create the dataset with default properties (dset_id).
+		        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, randField(:,i), dims, error) ! Write the dataset.
+		        call h5dclose_f(dset_id, error) ! End access to the dataset and release resources used by it.
+		        call h5sclose_f(dspace_id, error) ! Terminate access to the data space.
+		    end do
+
+			write(*,*) ">>>>>>>>> Closing file";
+	        call h5fclose_f(file_id, error) ! Close the file.
+	        call h5close_f(error) ! Close FORTRAN interface.
+
+	        call writeXMF_RF_MPI(randField, fileHDF5Name, fileName, rang)
+
+        end if
+
+
+
+        write(*,*) "";
+        write(*,*) "------------END Writing result HDF5 file-----------------------";
+        write(*,*) "";
+
+    end subroutine write_ResultHDF5Unstruct_MPI
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -254,8 +455,8 @@ contains
 		nElemStr = adjustL(nElemStr)
 
         write(*,*) "fileXMFName", fileXMFName
-        write(*,*) "nElem = ", nElemStr
-		write(*,*) "Nmc   = ", NmcStr
+        !write(*,*) "nElem = ", nElemStr
+		!write(*,*) "Nmc   = ", NmcStr
 
         file=21;
 
@@ -273,6 +474,8 @@ contains
 			write (file,'(A)'    )'     </DataItem>'
 			write (file,'(A)'    )'    </Geometry>'
 			do i = 1, Nmc
+
+
 				write(numberStr,'(I)'  ) i
 				numberStr = adjustL(numberStr)
 				write(eventName,'(A,A)') "RF_", numberStr
@@ -297,6 +500,115 @@ contains
         write(*,*) "";
 
     end subroutine writeXMF_RF
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    subroutine writeXMF_RF_MPI(randField, fileHDF5Name, fileName, rang)
+        implicit none
+
+        !INPUTS
+        double precision,  dimension(:,:), intent(in) :: randField;
+        character (len=*)                , intent(in) :: filename;
+        character (len=*)                , intent(in) :: fileHDF5Name;
+        integer                          , intent(in) :: rang;
+
+		!LOCAL VARIABLES
+        integer            :: Nmc, i, j, file, nElem, nb_procs, code;
+        character (len=35) :: fileXMFName;
+        character (len=35) :: eventName;
+        character (len=12) :: numberStr, nElemStr, NmcStr;
+        character (len=35), dimension(:), allocatable :: all_fileHDF5Name
+        character (len=12), dimension(:), allocatable :: all_nElemStr
+
+        if(rang == 0) then
+        	write(*,*) "";
+        	write(*,*) "------------START Writing result XMF file-----------------------";
+        	write(*,*) "";
+        end if
+
+		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
+
+        nElem   = size(randField, 1)
+		write(nElemStr,'(I)') nElem
+		nElemStr = adjustL(nElemStr)
+
+		if(rang == 0) then
+			allocate(all_nElemStr(nb_procs))
+			allocate(all_fileHDF5Name(nb_procs))
+		end if
+
+		call MPI_GATHER(nElemStr    , len(nElemStr), MPI_CHARACTER,     &
+		                all_nElemStr, len(nElemStr), MPI_CHARACTER,     &
+		                 0          , MPI_COMM_WORLD , code)
+
+		call MPI_GATHER(fileHDF5Name    , len(fileHDF5Name), MPI_CHARACTER,     &
+		                all_fileHDF5Name, len(fileHDF5Name), MPI_CHARACTER,     &
+		                 0          , MPI_COMM_WORLD , code)
+
+		if(rang == 0) then
+			!Common parameters
+			Nmc     = size(randField, 2)
+			fileXMFName = trim(fileName)//".xmf"
+			write(*,*) "fileXMFName = ", fileXMFName
+
+			!Creating and adjusting strings
+			write(NmcStr,'(I)'  ) Nmc
+			NmcStr       = adjustL(NmcStr)
+			all_nElemStr = adjustL(all_nElemStr)
+
+			!Building file
+	        file=21;
+
+	        open (unit = file , file = trim(fileXMFName), action = 'write')
+
+				write (file,'(A)'      )'<?xml version="1.0" ?>'
+				write (file,'(A)'      )'<Xdmf Version="2.0">'
+				write (file,'(A)'      )' <Domain>'
+				write (file,'(A)'      )'  <Grid Name="meshRF" GridType="Uniform">'
+				write (file,'(A,A,A)'  )'   <Topology Type="Polyvertex" NodesPerElements="1" NumberOfElements="',trim(nElemStr),'">'
+				write (file,'(A)'      )'   </Topology>'
+				write (file,'(A)'      )'    <Geometry GeometryType="XYZ">'
+				write (file,'(A)    '  )'     <DataItem Name="Coordinates" ItemType="Collection" Format="HDF" DataType="Float" Precision="8">'
+				do j = 1, nb_procs
+				write (file,'(A,A,A)'  )'      <DataItem Dimensions="',trim(all_nElemStr(j)), ' 3">'
+				write (file,'(A,A,A)'  )'     	  ',trim(all_fileHDF5Name(j)),':/XYZ'
+				write (file,'(A)'      )'      </DataItem>'
+				end do
+				write (file,'(A)'      )'     </DataItem>'
+				write (file,'(A)'      )'    </Geometry>'
+				do i = 1, Nmc
+					write(numberStr,'(I)'  ) i
+					numberStr = adjustL(numberStr)
+					write(eventName,'(2A)' ) "RF_", trim(numberStr)
+						!write(eventName,'(4A)') "RF_", trim(numberStr),"-proc_", trim(rangStr)
+				write (file,'(3A)'     )'    <Attribute Name="',trim(eventName),'" Center="Node" AttributeType="Scalar">'
+				write (file,'(3A)'     )'      <DataItem ItemType="Collection" Format="HDF" DataType="Float" Precision="8">'
+					do j = 1, nb_procs
+				write (file,'(3A)'     )'       <DataItem Dimensions="',trim(all_nElemStr(j)),'">'
+				write (file,'(4A)'     )'          ',trim(all_fileHDF5Name(j)),":/", eventName
+				write (file,'(A)'      )'       </DataItem>'
+					end do
+				write (file,'(A)'      )'      </DataItem>'
+				write (file,'(A)'      )'    </Attribute>'
+				end do
+
+				write (file,'(A)'      )'  </Grid>'
+				write (file,'(A)'      )' </Domain>'
+				write (file,'(A)'      )'</Xdmf>'
+
+	        close(file)
+        end if
+
+		if(rang == 0) then
+			deallocate(all_fileHDF5Name)
+			deallocate(all_nElemStr)
+
+        	write(*,*) "";
+        	write(*,*) "------------END Writing result XMF file-----------------------";
+        	write(*,*) "";
+        end if
+
+    end subroutine writeXMF_RF_MPI
 
 !TRASH
 

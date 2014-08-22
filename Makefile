@@ -40,6 +40,7 @@ SRCS = $(wildcard *.f90)
 OBJS += ./displayCarvalhol.o \
 ./main_RandomField.o \
 ./math_RF.o \
+./obsolete_RF.o \
 ./randomFieldND.o \
 ./readFile_RF.o \
 ./spectra_RF.o \
@@ -58,11 +59,13 @@ INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI)
 	@echo ' '
 
 #Dependencies
-main_RandomField.o   : displayCarvalhol.o statistics_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o
-writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o
-randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o    
+main_RandomField.o   : displayCarvalhol.o statistics_RF.o obsolete_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o
+writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o obsolete_RF.o 
+randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o obsolete_RF.o 
+obsolete_RF.o        : displayCarvalhol.o math_RF.o  
 statistics_RF.o      : displayCarvalhol.o math_RF.o
 spectra_RF.o         : displayCarvalhol.o math_RF.o
+math_RF.o            : displayCarvalhol.o
 
 # All Target
 all: randomField
