@@ -9,6 +9,11 @@ module statistics_RF
 		                 set_StatisticsUnstruct_MPI
 	end interface set_Statistics_MPI
 
+	interface set_CompStatistics
+		module procedure set_CompStatisticsStructured,   &
+		                 set_CompStatisticsUnstruct
+	end interface set_CompStatistics
+
 contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -125,14 +130,14 @@ contains
 
 		!call DispCarvalhol(xPoints,"xPoints")
 		!call DispCarvalhol(covMatrix,"covMatrix", nColumns = 15)
-		!call DispCarvalhol(distMatrix,"distMatrix 1", nColumns = 15)
-		!call DispCarvalhol(deltaMatrix,"deltaMatrix 1", nColumns = 15)
+		!call DispCarvalhol(distMatrix,"distMatrix", nColumns = 15)
+		!call DispCarvalhol(deltaMatrix,"deltaMatrix", nColumns = 15)
 
 		do i = 1, nDim
-			!write(*,*) "nDim = ", i, "-------------------------"
+			write(*,*) "nDim = ", i, "-------------------------"
 			sumOthers = sum(distMatrix, 3) - distMatrix(:,:,i)
 			!call DispCarvalhol(sumOthers,"sumOthers BEFORE")
-			nFactors = count(sumOthers < tolerance); !- size(..) to take into account the diagonal
+			nFactors = count(sumOthers < tolerance);
 			!write(*,*) "nFactors = ", nFactors
 			where(sumOthers < tolerance)
 				sumOthers(:,:) = covMatrix (:,:)
@@ -146,7 +151,7 @@ contains
 			end do
 			!call DispCarvalhol(sumOthers,"sumOthers AFTER")
 
-			procCorrL(i) = sum(sumOthers)/nFactors
+			procCorrL(i) = sum(sumOthers)/sqrt(dble(nFactors))
 		end do
 
 		!call DispCarvalhol(procCorrL,"procCorrL")
@@ -338,5 +343,87 @@ contains
 		deallocate(centeredRF)
 
 	end subroutine set_CovMatrix
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	subroutine set_CompStatisticsUnstruct(all_RandField, all_xPoints,                   &
+			                        	  compEvntAvg, compEvntStdDev,                  &
+			                        	  compGlobAvg, compGlobStdDev, compGlobCorrL)
+		implicit none
+		!INPUT
+		double precision, dimension(:, :), intent(in) :: all_RandField, all_xPoints;
+		!OUTPUT
+		double precision, dimension(:), allocatable, intent(out) :: compEvntAvg, compEvntStdDev, compGlobCorrL;
+		double precision, intent(out) :: compGlobAvg, compGlobStdDev;
+		!LOCAL VARIABLES
+		integer :: i, Nmc, nPoints,  nDim;
+
+		nPoints = size(all_RandField, 1);
+		Nmc     = size(all_RandField, 2);
+		nDim    = size(all_xPoints  , 2);
+
+		allocate(compEvntAvg(Nmc));
+		allocate(compEvntStdDev(Nmc));
+		allocate(compGlobCorrL(nDim));
+
+		compEvntAvg    = sum(all_RandField, 1)/nPoints;
+		compEvntStdDev = sqrt(sum(all_RandField**2, 1)/nPoints - compEvntAvg**2);
+		compGlobAvg    = sum(all_RandField)/(nPoints*Nmc);
+		compGlobStdDev = sqrt(sum(all_RandField**2)/(nPoints*Nmc) - compGlobAvg**2);
+
+		call set_CorrelationLengthUnstruct(all_RandField, all_xPoints, compGlobCorrL)
+
+	end subroutine set_CompStatisticsUnstruct
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	subroutine set_CompStatisticsStructured(all_RandField, all_xPoints,                 &
+									   		all_xMin, all_xMax, all_xNStep,               &
+		                    			    compEvntAvg, compEvntStdDev,                  &
+		                   				    compGlobAvg, compGlobStdDev, compGlobCorrL)
+		implicit none
+		!INPUT
+		integer         , dimension(:, :), intent(in) :: all_xNStep;
+		double precision, dimension(:, :), intent(in) :: all_RandField, all_xPoints;
+		double precision, dimension(:, :), intent(in) :: all_xMin, all_xMax;
+		!OUTPUT
+		double precision, dimension(:), allocatable, intent(out) :: compEvntAvg, compEvntStdDev, compGlobCorrL;
+		double precision, intent(out) :: compGlobAvg, compGlobStdDev;
+		!LOCAL VARIABLES
+		integer :: i, Nmc, nPoints,  nDim, nbProcs;
+		integer, dimension(:), allocatable :: totalXNStep;
+		double precision, dimension(:), allocatable :: totalXRange, totalXMax, totalXMin;
+
+		nPoints = size(all_RandField, 1);
+		Nmc     = size(all_RandField, 2);
+		nDim    = size(all_xPoints  , 2);
+		nbProcs = size(all_xMax, 2)
+
+		allocate(compEvntAvg(Nmc));
+		allocate(compEvntStdDev(Nmc));
+		allocate(compGlobCorrL(nDim));
+		allocate(totalXRange(nDim));
+		allocate(totalXNStep(nDim));
+		allocate(totalXMax(nDim))
+		allocate(totalXMin(nDim))
+
+		totalXNStep    = sum(all_xNStep,2);
+		compEvntAvg    = sum(all_RandField, 1)/nPoints;
+		compEvntStdDev = sqrt(sum(all_RandField**2, 1)/nPoints - compEvntAvg**2);
+		compGlobAvg    = sum(all_RandField)/(nPoints*Nmc);
+		compGlobStdDev = sqrt(sum(all_RandField**2)/(nPoints*Nmc) - compGlobAvg**2);
+		totalXMax      = maxval(all_xMax, 2)
+		totalXMin      = minval(all_xMin, 2)
+		totalXRange    = totalXMax - totalXMin
+
+		call calculateAverageCorrL(all_RandField, totalXRange, totalXNStep, compGlobCorrL) !To change by set_CorrelationLengthStructured
+		!call set_CorrelationLengthStructured(all_RandField, totalXMax, totalXMin, totalXNStep, compGlobCorrL)
+
+		if(allocated(totalXRange)) deallocate(totalXRange);
+		if(allocated(totalXNStep)) deallocate(totalXNStep);
+		if(allocated(totalXMax))   deallocate(totalXMax);
+		if(allocated(totalXMin))   deallocate(totalXMin);
+
+	end subroutine set_CompStatisticsStructured
 
 end module statistics_RF

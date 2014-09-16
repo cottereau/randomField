@@ -125,7 +125,7 @@ contains
         integer :: code, nDim, i;
         double precision, dimension(:), allocatable :: xMinLoc, xMaxLoc;
 
-		write(*,*) ">>>>>>>>> Communicating Extremes (unstructured) "
+		!write(*,*) ">>>>>>>>> Communicating Extremes (unstructured) "
         nDim = size(xPoints, 2)
 
         allocate(xMinGlob(nDim))
@@ -275,6 +275,10 @@ contains
 				increment    = (xPoints(posNeigh,i) - xPoints(pos,i)) / 2
 				deltaMatrix(pos     , i) = deltaMatrix(pos     , i) + increment
 				deltaMatrix(posNeigh, i) = deltaMatrix(posNeigh, i) + increment
+
+				!!Supposing the extremes symetrics
+				!if (pos == 1) deltaMatrix(pos     , i) = deltaMatrix(pos     , i) + increment
+				!if (pos == (nFactors - 1)) deltaMatrix(posNeigh, i) = deltaMatrix(posNeigh, i) + increment
 			end do
 		end do
 
@@ -400,5 +404,92 @@ contains
 		deallocate(tempXPoints)
 
 	end subroutine reorderToGlobal
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	subroutine calculateAverageCorrL(randField, xRange, xNStep, averageCorrL)
+		implicit none
+		!INPUT
+		double precision, dimension(:, :), intent(in) :: randField;
+		double precision, dimension(:),    intent(in) :: xRange;
+		integer,          dimension(:),    intent(in) :: xNStep;
+		!OUTPUT
+		double precision, dimension(:),    intent(out) :: averageCorrL;
+		!LOCAL VARIABLES
+		double precision, dimension(:),    allocatable :: ptAvg, ptStdDev;
+		integer :: i, j, k, Nmc, beg, step, end;
+		integer :: nPoints, nPlanes, nDim;
+		double precision :: corrL
+		!double precision, dimension(:), allocatable :: Ra, Rb, Rc, R
+
+		write(*,*) ">>>> Calculating comparation corrL (global)"
+
+!		call DispCarvalhol(randField, "randField")
+		!call DispCarvalhol(xRange, "xRange")
+		!call DispCarvalhol(xNStep, "xNStep")
+
+		nPoints      = size(randField, 1);
+		Nmc          = size(randField, 2);
+		nDim         = size(xNStep);
+		averageCorrL = 0;
+
+!		write(*,*) "nPoints = ", nPoints
+!		write(*,*) "Nmc = ", Nmc
+!		write(*,*) "nDim = ", nDim
+!		write(*,*) "averageCorrL = ", averageCorrL
+
+!		write(*,*) "Before Allocation"
+		allocate(ptAvg(nPoints))
+		allocate(ptStdDev(nPoints))
+
+		ptAvg    = sum(randField, 2)/Nmc
+		ptStdDev = sqrt(sum(randField**2, 2)/Nmc - (ptAvg)**2)
+
+		do i = 1, nDim
+			nPlanes = nPoints/xNStep(i)
+			do j = 1, nPlanes
+				call get_SequenceParam(i, j, xNStep, beg, step, end)
+!
+				if(end > nPoints) end = nPoints
+
+				averageCorrL(i) = sum(((1d0/dble(Nmc) * matmul(randField(beg:end:step, :),randField(beg,:))) &
+				                      - (ptAvg(beg:end:step)    * ptAvg(beg)))                               &
+									  / (ptStdDev(beg:end:step) * ptStdDev(beg)))                            &
+								       + averageCorrL(i)
+
+!				averageCorrL(i) = sum(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) &
+!				                      - (ptAvg(beg+step:end:step)    * ptAvg(beg)))                               &
+!									  / (ptStdDev(beg+step:end:step) * ptStdDev(beg)))                            &
+!								       + averageCorrL(i)
+
+					!Ra = 1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),&
+					!						    randField(beg,:))
+					!Rb = average(beg+step:end:step)*average(beg)
+					!Rc = stdDeviation(beg+step:end:step)*stdDeviation(beg)
+					!R = (Ra - Rb) / Rc
+					!averageCorrL(i) = sum(R) * xMax(i,1)/xNStep(i,1) + averageCorrL(i)
+
+					!call dispCarvalhol(1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),&
+					!						    randField(beg,:)),"Ra")
+					!call dispCarvalhol(average(beg+step:end:step)*average(beg),"Rb")
+					!call dispCarvalhol(stdDeviation(beg+step:end:step)*stdDeviation(beg),"Rc")
+					!call dispCarvalhol(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) - &
+					!					  (average(beg+step:end:step)*average(beg))) / &
+					!					  (stdDeviation(beg+step:end:step)*stdDeviation(beg)),"R")
+					!write(*,*) "R"
+					!write(*,*)(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) - &
+					!					  (average(beg+step:end:step)*average(beg))) / &
+					!					  (stdDeviation(beg+step:end:step)*stdDeviation(beg)))
+					!write(*,*) "averageCorrL(",i,") = ", averageCorrL(i)
+
+			end do
+			averageCorrL(i) = (xRange(i)/xNStep(i))*averageCorrL(i) / dble(nPlanes)
+		end do
+		averageCorrL = 2*averageCorrL !Symmetry
+
+		if(allocated(ptAvg)) deallocate(ptAvg)
+		if(allocated(ptStdDev)) deallocate(ptStdDev)
+
+	end subroutine calculateAverageCorrL
 
 end module math_RF

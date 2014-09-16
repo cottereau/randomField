@@ -3,12 +3,6 @@ module obsolete_RF
 	use displayCarvalhol
 	use math_RF
 	use mpi
-!	use statistics_RF
-
-	interface set_CompStatistics
-		module procedure set_CompStatisticsStructured,   &
-		                 set_CompStatisticsUnstruct
-	end interface set_CompStatistics
 
 	interface set_allRandField
 		module procedure set_allRandFieldStructured,   &
@@ -16,167 +10,6 @@ module obsolete_RF
 	end interface set_allRandField
 
 contains
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine calculateAverageCorrL(randField, xRange, xNStep, averageCorrL)
-		implicit none
-		!INPUT
-		double precision, dimension(:, :), intent(in) :: randField;
-		double precision, dimension(:),    intent(in) :: xRange;
-		integer,          dimension(:),    intent(in) :: xNStep;
-		!OUTPUT
-		double precision, dimension(:),    intent(out) :: averageCorrL;
-		!LOCAL VARIABLES
-		double precision, dimension(:),    allocatable :: ptAvg, ptStdDev;
-		integer :: i, j, k, Nmc, beg, step, end;
-		integer :: nPoints, nPlanes, nDim;
-		double precision :: corrL
-		!double precision, dimension(:), allocatable :: Ra, Rb, Rc, R
-
-		write(*,*) ">>>> Calculating comparation corrL (global)"
-
-!		call DispCarvalhol(randField, "randField")
-		!call DispCarvalhol(xRange, "xRange")
-		!call DispCarvalhol(xNStep, "xNStep")
-
-		nPoints      = size(randField, 1);
-		Nmc          = size(randField, 2);
-		nDim         = size(xNStep);
-		averageCorrL = 0;
-
-!		write(*,*) "nPoints = ", nPoints
-!		write(*,*) "Nmc = ", Nmc
-!		write(*,*) "nDim = ", nDim
-!		write(*,*) "averageCorrL = ", averageCorrL
-
-!		write(*,*) "Before Allocation"
-		allocate(ptAvg(nPoints))
-		allocate(ptStdDev(nPoints))
-
-		ptAvg    = sum(randField, 2)/Nmc
-		ptStdDev = sqrt(sum(randField**2, 2)/Nmc - (ptAvg)**2)
-
-		do i = 1, nDim
-			nPlanes = nPoints/xNStep(i)
-			do j = 1, nPlanes
-				call get_SequenceParam(i, j, xNStep, beg, step, end)
-!
-				if(end > nPoints) end = nPoints
-
-				averageCorrL(i) = sum(((1d0/dble(Nmc) * matmul(randField(beg:end:step, :),randField(beg,:))) &
-				                      - (ptAvg(beg:end:step)    * ptAvg(beg)))                               &
-									  / (ptStdDev(beg:end:step) * ptStdDev(beg)))                            &
-								       + averageCorrL(i)
-
-!				averageCorrL(i) = sum(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) &
-!				                      - (ptAvg(beg+step:end:step)    * ptAvg(beg)))                               &
-!									  / (ptStdDev(beg+step:end:step) * ptStdDev(beg)))                            &
-!								       + averageCorrL(i)
-
-					!Ra = 1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),&
-					!						    randField(beg,:))
-					!Rb = average(beg+step:end:step)*average(beg)
-					!Rc = stdDeviation(beg+step:end:step)*stdDeviation(beg)
-					!R = (Ra - Rb) / Rc
-					!averageCorrL(i) = sum(R) * xMax(i,1)/xNStep(i,1) + averageCorrL(i)
-
-					!call dispCarvalhol(1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),&
-					!						    randField(beg,:)),"Ra")
-					!call dispCarvalhol(average(beg+step:end:step)*average(beg),"Rb")
-					!call dispCarvalhol(stdDeviation(beg+step:end:step)*stdDeviation(beg),"Rc")
-					!call dispCarvalhol(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) - &
-					!					  (average(beg+step:end:step)*average(beg))) / &
-					!					  (stdDeviation(beg+step:end:step)*stdDeviation(beg)),"R")
-					!write(*,*) "R"
-					!write(*,*)(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) - &
-					!					  (average(beg+step:end:step)*average(beg))) / &
-					!					  (stdDeviation(beg+step:end:step)*stdDeviation(beg)))
-					!write(*,*) "averageCorrL(",i,") = ", averageCorrL(i)
-
-			end do
-			averageCorrL(i) = (xRange(i)/xNStep(i))*averageCorrL(i) / dble(nPlanes)
-		end do
-		averageCorrL = 2*averageCorrL !Symmetry
-
-		if(allocated(ptAvg)) deallocate(ptAvg)
-		if(allocated(ptStdDev)) deallocate(ptStdDev)
-
-	end subroutine calculateAverageCorrL
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine set_CompStatisticsUnstruct(all_RandField, all_xPoints,                   &
-			                        	  compEvntAvg, compEvntStdDev,                  &
-			                        	  compGlobAvg, compGlobStdDev, compGlobCorrL)
-		implicit none
-		!INPUT
-		double precision, dimension(:, :), intent(in) :: all_RandField, all_xPoints;
-		!OUTPUT
-		double precision, dimension(:), allocatable, intent(out) :: compEvntAvg, compEvntStdDev, compGlobCorrL;
-		double precision, intent(out) :: compGlobAvg, compGlobStdDev;
-		!LOCAL VARIABLES
-		integer :: i, Nmc, nPoints,  nDim;
-
-		nPoints = size(all_RandField, 1);
-		Nmc     = size(all_RandField, 2);
-		nDim    = size(all_xPoints  , 2);
-
-		allocate(compEvntAvg(Nmc));
-		allocate(compEvntStdDev(Nmc));
-		allocate(compGlobCorrL(nDim));
-
-		compEvntAvg    = sum(all_RandField, 1)/nPoints;
-		compEvntStdDev = sqrt(sum(all_RandField**2, 1)/nPoints - compEvntAvg**2);
-		compGlobAvg    = sum(all_RandField)/(nPoints*Nmc);
-		compGlobStdDev = sqrt(sum(all_RandField**2)/(nPoints*Nmc) - compGlobAvg**2);
-
-!		call set_CorrelationLengthUnstruct(all_RandField, all_xPoints, compGlobCorrL)
-
-	end subroutine set_CompStatisticsUnstruct
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine set_CompStatisticsStructured(all_RandField, all_xPoints,                 &
-									   		all_xMin, all_xMax, all_xNStep,               &
-		                    			    compEvntAvg, compEvntStdDev,                  &
-		                   				    compGlobAvg, compGlobStdDev, compGlobCorrL)
-		implicit none
-		!INPUT
-		integer         , dimension(:, :), intent(in) :: all_xNStep;
-		double precision, dimension(:, :), intent(in) :: all_RandField, all_xPoints;
-		double precision, dimension(:, :), intent(in) :: all_xMin, all_xMax;
-		!OUTPUT
-		double precision, dimension(:), allocatable, intent(out) :: compEvntAvg, compEvntStdDev, compGlobCorrL;
-		double precision, intent(out) :: compGlobAvg, compGlobStdDev;
-		!LOCAL VARIABLES
-		integer :: i, Nmc, nPoints,  nDim;
-		integer, dimension(:), allocatable :: xNStep;
-		double precision, dimension(:), allocatable :: xRange;
-
-		nPoints = size(all_RandField, 1);
-		Nmc     = size(all_RandField, 2);
-		nDim    = size(all_xPoints  , 2);
-
-		allocate(compEvntAvg(Nmc));
-		allocate(compEvntStdDev(Nmc));
-		allocate(compGlobCorrL(nDim));
-		allocate(xRange(nDim));
-		allocate(xNStep(nDim));
-
-		xNStep  = sum(all_xNStep,2);
-		compEvntAvg    = sum(all_RandField, 1)/nPoints;
-		compEvntStdDev = sqrt(sum(all_RandField**2, 1)/nPoints - compEvntAvg**2);
-		compGlobAvg    = sum(all_RandField)/(nPoints*Nmc);
-		compGlobStdDev = sqrt(sum(all_RandField**2)/(nPoints*Nmc) - compGlobAvg**2);
-		xRange         = maxval(all_xMax, 2) - minval(all_xMin, 2)
-
-		call calculateAverageCorrL(all_RandField, xRange, xNStep, compGlobCorrL)
-
-		if(allocated(xRange)) deallocate(xRange);
-		if(allocated(xNStep)) deallocate(xNStep);
-
-	end subroutine set_CompStatisticsStructured
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -315,8 +148,8 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     subroutine set_allRandFieldStructured(randField, xMin, xMax, xNStep, rang,    &
-					            all_xMin, all_xMax, all_xNStep,         &
-					            all_RandField, all_xPoints)
+					            	      all_xMin, all_xMax, all_xNStep,         &
+					           			  all_RandField, all_xPoints)
     	implicit none
     	!INPUT
     	double precision, dimension(:, :), intent(in) :: randField

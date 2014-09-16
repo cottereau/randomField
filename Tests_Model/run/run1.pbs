@@ -1,0 +1,28 @@
+#!/bin/bash
+
+#PBS -S /bin/bash
+#PBS -N run1_rf
+#PBS -o ../output/run1_rf-output.txt
+#PBS -j oe
+#PBS -l walltime=04:00:00
+#PBS -l select=1:ncpus=1:mpiprocs=1:mem=20gb
+#PBS -q icexq
+# #PBS -q iceq 
+#PBS -M lucianopaludoecp@gmail.com
+
+# chargement des modules
+module load intel-compiler/14.0.0
+module load intel-mkl/11.1.0
+module load intel-mpi/4.0.0.028
+module load hdf5/1.8.12
+
+# On se place dans le repertoire depuis lequel le job a ete soumis
+cd $PBS_O_WORKDIR
+
+cat $PBS_NODEFILE | uniq > mpd.hosts
+nb_nodes=`cat mpd.hosts|wc -l`
+
+mpirun --rsh=ssh -n $nb_nodes -f mpd.hosts -np 1 /home/carvalhol/workspace/randomField/Build/randomField.exe 
+
+#/home/carvalhol/workspace/randomField/Build/randomField.exe
+#mpirun --rsh=ssh -n $nb_nodes -f mpd.hosts -np 120 ./prog_mpi_intel 

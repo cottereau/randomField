@@ -1,0 +1,10 @@
+!$$ For scalar entries!
+!$  For vector entries!
+!   Comments are in between two exclamation points !
+
+$$Nmc     10
+$$corrMod gaussian
+$corrL
+   0.5
+   0.5
+   0.5 

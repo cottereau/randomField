@@ -1,0 +1,37 @@
+!$$ For scalar entries!
+!$  For vector entries!
+!   Comments are in between two exclamation points !
+
+!
+$$sampleSpecName     inputName
+$$outputName         outputName
+$$meshName           meshName
+!
+
+!CASE UNSTRUCTURED 1D!
+!
+$$sampleSpecName     spec_1D_1
+$$outputName         test1D_Unstr
+$$meshName           mesh_1D_auto
+!
+
+!CASE AUTOMATIC 2D!
+!
+$$sampleSpecName     spec_2D_1
+$$outputName         test2D_Unstr
+$$meshName           mesh_2D_auto
+!
+
+!CASE UNSTRUCTURED 3D!
+
+$$sampleSpecName     spec_3D_1
+$$outputName         test3D_Unstr
+$$meshName           mesh_3D_auto
+
+
+!CASE MANUAL 3D!
+!
+$$sampleSpecName     spec_3D_1
+$$outputName         test1
+$$meshName           mesh_3D_man
+!

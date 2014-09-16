@@ -11,6 +11,9 @@ module randomFieldND
 		                 createRandomFieldStructured
 	end interface createRandomField
 
+	double precision :: periodMult = 1.1 !"range" multiplier
+	double precision :: kAdjust = 5 !"kNStep minimum" multiplier
+
 contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -37,7 +40,8 @@ contains
         integer          :: i, j, k, m, nDim;
         integer          :: xNTotal, kNTotal;
         integer          :: nb_procs, rang, code;
-        double precision :: Sk, periodMult, randPhase, deltaKprod;
+        double precision :: Sk, randPhase, deltaKprod;
+        !double precision :: periodMult = 1.1, kAdjust = 5;
         double precision :: pi = 3.1415926535898, zero = 0d0;
 
 		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
@@ -59,10 +63,11 @@ contains
 
 		call set_Extremes(xPoints, xMinGlob, xMaxGlob) !Communicating extremes
 		call set_kMaxND(corrMod, corrL, kMax) !Defining kMax according to corrMod and corrL
-		periodMult = 1.1;
 		kDelta     = 2*pi/(periodMult*(xMaxGlob - xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
-		kNStep     = ceiling(kMax/kDelta) + 1;
+		kNStep     = kAdjust*(ceiling(kMax/kDelta) + 1);
 		kNTotal    = product(kNStep);
+
+
 
 		!Random Field
 		allocate(angleVec    (xNTotal));
@@ -79,8 +84,12 @@ contains
 			write(*,*) "";
 			write(*,*) "Number of dimensions = ", nDim;
 			write(*,*) "Number of events     = ", Nmc;
-			write(*,*) "Number x points      = ", xNTotal;
-			write(*,*) "Number k points      = ", kNTotal;
+			write(*,*) "Number x points ";
+			write(*,*) "      by Dimension   = --- (unstructured)";
+			write(*,*) "      Total          = ", xNTotal;
+			write(*,*) "Number k points ";
+			write(*,*) "      by Dimension   = ", kNStep;
+			write(*,*) "      Total          = ", kNTotal;
 			write(*,*) "";
 		end if
 
@@ -88,40 +97,66 @@ contains
 		angleVec   = 0;
 		deltaK     = 0;
 	    deltaK     = (kMax)/(kNStep-1); !Defines deltaK
-	    deltaKprod = 0
 		call set_kSign(kSign)
 
+	! START NEW VERSION
 		do k = 1, Nmc
 			call random_number(phiN(:,1:kNTotal))
 			do j = 1, kNTotal
 				call get_Permutation(j, kMax, kNStep, kVecUnsigned);
-				deltaKprod = product(deltaK)
-				!write(*,*) "kN = ", j
 			    do m = 1, size(kSign,1)
 			    	kVec      = kVecUnsigned * kSign(m, :)
 					Sk        = get_SpectrumND(kVec, corrMod, corrL);
 					randPhase = 2*pi*phiN(m, j)
-
 					do i = 1, xNTotal
-						angleVec(i) = dot_product(kVec, xPoints(i,:)) + randPhase ; !angle + random phase
-						if (i == 1 .or. i == 3) then
-							!write(*,*) "angleVec ", i, " = ", mod(180.0*angleVec(i)/pi,360.0)
-							!write(*,*) "constPhase             = ", mod(180.0*dot_product(kVec, xPoints(i,:))/pi, 360.0)
-						end if
+						angleVec(i) = dot_product(kVec, xPoints(i,:)) + randPhase !angle + random phase
 					end do
-					!write(*,*) "randPhase =   ", mod(180.0*randPhase/pi,360.0)
-					randField(:,k) = sqrt(Sk*2*deltaKprod) * cos(angleVec(:)) &
-									 + randField(:,k)
-					!write(*,*) "CONTRIB 1 = ", sqrt(Sk*2*deltaKprod) * cos(angleVec(1)), "Proc = ", rang
-					!write(*,*) "CONTRIB 3 = ", sqrt(Sk*2*deltaKprod) * cos(angleVec(3)), "Proc = ", rang
+					randField(:,k) = sqrt(Sk) * cos(angleVec(:)) + randField(:,k)
 				end do
-				!write(*,*) "randField(1,", k, ") = ", randField(1,k)
-				!write(*,*) "randField(3,", k, ") = ", randField(3,k)
 			end do
 			!if(rang == 0) write(*,*) "Event ",k, "of", Nmc, "completed (counting only in proc 0)";
 		end do
 
-		randField(:,:) = product(corrL)*sqrt(2d0)*randField(:,:)
+		randField(:,:) = (2.0d0)**(2.0d0-nDim)*sqrt(product(corrL)*product(deltaK)/pi)*randField(:,:)
+
+	! END NEW VERSION
+
+	if (corrMod == "lognormal") then
+		randField(:,:) = exp(randField(:,:))
+	end if
+
+
+!		do k = 1, Nmc
+!			call random_number(phiN(:,1:kNTotal))
+!			do j = 1, kNTotal
+!				call get_Permutation(j, kMax, kNStep, kVecUnsigned);
+!				deltaKprod = product(deltaK)
+!				!write(*,*) "kN = ", j
+!			    do m = 1, size(kSign,1)
+!			    	kVec      = kVecUnsigned * kSign(m, :)
+!					Sk        = get_SpectrumND(kVec, corrMod, corrL);
+!					randPhase = 2*pi*phiN(m, j)
+!
+!					do i = 1, xNTotal
+!						angleVec(i) = dot_product(kVec, xPoints(i,:)) + randPhase ; !angle + random phase
+!						if (i == 1 .or. i == 3) then
+!							!write(*,*) "angleVec ", i, " = ", mod(180.0*angleVec(i)/pi,360.0)
+!							!write(*,*) "constPhase             = ", mod(180.0*dot_product(kVec, xPoints(i,:))/pi, 360.0)
+!						end if
+!					end do
+!					!write(*,*) "randPhase =   ", mod(180.0*randPhase/pi,360.0)
+!					randField(:,k) = sqrt(Sk*2*deltaKprod) * cos(angleVec(:)) &
+!									 + randField(:,k)
+!					!write(*,*) "CONTRIB 1 = ", sqrt(Sk*2*deltaKprod) * cos(angleVec(1)), "Proc = ", rang
+!					!write(*,*) "CONTRIB 3 = ", sqrt(Sk*2*deltaKprod) * cos(angleVec(3)), "Proc = ", rang
+!				end do
+!				!write(*,*) "randField(1,", k, ") = ", randField(1,k)
+!				!write(*,*) "randField(3,", k, ") = ", randField(3,k)
+!			end do
+!			!if(rang == 0) write(*,*) "Event ",k, "of", Nmc, "completed (counting only in proc 0)";
+!		end do
+!
+!		randField(:,:) = product(corrL)*sqrt(2d0)*randField(:,:)
 
 		!Only printing------------------------------------------
 
@@ -214,7 +249,8 @@ contains
         integer          :: xNTotal, kNTotal;
         integer          :: testDim; !Only for tests
         integer          :: nb_procs, rang, code !, xStart, xEnd, sizeUnif, sizeLoc;
-        double precision :: Sk, periodMult;
+        double precision :: xPerCorrL = 5; !number of points per Correlation Length
+        double precision :: Sk;
         double precision :: pi = 3.1415926535898, zero = 0d0;
 
 		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
@@ -237,17 +273,12 @@ contains
 		call set_Extremes(xMin, xMax, xMinGlob, xMaxGlob)
 
 		!Initializing (obs: parameters FOR EACH PROC)
-		testDim    = 5; !Number of points by correlation length
-		periodMult = 1.1;
 		call set_kMaxND(corrMod, corrL, kMax)
-		xNStep = testDim*ceiling((xMax-xMin)/corrL);
-		kDelta = 2*pi/(periodMult*(xMaxGlob - xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
-		kNStep = ceiling(kMax/kDelta) + 1;
-
-		!Overwriting for tests
-!		xNStep = testDim
-!		kNStep = testDim
-		!/Overwriting for tests
+		xNStep  = xPerCorrL*ceiling((xMax-xMin)/corrL);
+		kDelta  = 2*pi/(periodMult*(xMaxGlob - xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
+		kNStep  = kAdjust*(ceiling(kMax/kDelta) + 1);
+		xNTotal = product(xNStep);
+		kNTotal = product(kNStep);
 
 !		if (rang == 0) then
 !			call DispCarvalhol (xMax, "xMax")
@@ -260,8 +291,7 @@ contains
 !			call DispCarvalhol (kNStep, "kNStep")
 !		end if
 
-		xNTotal = product(xNStep);
-		kNTotal = product(kNStep);
+
 
 		!Random Field
 		allocate(randField((xNTotal),Nmc));
@@ -275,12 +305,16 @@ contains
 
 		if(rang == 0) then
 			write(*,*) "";
-			write(*,*) ">>>>>>>>> Random Field Creation on proc ", rang;
+			write(*,*) ">>>>>>>>> Random Field Creation (only showing proc 0)";
 			write(*,*) "";
 			write(*,*) "Number of dimensions = ", nDim;
 			write(*,*) "Number of events     = ", Nmc;
-			write(*,*) "Number x points      = ", xNTotal;
-			write(*,*) "Number k points      = ", kNTotal;
+			write(*,*) "Number x points ";
+			write(*,*) "      by Dimension   = ", xNStep;
+			write(*,*) "      Total          = ", xNTotal;
+			write(*,*) "Number k points ";
+			write(*,*) "      by Dimension   = ", kNStep;
+			write(*,*) "      Total          = ", kNTotal;
 			write(*,*) "";
 		end if
 
@@ -381,21 +415,21 @@ contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    subroutine set_XPoints(corrL, xMin, xMax, xPoints)
+    subroutine set_XPoints(corrL, xMin, xMax, xPoints, nPoinsPerCorrL)
     	implicit none
 
     	!INPUT
     	double precision, dimension(:), intent(in) :: corrL, xMin, xMax;
+    	integer                       , intent(in) :: nPoinsPerCorrL !Number of points by correlation length
     	!OUTPUT
     	double precision, dimension(:,:), allocatable, intent(OUT) :: xPoints;
     	!LOCAL VARIABLES
-    	integer :: nDim, testDim, i, xNTotal;
+    	integer :: nDim, i, xNTotal;
     	integer , dimension(:) , allocatable :: xNStep;
 
-    	nDim = size(corrL)
+    	nDim    = size(corrL)
     	allocate(xNStep(nDim))
-		testDim = 2; !Number of points by correlation length
-		xNStep = testDim*ceiling((xMax-xMin)/corrL);
+		xNStep  = nPoinsPerCorrL*ceiling((xMax-xMin)/corrL);
 		xNTotal = product(xNStep)
 		allocate(xPoints(xNTotal, nDim))
 

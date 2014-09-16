@@ -81,9 +81,10 @@ contains
         allocate (eta(nDim))
 
         select case(corrMod)
-            case("gaussian")
-            	eta = corrL/(2*sqrt(pi))
-				Sk  = exp(-dot_product((eta**2),(kVector**2))); !Amplitude part "product(corrL)" is external to the function
+            case("gaussian" : "lognormal")
+				Sk  = exp(-dot_product((kVector**2),(corrL**2))/(4.0d0)); !Amplitude part "product(corrL)" is external to the function
+!            	eta = corrL/(2*sqrt(pi))
+!				Sk  = exp(-dot_product((eta**2),(kVector**2))); !Amplitude part "product(corrL)" is external to the function
         end select
 
         deallocate (eta)
