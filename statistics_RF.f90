@@ -134,7 +134,7 @@ contains
 		!call DispCarvalhol(deltaMatrix,"deltaMatrix", nColumns = 15)
 
 		do i = 1, nDim
-			write(*,*) "nDim = ", i, "-------------------------"
+			!write(*,*) "nDim = ", i, "-------------------------"
 			sumOthers = sum(distMatrix, 3) - distMatrix(:,:,i)
 			!call DispCarvalhol(sumOthers,"sumOthers BEFORE")
 			nFactors = count(sumOthers < tolerance);

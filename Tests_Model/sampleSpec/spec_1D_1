@@ -2,7 +2,11 @@
 !$  For vector entries!
 !   Comments are in between two exclamation points !
 
-$$Nmc     10
-$$corrMod gaussian
+$$Nmc     100000
+$$corrMod lognormal
 $corrL
    1.0
+$fieldAvg
+   1.0
+$fieldVar
+   2.0

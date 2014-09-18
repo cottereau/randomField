@@ -12,20 +12,21 @@ module randomFieldND
 	end interface createRandomField
 
 	double precision :: periodMult = 1.1 !"range" multiplier
-	double precision :: kAdjust = 5 !"kNStep minimum" multiplier
+	double precision :: kAdjust = 10 !"kNStep minimum" multiplier
 
 contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine createRandomFieldUnstruct(xPoints, corrMod, corrL, Nmc, randField);
+	subroutine createRandomFieldUnstruct(xPoints, corrMod, corrL, fieldAvg, fieldVar, Nmc, randField);
         implicit none
 
         !INPUT
         double precision, dimension(:, :), intent(in) :: xPoints;
-        character (len=*)                , intent(in) :: corrMod;
         double precision, dimension(:)   , intent(in) :: corrL;
+        character (len=*)                , intent(in) :: corrMod;
         integer                          , intent(in) :: Nmc;
+        double precision                 , intent(in) :: fieldAvg, fieldVar;
 
         !OUTPUT
         double precision, dimension(:, :), allocatable, intent(out) :: randField;
@@ -39,8 +40,8 @@ contains
         double precision, dimension(:)  , allocatable :: xMaxGlob, xMinGlob;
         integer          :: i, j, k, m, nDim;
         integer          :: xNTotal, kNTotal;
-        integer          :: nb_procs, rang, code;
-        double precision :: Sk, randPhase, deltaKprod;
+        integer          :: nb_procs, rang, code, error;
+        double precision :: Sk, randPhase, deltaKprod, normalAvg, normalVar;
         !double precision :: periodMult = 1.1, kAdjust = 5;
         double precision :: pi = 3.1415926535898, zero = 0d0;
 
@@ -99,7 +100,24 @@ contains
 	    deltaK     = (kMax)/(kNStep-1); !Defines deltaK
 		call set_kSign(kSign)
 
-	! START NEW VERSION
+		select case (corrMod)
+			case("gaussian")
+				normalVar = fieldVar
+				normalAvg = fieldAvg
+			case("lognormal")
+				if(fieldAvg <= 0) then
+					write(*,*) ""
+					write(*,*) "ERROR - when using lognormal fieldAvg should be a positive number greater than 0.001"
+					call MPI_ABORT(MPI_COMM_WORLD, error, code)
+				end if
+				normalVar = log(1 + fieldVar/(fieldAvg**2))
+				normalAvg = log(fieldAvg) - normalVar/2
+
+		end select
+
+		if(rang == 0) write(*,*) "normalVar = ", normalVar
+		if(rang == 0) write(*,*) "normalAvg = ", normalAvg
+
 		do k = 1, Nmc
 			call random_number(phiN(:,1:kNTotal))
 			do j = 1, kNTotal
@@ -117,90 +135,17 @@ contains
 			!if(rang == 0) write(*,*) "Event ",k, "of", Nmc, "completed (counting only in proc 0)";
 		end do
 
-		randField(:,:) = (2.0d0)**(2.0d0-nDim)*sqrt(product(corrL)*product(deltaK)/pi)*randField(:,:)
+		randField(:,:) = sqrt(2/pi)*sqrt(product(corrL)*product(deltaK))&
+						 * randField(:,:) * sqrt(normalVar)&
+						 + normalAvg; !Obs: sqrt(2*pi) division
+!		randField(:,:) = (2.0d0)**(2.0d0-nDim)*sqrt(product(corrL)*product(deltaK)/pi)&
+!						 * randField(:,:) * sqrt(normalVar)&
+!						 + normalAvg;
 
-	! END NEW VERSION
+		if (corrMod == "lognormal") then
+			randField(:,:) = exp(randField(:,:))
+		end if
 
-	if (corrMod == "lognormal") then
-		randField(:,:) = exp(randField(:,:))
-	end if
-
-
-!		do k = 1, Nmc
-!			call random_number(phiN(:,1:kNTotal))
-!			do j = 1, kNTotal
-!				call get_Permutation(j, kMax, kNStep, kVecUnsigned);
-!				deltaKprod = product(deltaK)
-!				!write(*,*) "kN = ", j
-!			    do m = 1, size(kSign,1)
-!			    	kVec      = kVecUnsigned * kSign(m, :)
-!					Sk        = get_SpectrumND(kVec, corrMod, corrL);
-!					randPhase = 2*pi*phiN(m, j)
-!
-!					do i = 1, xNTotal
-!						angleVec(i) = dot_product(kVec, xPoints(i,:)) + randPhase ; !angle + random phase
-!						if (i == 1 .or. i == 3) then
-!							!write(*,*) "angleVec ", i, " = ", mod(180.0*angleVec(i)/pi,360.0)
-!							!write(*,*) "constPhase             = ", mod(180.0*dot_product(kVec, xPoints(i,:))/pi, 360.0)
-!						end if
-!					end do
-!					!write(*,*) "randPhase =   ", mod(180.0*randPhase/pi,360.0)
-!					randField(:,k) = sqrt(Sk*2*deltaKprod) * cos(angleVec(:)) &
-!									 + randField(:,k)
-!					!write(*,*) "CONTRIB 1 = ", sqrt(Sk*2*deltaKprod) * cos(angleVec(1)), "Proc = ", rang
-!					!write(*,*) "CONTRIB 3 = ", sqrt(Sk*2*deltaKprod) * cos(angleVec(3)), "Proc = ", rang
-!				end do
-!				!write(*,*) "randField(1,", k, ") = ", randField(1,k)
-!				!write(*,*) "randField(3,", k, ") = ", randField(3,k)
-!			end do
-!			!if(rang == 0) write(*,*) "Event ",k, "of", Nmc, "completed (counting only in proc 0)";
-!		end do
-!
-!		randField(:,:) = product(corrL)*sqrt(2d0)*randField(:,:)
-
-		!Only printing------------------------------------------
-
-!		if(rang == 0) then
-!			write (*,*) "randField = ", rang
-!			do i = 1, 10! size(randField, 1)
-!				write(*,*) randField(i,:)
-!			end do
-!		end if
-
-!		call DispCarvalhol(xNStep, "xNStep");
-!		call DispCarvalhol(kNStep, "kNStep");
-!
-!
-!		call DispCarvalhol(xPoints, "xPoints")
-!		call DispCarvalhol(randField, "randField")
-
-!		do i = 1, xNTotal
-!			write(*,'(A, I10, A, 3F10.5, A, F10.5)') "Point ", i, ">>", xPoints(i,:), "  RF = ", randField(i,1)
-!		end do
-!
-!		if (rang == 0) then
-!			call DispCarvalhol(kMax  , "kMax")
-!			call DispCarvalhol(kNStep, "kNStep")
-!			write(*,*) "Permutation K (Nmc = 1)"
-!			do i = 1, kNTotal
-!			call get_Permutation(i, kMax, kNStep, kVecUnsigned);
-!				write(*,*) i, ">", kVecUnsigned;
-!			end do
-!		end if
-!
-!		!Spectrum
-!		write(*,*) "Spectrum (Nmc = 1)"
-!		do i = 1, kNTotal
-!			call get_Permutation(j, kMax, kNStep, kVecUnsigned);
-!		    do m = 1, size(kSign,1)
-!		    	kVec           = kVecUnsigned * kSign(m, :)
-!				Sk             = get_SpectrumND(kVec, corrMod, corrL);
-!			end do
-!		end do
-!
-!		call DispCarvalhol(randField)
-
-		!---------------------------------------------------
 
 		if(allocated(deltaK))       deallocate(deltaK);
 		if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);

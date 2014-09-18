@@ -126,20 +126,20 @@ contains
                     posTaken = .TRUE.
                 endif
                 if (contentVector(i)(2:2) == tagID) unitTags = unitTags + 1
-!                !write(*,*) nLines, "tag = ", tagTotal;
+                !write(*,*) "tag = ", tagTotal;
             else if (.not.((contentVector(i)(1:1) == comment) .or. (contentVector(i)(1:1) == empty))) then
                 dataTotal = dataTotal+1
-!                !write(*,*) nLines, "data = ", dataTotal;
+                !write(*,*) "data = ", dataTotal;
             else
                 blankTotal = blankTotal+1
-!                !write(*,*) nLines, "Comment or blank";
+                !write(*,*) "Comment or blank";
             endif
             read(fileID,'(A)',IOSTAT = stat) contentVector(i)
         enddo
 
-!        write(*,*) "dataTotal            = ", dataTotal;
-!        write(*,*) "tagTotal             = ", tagTotal;
-!        write(*,*) "blank/comment Total  = ", blankTotal;
+        !write(*,*) "dataTotal            = ", dataTotal;
+        !write(*,*) "tagTotal             = ", tagTotal;
+        !write(*,*) "blank/comment Total  = ", blankTotal;
 
 		if(dataTotal == 0 .or. tagTotal == 0) then
         	write(*,*) "ERROR! In set_DataTable, no tags and/or data bad conditioned "

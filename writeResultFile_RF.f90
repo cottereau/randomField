@@ -84,7 +84,7 @@ contains
         nPoints      = size(randField, 1)
         Nmc          = size(randField, 2)
 
-        write(*,*) "fileHDF5Name", fileHDF5Name
+       if(rang == 0) write(*,*) "fileHDF5Name in rang 0", fileHDF5Name
 
 
         if (nDim > 3) then
@@ -107,7 +107,7 @@ contains
 
 			!write(coordName,'(2A)') "XYZ-proc_", trim(rangStr)
 			write(coordName,'(A)') "XYZ"
-			if(Nmc < 11) write(*,*) "coordName = ", coordName
+			!if(Nmc < 11) write(*,*) "coordName = ", coordName
 
 	        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
 	        call h5dcreate_f(file_id, coordName, H5T_NATIVE_DOUBLE,  &
@@ -128,7 +128,7 @@ contains
 				write(numberStr,'(I)'  ) i
 				numberStr = adjustL(numberStr)
 				write(eventName,'(2A)') "RF_", trim(numberStr)
-				if(Nmc < 11) write(*,*) "eventName = ", eventName
+				!if(Nmc < 11) write(*,*) "eventName = ", eventName
 
 		        call h5screate_simple_f(rank, dims, dspace_id, error) ! Create the dataspace (dspace_id).
 		        call h5dcreate_f(file_id, eventName, H5T_NATIVE_DOUBLE,  &

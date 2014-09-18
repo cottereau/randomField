@@ -29,6 +29,8 @@ contains
     	select case(corrMod)
    				case("gaussian")
 				kMax(:) = 2*pi*corrL(:); !CRITERIA STILL TO BE TESTED
+				case("lognormal")
+				kMax(:) = 4*pi*corrL(:); !CRITERIA STILL TO BE TESTED
    		end select
 
     end subroutine set_kMaxND
@@ -78,16 +80,19 @@ contains
 
         Sk = 0;
         nDim = size(kVector)
-        allocate (eta(nDim))
+        !allocate (eta(nDim))
 
         select case(corrMod)
             case("gaussian" : "lognormal")
-				Sk  = exp(-dot_product((kVector**2),(corrL**2))/(4.0d0)); !Amplitude part "product(corrL)" is external to the function
+				!Sk  = exp(-dot_product((kVector**2),(corrL**2))/(4.0d0)); !Amplitude part "product(corrL)" is external to the function
+				Sk  = exp(-dot_product((kVector**2),(corrL**2))/(4.0d0*pi)); !Amplitude part "product(corrL)" is external to the function
+				!write(*,*) "kVector = ", kVector
+				!write(*,*) "Sk = ", Sk
 !            	eta = corrL/(2*sqrt(pi))
 !				Sk  = exp(-dot_product((eta**2),(kVector**2))); !Amplitude part "product(corrL)" is external to the function
         end select
 
-        deallocate (eta)
+        !deallocate (eta)
     end function get_SpectrumND
 
 end module spectra_RF

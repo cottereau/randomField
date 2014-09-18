@@ -19,6 +19,7 @@ program main_RandomField
     character (len=50)                             :: sampleSpecName, meshName, outputName;
     character (len=15)                             :: corrMod, meshType, meshMod;
     double precision,   dimension(:),  allocatable :: corrL;
+    double precision                               :: fieldAvg, fieldVar;
 
 	!OUTPUTS (in this case variables to be filled in in the proces)
 	double precision, dimension(:)   , allocatable :: kMax, xMax, xMin;
@@ -32,7 +33,7 @@ program main_RandomField
     double precision                               :: globalAvg, globalStdDev, compGlobAvg, compGlobStdDev;
 
 	!LOCAL VARIABLES
-    integer           :: i, baseStep;
+    integer           :: i, baseStep, pointsPerCorrL;
     integer           :: code, rang, error, nb_procs;
     logical           :: structured = .false.
     double precision  :: pi = 3.1415926535898;
@@ -66,10 +67,12 @@ program main_RandomField
 	!Reading Input
 	path = trim(adjustL(sampleSpecFolder))//"/"//sampleSpecName
 	call set_DataTable(path, dataTable)
-	!if(rang == 0) call DispCarvalhol (dataTable, inputName);
-	call read_DataTable(dataTable, "Nmc",  Nmc)
-	call read_DataTable(dataTable, "corrMod", corrMod)
-	call read_DataTable(dataTable, "corrL", corrL)
+	!if(rang == 0) call DispCarvalhol (dataTable, sampleSpecName);
+	call read_DataTable(dataTable, "Nmc"     ,  Nmc)
+	call read_DataTable(dataTable, "corrMod" , corrMod)
+	call read_DataTable(dataTable, "corrL"   , corrL)
+	call read_DataTable(dataTable, "fieldAvg", fieldAvg)
+	call read_DataTable(dataTable, "fieldVar", fieldVar)
 	deallocate(dataTable)
 
 	nDim = size(corrL)
@@ -113,6 +116,8 @@ program main_RandomField
 		write(*,*) "meshName       = ", meshName
 		write(*,*) "meshType       = ", meshType
 		write(*,*) "meshMod        = ", meshMod
+		write(*,*) "xMin           = ", xMin
+		write(*,*) "xMax           = ", xMax
 		write(*,*) ""
 		write(*,*) "##EVENTS"
 		write(*,*) "nDim           = ", nDim
@@ -151,13 +156,14 @@ program main_RandomField
 		!Creating x points for each processor (in the future this would be one of the inputs)
 		write(*,*) ""
 		if(rang == 0) write(*,*) ">>>>>>>>> Creating xPoints for unstructured mesh";
-		call set_XPoints(corrL, xMin, xMax, xPoints, 10)
+		pointsPerCorrL = 10
+		call set_XPoints(corrL, xMin, xMax, xPoints, pointsPerCorrL)
 		!write(*,*) " Rang = ", rang
 		!call dispCarvalhol(xPoints, "xPoints")
 
 		!Calculating a part of the random field in each processor
 		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Random field (unstructured)";
-		call createRandomField(xPoints, corrMod, corrL, Nmc, randField);
+		call createRandomField(xPoints, corrMod, corrL, fieldAvg, fieldVar, Nmc, randField);
 		!call dispCarvalhol(xPoints, "xPoints", mpi = .true.)
 		!call dispCarvalhol(randField, "randField", mpi = .true.)
 
@@ -190,7 +196,7 @@ program main_RandomField
 		end if
 
 	!--------------------------------------------------------------------------------------
-	!--------------------------------STRUCTURED--------------------------------------------
+	!--------------------------------STRUCTURED (need to be updated)--------------------------------------------
 	!--------------------------------------------------------------------------------------
 
 	else if(meshType == "structured") then
@@ -236,15 +242,15 @@ program main_RandomField
 			write(*,*) ">>BY EVENT"
 			call DispCarvalhol(evntAvg, "    MPI Avg = ")
 			call DispCarvalhol(compEvntAvg, "   Comp Avg = ")
-			call DispCarvalhol(evntStdDev, " MPI StdDev = ")
-			call DispCarvalhol(compEvntStdDev, "Comp StdDev = ")
+			call DispCarvalhol(evntStdDev**2, "    MPI Var = ")
+			call DispCarvalhol(compEvntStdDev**2, "   Comp Var = ")
 		end if
 
 		write(*,*) ">>GLOBAL"
 		write(*,*) "    MPI Avg = ", globalAvg;
 		write(*,*) "   Comp Avg = ", compGlobAvg;
-		write(*,*) " MPI StdDev = ", globalStdDev;
-		write(*,*) "Comp StdDev = ", compGlobStdDev;
+		write(*,*) "    MPI Var = ", globalStdDev**2;
+		write(*,*) "   Comp Var = ", compGlobStdDev**2;
 		write(*,*) " MPI CorrL  = ", globalCorrL;
 		write(*,*) "Comp CorrL  = ", compGlobCorrL;
 !		call DispCarvalhol(globalCorrL, "  MPI CorrL ")

@@ -7,3 +7,7 @@ $$corrMod gaussian
 $corrL
    1.0
    1.0
+$fieldAvg
+   0.0
+$fieldVar
+   1.0

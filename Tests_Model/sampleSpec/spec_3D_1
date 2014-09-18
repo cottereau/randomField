@@ -6,5 +6,9 @@ $$Nmc     10
 $$corrMod gaussian
 $corrL
    0.5
-   0.5
-   0.5 
+   0.75
+   1.0
+$fieldAvg
+   0.0
+$fieldVar
+   1.0
