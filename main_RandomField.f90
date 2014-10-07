@@ -17,14 +17,14 @@ program main_RandomField
     character (len=50), parameter                  :: meshFolder       = "../mesh"
     character (len=50), parameter                  :: outputFolder     = "../output"
     character (len=50)                             :: sampleSpecName, meshName, outputName;
-    character (len=15)                             :: corrMod, meshType, meshMod;
+    character (len=15)                             :: corrMod, margiFirst, meshType, meshMod;
     double precision,   dimension(:),  allocatable :: corrL;
     double precision                               :: fieldAvg, fieldVar;
 
 	!OUTPUTS (in this case variables to be filled in in the proces)
-	double precision, dimension(:)   , allocatable :: kMax, xMax, xMin;
 	integer         , dimension(:)   , allocatable :: xNStep, kNStep;
     integer         , dimension(:, :), allocatable :: all_xNStep;
+	double precision, dimension(:)   , allocatable :: kMax, xMax, xMin;
     double precision, dimension(:, :), allocatable :: randField, xPoints;
     double precision, dimension(:, :), allocatable :: all_RandField, all_xPoints;
     double precision, dimension(:, :), allocatable :: all_xMin, all_xMax;
@@ -33,9 +33,9 @@ program main_RandomField
     double precision                               :: globalAvg, globalStdDev, compGlobAvg, compGlobStdDev;
 
 	!LOCAL VARIABLES
+    logical           :: structured = .false., calcComp = .false.
     integer           :: i, baseStep, pointsPerCorrL;
     integer           :: code, rang, error, nb_procs;
-    logical           :: structured = .false.
     double precision  :: pi = 3.1415926535898;
     character(len=30) :: rangChar;
     character(len=30) , dimension(:,:), allocatable :: dataTable;
@@ -68,11 +68,12 @@ program main_RandomField
 	path = trim(adjustL(sampleSpecFolder))//"/"//sampleSpecName
 	call set_DataTable(path, dataTable)
 	!if(rang == 0) call DispCarvalhol (dataTable, sampleSpecName);
-	call read_DataTable(dataTable, "Nmc"     ,  Nmc)
-	call read_DataTable(dataTable, "corrMod" , corrMod)
-	call read_DataTable(dataTable, "corrL"   , corrL)
-	call read_DataTable(dataTable, "fieldAvg", fieldAvg)
-	call read_DataTable(dataTable, "fieldVar", fieldVar)
+	call read_DataTable(dataTable, "Nmc"        ,  Nmc)
+	call read_DataTable(dataTable, "corrMod"    , corrMod)
+	call read_DataTable(dataTable, "margiFirst" , margiFirst)
+	call read_DataTable(dataTable, "corrL"      , corrL)
+	call read_DataTable(dataTable, "fieldAvg"   , fieldAvg)
+	call read_DataTable(dataTable, "fieldVar"   , fieldVar)
 	deallocate(dataTable)
 
 	nDim = size(corrL)
@@ -123,7 +124,10 @@ program main_RandomField
 		write(*,*) "nDim           = ", nDim
 		write(*,*) "Nmc            = ", Nmc !number of Monte-Carlo experiments
 		write(*,*) "corrMod        = ", corrMod
+		write(*,*) "margiFirst     = ", margiFirst
 		write(*,*) "corrL          = ", corrL
+		write(*,*) "fieldAvg       = ", fieldAvg
+		write(*,*) "fieldVar       = ", fieldVar
 	end if
 
 	!Input Validation
@@ -156,27 +160,29 @@ program main_RandomField
 		!Creating x points for each processor (in the future this would be one of the inputs)
 		write(*,*) ""
 		if(rang == 0) write(*,*) ">>>>>>>>> Creating xPoints for unstructured mesh";
-		pointsPerCorrL = 10
+		pointsPerCorrL = 5
 		call set_XPoints(corrL, xMin, xMax, xPoints, pointsPerCorrL)
 		!write(*,*) " Rang = ", rang
 		!call dispCarvalhol(xPoints, "xPoints")
 
 		!Calculating a part of the random field in each processor
 		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Random field (unstructured)";
-		call createRandomField(xPoints, corrMod, corrL, fieldAvg, fieldVar, Nmc, randField);
+		!call createRandomField(xPoints, corrMod, margiFirst, corrL, fieldAvg, fieldVar, Nmc, randField);
+		!START Test Victor
+		call createStandardGaussianFieldUnstructVictor(xPoints, corrL, corrMod, Nmc, randField);
+		!END Test Victor
 		!call dispCarvalhol(xPoints, "xPoints", mpi = .true.)
 		!call dispCarvalhol(randField, "randField", mpi = .true.)
+
+		if(rang == 0) write(*,*) ">>>>>>>>> Writing Result File";
+		path = trim(adjustL(outputFolder))//"/"//outputName
+		call write_ResultHDF5(xPoints, randField, path, rang) !HDF5 of this processor
 
 		!Calculating Statistics
 		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics MPI (unstructured)";
 		call set_Statistics_MPI(randField, xPoints, rang,             &
 							 	evntAvg, evntStdDev, procCorrL,       &
 							 	globalAvg, globalStdDev, globalCorrL)
-
-
-		if(rang == 0) write(*,*) ">>>>>>>>> Writing Result File";
-		path = trim(adjustL(outputFolder))//"/"//outputName
-		call write_ResultHDF5(xPoints, randField, path, rang) !HDF5 of this processor
 
 		!Writing results and comparison statistics (To be deleted)
 		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Comparison Statistics (unstructured)";
@@ -214,15 +220,17 @@ program main_RandomField
 		call write_ResultHDF5(xMin, xMax, xNStep, randField, path, rang) !HDF5 of this processor
 
 		!Writing results and comparison statistics (To be deleted)
-		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Comparison Statistics (structured)";
-		call set_allRandField(randField, xMin, xMax, xNStep, rang,    &
-						      all_xMin, all_xMax, all_xNStep,         &
-						      all_RandField, all_xPoints)
-		if(rang == 0) then
-			call set_CompStatistics(all_RandField, all_xPoints,                   &
-									all_xMin, all_xMax, all_xNStep,               &
-			                        compEvntAvg, compEvntStdDev,                  &
-			                        compGlobAvg, compGlobStdDev, compGlobCorrL)
+		if (calcComp) then
+			if(rang == 0) write(*,*) ">>>>>>>>> Calculating Comparison Statistics (structured)";
+			call set_allRandField(randField, xMin, xMax, xNStep, rang,    &
+							      all_xMin, all_xMax, all_xNStep,         &
+							      all_RandField, all_xPoints)
+			if(rang == 0) then
+				call set_CompStatistics(all_RandField, all_xPoints,                   &
+										all_xMin, all_xMax, all_xNStep,               &
+				                        compEvntAvg, compEvntStdDev,                  &
+				                        compGlobAvg, compGlobStdDev, compGlobCorrL)
+			end if
 		end if
 
 	!--------------------------------------------------------------------------------------
@@ -241,18 +249,23 @@ program main_RandomField
 		if(Nmc < 11) then
 			write(*,*) ">>BY EVENT"
 			call DispCarvalhol(evntAvg, "    MPI Avg = ")
-			call DispCarvalhol(compEvntAvg, "   Comp Avg = ")
+			if (calcComp) call DispCarvalhol(compEvntAvg, "   Comp Avg = ")
 			call DispCarvalhol(evntStdDev**2, "    MPI Var = ")
-			call DispCarvalhol(compEvntStdDev**2, "   Comp Var = ")
+			if (calcComp) call DispCarvalhol(compEvntStdDev**2, "   Comp Var = ")
 		end if
 
 		write(*,*) ">>GLOBAL"
+		write(*,*) "  INPUT Avg = ", fieldAvg
+		if (calcComp) write(*,*) "   Comp Avg = ", compGlobAvg;
 		write(*,*) "    MPI Avg = ", globalAvg;
-		write(*,*) "   Comp Avg = ", compGlobAvg;
+		write(*,*) " "
+		write(*,*) "  INPUT Var = ", fieldVar
+		if (calcComp) write(*,*) "   Comp Var = ", compGlobStdDev**2;
 		write(*,*) "    MPI Var = ", globalStdDev**2;
-		write(*,*) "   Comp Var = ", compGlobStdDev**2;
-		write(*,*) " MPI CorrL  = ", globalCorrL;
-		write(*,*) "Comp CorrL  = ", compGlobCorrL;
+		write(*,*) " "
+		write(*,*) "INPUT CorrL = ", corrL
+		if (calcComp) write(*,*) " Comp CorrL = ", compGlobCorrL;
+		write(*,*) "  MPI CorrL = ", globalCorrL;
 !		call DispCarvalhol(globalCorrL, "  MPI CorrL ")
 !		call DispCarvalhol(compGlobCorrL, " Comp CorrL = ")
 	end if

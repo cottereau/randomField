@@ -6,10 +6,10 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine set_kMaxND(corrMod, corrL, kMax);
+    subroutine set_kMaxND(corrMod, kMax, corrL);
     	!INPUT
         character (len=15),                intent(in) :: corrMod;
-        double precision,   dimension(:),  intent(in) :: corrL;
+        double precision,   dimension(:),  intent(in), optional :: corrL;
 
         !OUTPUT
         double precision, dimension(:),   intent(out) :: kMax;
@@ -17,7 +17,12 @@ contains
         !LOCAL VARIABLES
         double precision :: pi = 3.1415926535898
         integer          :: i
+        double precision, dimension(:), allocatable:: corrL_effec
 
+        allocate(corrL_effec (size(kMax)))
+
+		if (present(corrL)) corrL_effec = corrL
+		if (.not. present(corrL)) corrL_effec = 1
 !        do i = 1, 100
 !        	kMax = i/10.0 * corrL(:)
 !        	write(*,*) "kMax = ", kMax
@@ -28,10 +33,10 @@ contains
 
     	select case(corrMod)
    				case("gaussian")
-				kMax(:) = 2*pi*corrL(:); !CRITERIA STILL TO BE TESTED
-				case("lognormal")
-				kMax(:) = 4*pi*corrL(:); !CRITERIA STILL TO BE TESTED
+				kMax(:) = 2*pi*corrL_effec(:); !CRITERIA STILL TO BE TESTED
    		end select
+
+   		deallocate(corrL_effec)
 
     end subroutine set_kMaxND
 
@@ -67,8 +72,8 @@ contains
 
         !INPUT
         double precision, dimension(:), intent(in) :: kVector;
-        double precision, dimension(:), intent(in) :: corrL;
         character (len=*),              intent(in) :: corrMod
+        double precision, dimension(:), intent(in), optional :: corrL;
 
         !OUTPUT
         double precision :: Sk;
@@ -77,22 +82,27 @@ contains
         integer :: j, nDim;
         double precision, dimension(:), allocatable :: eta;
         double precision :: pi = 3.1415926535898
+        double precision, dimension(:), allocatable:: corrL_effec
+
+        allocate(corrL_effec (size(kVector)))
+
+		if (present(corrL)) corrL_effec = corrL
+		if (.not. present(corrL)) corrL_effec = 1
 
         Sk = 0;
         nDim = size(kVector)
-        !allocate (eta(nDim))
 
         select case(corrMod)
-            case("gaussian" : "lognormal")
-				!Sk  = exp(-dot_product((kVector**2),(corrL**2))/(4.0d0)); !Amplitude part "product(corrL)" is external to the function
-				Sk  = exp(-dot_product((kVector**2),(corrL**2))/(4.0d0*pi)); !Amplitude part "product(corrL)" is external to the function
-				!write(*,*) "kVector = ", kVector
-				!write(*,*) "Sk = ", Sk
-!            	eta = corrL/(2*sqrt(pi))
-!				Sk  = exp(-dot_product((eta**2),(kVector**2))); !Amplitude part "product(corrL)" is external to the function
+            case("gaussian")
+
+				!REGIS
+				!Sk  = exp(-dot_product((kVector**2),(corrL_effec**2))/(4.0d0)); !Amplitude part "product(corrL)" is external to the function
+
+				!MEU
+				Sk = exp(-dot_product(kVector**2, corrL_effec**2)/(4.0d0*pi)); !Amplitude part "product(corrL)" is external to the function
+
         end select
 
-        !deallocate (eta)
     end function get_SpectrumND
 
 end module spectra_RF
