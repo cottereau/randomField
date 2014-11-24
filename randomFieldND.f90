@@ -12,7 +12,8 @@ module randomFieldND
 	end interface createRandomField
 
 	double precision :: periodMult = 1.1 !"range" multiplier
-	double precision :: kAdjust = 10 !"kNStep minimum" multiplier
+	double precision :: kAdjust    = 5 !"kNStep minimum" multiplier
+	double precision :: rAdjust    = 5 !"kNStep minimum" multiplier
 
 contains
 
@@ -23,7 +24,7 @@ contains
         implicit none
 
         !INPUT
-        double precision, dimension(:, :), intent(inout) :: xPoints; !inout because of normalization
+        double precision, dimension(:, :), intent(in)    :: xPoints;
         double precision, dimension(:)   , intent(in)    :: corrL;
         character (len=*)                , intent(in)    :: corrMod, margiFirst;
         integer                          , intent(in)    :: Nmc;
@@ -39,247 +40,16 @@ contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine createStandardGaussianFieldUnstruct (xPoints, corrL, corrMod, Nmc, randField)
-
-		!INPUT
-        double precision, dimension(:, :), intent(in)    :: xPoints; !inout because of normalization
-        double precision, dimension(:)   , intent(in)    :: corrL;
-        integer                          , intent(in)    :: Nmc;
-        character (len=*)                , intent(in)    :: corrMod;
-
-        !OUTPUT
-        double precision, dimension(:, :), allocatable, intent(out) :: randField;
-
-        !LOCAL VARIABLES
-        integer         , dimension(:)  , allocatable :: kNStep;
-        double precision, dimension(:)  , allocatable :: kMax;
-        double precision, dimension(:,:), allocatable :: kSign, phiN, xPointsNorm;
-        double precision, dimension(:)  , allocatable :: kVec, kVecUnsigned; !Allocated in function
-        double precision, dimension(:)  , allocatable :: deltaK, kDelta;
-        double precision, dimension(:)  , allocatable :: xMaxGlob, xMinGlob;
-        integer          :: i, j, k, m, nDim;
-        integer          :: xNTotal, kNTotal;
-        integer          :: nb_procs, rang, code, error;
-        double precision :: Sk, deltaKprod;
-        double precision :: pi = 3.1415926535898, zero = 0d0;
-
-		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
-		call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
-		allocate (xPointsNorm (size(xPoints,1), size(xPoints,2)))
-
-		nDim    = size(xPoints, 2);
-		xNTotal = size(xPoints, 1);
-
-		!Normalization
-		xPointsNorm = xPoints
-		do i = 1, nDim
-			if(corrL(i) /= 1) xPointsNorm(:,i) = xPointsNorm (:,i)/corrL(i)
-		end do
-
-		!if(rang == 0) write(*,*) ">>>>>>>>> Variables initialization: kMax, kDelta, kNStep, xMinGlob, xMaxGlob";
-		!Allocating
-		allocate(kMax   (nDim));
-		allocate(kNStep (nDim));
-		allocate(kDelta (nDim));
-
-		call set_Extremes(xPoints, xMinGlob, xMaxGlob) !Communicating normalized extremes
-		call set_kMaxND(corrMod, kMax) !Defining kMax according to corrMod
-		kDelta  = 2*pi/(periodMult*(xMaxGlob - xMinGlob)) !Delta min in between two wave numbers to avoid periodicity
-		kNStep  = kAdjust*(ceiling(kMax/kDelta) + 1);
-		kNTotal = product(kNStep);
-
-		!Random Field
-		allocate(deltaK      (nDim));
-		allocate(kVec        (nDim));
-		allocate(kVecUnsigned(nDim));
-		allocate(kSign       (2**(nDim-1), nDim));
-		allocate(phiN        (size(kSign,1), kNTotal));
-		allocate(randField   ((xNTotal),Nmc));
-
-		randField  = 0;
-		deltaK     = 0;
-	    deltaK     = (kMax)/(kNStep-1); !Defines deltaK
-		call set_kSign(kSign) !Set the sign permutations for kVec
-
-		do k = 1, Nmc
-			call random_number(phiN(:,1:kNTotal))
-			do j = 1, kNTotal
-				call get_Permutation(j, kMax, kNStep, kVecUnsigned);
-			    do m = 1, size(kSign,1)
-			    	kVec           = kVecUnsigned * kSign(m, :)
-					Sk             = get_SpectrumND(kVec, corrMod);
-					randField(:,k) = sqrt(Sk) * cos(matmul(xPoints(:,:), kVec(:)) &
-									 + 2*pi*phiN(m, j)) &
-									 + randField(:,k)
-				end do
-			end do
-		end do
-
-		if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
-
-		randField(:,:) = 2*sqrt(product(deltaK)/((2*pi)**(nDim)))&
-						 * randField(:,:) !Obs: sqrt(product(corrL)) is not needed because of normalization
-
-		if(allocated(deltaK))       deallocate(deltaK);
-		if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);
-		if(allocated(kVec))         deallocate(kVec);
-		if(allocated(kMax))         deallocate(kMax);
-		if(allocated(kNStep))       deallocate(kNStep);
-		if(allocated(kDelta))       deallocate(kDelta);
-		if(allocated(kSign))        deallocate(kSign);
-		if(allocated(phiN))         deallocate(phiN);
-		if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);
-		if(allocated(xMinGlob))     deallocate(xMinGlob);
-        if(allocated(xMaxGlob))     deallocate(xMaxGlob);
-        if(allocated(xPointsNorm))  deallocate (xPointsNorm);
-
-	end subroutine createStandardGaussianFieldUnstruct
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-	subroutine createStandardGaussianFieldUnstructVictor (xPoints, corrL, corrMod, Nmc, randField)
-
-		!INPUT
-        double precision, dimension(:, :), intent(in)    :: xPoints; !inout because of normalization
-        double precision, dimension(:)   , intent(in)    :: corrL;
-        integer                          , intent(in)    :: Nmc;
-        character (len=*)                , intent(in)    :: corrMod;
-
-        !OUTPUT
-        double precision, dimension(:, :), allocatable, intent(out) :: randField;
-
-        !LOCAL VARIABLES
-        integer         , dimension(:)  , allocatable :: kNStep;
-        double precision, dimension(:)  , allocatable :: kMax;
-        double precision, dimension(:,:), allocatable :: kSign,  xPointsNorm;
-        double precision, dimension(:)  , allocatable :: gammaN, phiN, thetaN;
-        double precision, dimension(:)  , allocatable :: kVec, kVecUnsigned, rVec; !Allocated in function
-        double precision, dimension(:)  , allocatable :: deltaK, kDelta;
-        double precision, dimension(:)  , allocatable :: xMaxGlob, xMinGlob;
-        double precision, dimension(1)                 :: rMax
-        integer          :: i, j, k, m, nDim, N;
-        integer          :: xNTotal, kNTotal, rNTotal;
-        integer          :: nb_procs, rang, code, error;
-        double precision :: Sk, deltaKprod;
-        double precision :: pi = 3.1415926535898, zero = 0d0;
-
-		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
-		call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
-		allocate (xPointsNorm (size(xPoints,1), size(xPoints,2)))
-
-		nDim    = size(xPoints, 2);
-		xNTotal = size(xPoints, 1);
-
-		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Random field (VICTOR)";
-
-		!Normalization
-		xPointsNorm = xPoints
-		do i = 1, nDim
-			if(corrL(i) /= 1) xPointsNorm(:,i) = xPointsNorm (:,i)/corrL(i)
-		end do
-
-		!if(rang == 0) write(*,*) ">>>>>>>>> Variables initialization: kMax, kDelta, kNStep, xMinGlob, xMaxGlob";
-		!Allocating
-		allocate(kMax   (nDim));
-		allocate(kNStep (nDim));
-		allocate(kDelta (nDim));
-
-		call set_Extremes(xPoints, xMinGlob, xMaxGlob) !Communicating normalized extremes
-		call set_kMaxND(corrMod, kMax) !Defining kMax according to corrMod
-		kDelta  = 2*pi/(periodMult*(xMaxGlob - xMinGlob)) !Delta min in between two wave numbers to avoid periodicity
-		kNStep  = kAdjust*(ceiling(kMax/kDelta) + 1);
-		kNTotal = product(kNStep);
-
-		N         = size(xPoints,1)
-		rMax(1)   = sqrt(sum((xMaxGlob - xMinGlob)**2))
-		rNTotal   = ceiling(sqrt(dble(N)))
-
-		if(rang == 0) write(*,*) "N       = ", N;
-		if(rang == 0) write(*,*) "rMax(1) = ",rMax(1);
-		if(rang == 0) write(*,*) "rNTotal = ",rNTotal;
-		!Random Field
-		allocate(kVec        (nDim));
-		allocate(rVec        (nDim));
-		allocate(phiN        (rNTotal));
-		allocate(thetaN      (rNTotal));
-		allocate(gammaN      (rNTotal));
-		allocate(randField   ((xNTotal),Nmc));
-
-		randField  = 0;
-
-		if (nDim == 2)
-			do k = 1, Nmc
-				call random_number(phiN(:))
-				call random_number(thetaN(:))
-				call random_number(gammaN(:))
-
-				do j = 1, rNTotal
-
-					rVec           = [cos(2*pi*thetaN(j)) * j*rMax(1)/sqrt(dble(N)), sin(2*pi*thetaN(j)) * j*rMax(1)/sqrt(dble(N))]
-					Sk             = get_SpectrumND(j*rMax/sqrt(dble(N)), corrMod);
-					randField(:,k) = sqrt(Sk * (j*rMax(1)**2)/N ) * gammaN(j) &
-					                 * cos(matmul(xPoints(:,:), rVec(:)) + 2*pi*phiN(j)) &
-									 + randField(:,k)
-
-!					if(rang == 0) write(*,*) "rN = ",j, "rVec = ", rVec;
-!					if(rang == 0) write(*,*) "randField(1,k) = ",randField(1,k), "Sk = ", Sk;
-				end do
-			end do
-
-		else
-			write(*,*) "The number of dimensions is not accepted in this method. nDim = ", nDim;
-			call MPI_ABORT(MPI_COMM_WORLD, error, code)
-		end if
-
-		call dispCarvalhol(randField, "randField")
-
-!		do k = 1, Nmc
-!			call random_number(phiN(:,1:kNTotal))
-!			call random_number(thetaN(:,1:kNTotal))
-!			do j = 1, kNTotal
-!				call get_Permutation(j, kMax, kNStep, kVecUnsigned);
-!			    do m = 1, size(kSign,1)
-!			    	kVec           = kVecUnsigned * kSign(m, :)
-!					Sk             = get_SpectrumND(kVec, corrMod);
-!					randField(:,k) = sqrt(Sk) * cos(matmul(xPoints(:,:), kVec(:)) &
-!									 + 2*pi*phiN(m, j)) &
-!									 + randField(:,k)
-!				end do
-!			end do
-!		end do
-
-		if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
-
-		if(allocated(deltaK))       deallocate(deltaK);
-		if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);
-		if(allocated(kVec))         deallocate(kVec);
-		if(allocated(kMax))         deallocate(kMax);
-		if(allocated(kNStep))       deallocate(kNStep);
-		if(allocated(kDelta))       deallocate(kDelta);
-		if(allocated(kSign))        deallocate(kSign);
-		if(allocated(phiN))         deallocate(phiN);
-		if(allocated(thetaN))       deallocate(thetaN);
-		if(allocated(gammaN))       deallocate(gammaN);
-		if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);
-		if(allocated(xMinGlob))     deallocate(xMinGlob);
-        if(allocated(xMaxGlob))     deallocate(xMaxGlob);
-        if(allocated(xPointsNorm))  deallocate (xPointsNorm);
-        if(allocated(rVec))         deallocate(rVec);
-
-	end subroutine createStandardGaussianFieldUnstructVictor
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	subroutine multiVariateTransformation (margiFirst, fieldAvg, fieldVar, randField)
 
         implicit none
 
         !INPUT
-        character (len=*)                , intent(in) :: margiFirst;
-        double precision                 , intent(in) :: fieldAvg, fieldVar;
+        character (len=*), intent(in) :: margiFirst;
+        double precision , intent(in) :: fieldAvg, fieldVar;
 
-        !OUTPUT
-        double precision, dimension(:, :), intent(inout) :: randField;
+        !OUTPUT (IN)
+        double precision, dimension(1:, 1:), intent(inout) :: randField;
 
         !LOCAL VARIABLES
         double precision :: normalVar, normalAvg
@@ -307,6 +77,444 @@ contains
 		end if
 
 	end subroutine
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	subroutine createStandardGaussianFieldUnstruct (xPoints, corrL, corrMod, Nmc, randField, &
+	                                                chosenSeed, MinBound, MaxBound, communicator, calculate)
+
+		!INPUT
+        double precision, dimension(1:, 1:), intent(in) :: xPoints;
+        double precision, dimension(1:)    , intent(in) :: corrL;
+        integer                            , intent(in) :: Nmc;
+        character (len=*)                  , intent(in) :: corrMod;
+        integer, dimension(1:), optional   , intent(in) :: chosenSeed
+        real   , dimension(1:), optional   , intent(in) :: MinBound, MaxBound
+        integer               , optional   , intent(in) :: communicator
+        logical, dimension(1:), optional   , intent(in) :: calculate
+
+        !OUTPUT
+        double precision, dimension(:, :), intent(out) :: randField;
+
+        !LOCAL VARIABLES
+        integer         , dimension(:)  , allocatable :: kNStep;
+        double precision, dimension(:)  , allocatable :: kMax;
+        double precision, dimension(:,:), allocatable :: kSign, phiN, xPointsNorm;
+        double precision, dimension(:)  , allocatable :: kVec, kVecUnsigned; !Allocated in function
+        double precision, dimension(:)  , allocatable :: deltaK, kDelta;
+        double precision, dimension(:)  , allocatable :: xMaxGlob, xMinGlob;
+        logical         , dimension(:)  , allocatable :: effectCalc;
+        integer          :: effectComm
+        integer          :: i, j, k, m, nDim;
+        integer          :: xNTotal, kNTotal;
+        integer          :: nb_procs, rang, code, error;
+        double precision :: Sk, deltaKprod;
+        double precision :: pi = 3.1415926535898, zero = 0d0;
+
+		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
+		call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
+
+		nDim    = size(xPoints, 2);
+		xNTotal = size(xPoints, 1);
+
+		allocate(effectCalc(Nmc))
+		effectCalc(:) = .true.
+		if(present(calculate)) effectCalc = calculate
+
+		if(present(communicator)) then
+			effectComm = communicator
+		else
+			effectComm = MPI_COMM_WORLD
+		end if
+
+		!Normalization
+		allocate (xPointsNorm (size(xPoints,1), size(xPoints,2)))
+		xPointsNorm(:,:) = xPoints(:,:)
+		do i = 1, nDim
+			if(corrL(i) /= 1) xPointsNorm(:,i) = xPointsNorm (:,i)/corrL(i)
+		end do
+
+		!if(rang == 0) write(*,*) ">>>>>>>>> Variables initialization: kMax, kDelta, kNStep, xMinGlob, xMaxGlob";
+		!Allocating
+		allocate(kMax   (nDim));
+		allocate(kNStep (nDim));
+		allocate(kDelta (nDim));
+
+
+		if((present(MinBound) .and. (.not.present(MaxBound))) .or. &
+		   (present(MaxBound) .and. (.not.present(MinBound)))) then
+			write(*,*) "ERROR - In 'createStandardGaussianFieldUnstruct': both or none of the bounds should be defined"
+			if(.not.present(MinBound)) write(*,*) "MinBound not present"
+			if(.not.present(MaxBound)) write(*,*) "MaxBound not present"
+			call MPI_ABORT(effectComm  , error, code)
+		endif
+
+		!Communicating normalized extremes
+        allocate(xMinGlob(nDim))
+        allocate(xMaxGlob(nDim))
+		if(.not.present(MinBound)) then
+			write(*,*) "Min bound not present, the extremes will be calculated automatically"
+			call set_Extremes(xPointsNorm, xMinGlob, xMaxGlob, effectComm)
+		else
+			!write(*,*) "lbound(MinBound) = ", lbound(MinBound)
+			!write(*,*) "ubound(MinBound) = ", ubound(MinBound)
+			!write(*,*) "lbound(MaxBound) = ", lbound(MaxBound)
+			!write(*,*) "ubound(MaxBound) = ", ubound(MaxBound)
+			!write(*,*) "lbound(corrL)    = ", lbound(corrL)
+			!write(*,*) "ubound(corrL)    = ", ubound(corrL)
+
+			do i = 1, nDim
+				!write(*,*) "i = ", i
+				xMinGlob(i) = MinBound(i)/corrL(i)
+				xMaxGlob(i) = MaxBound(i)/corrL(i)
+			end do
+		end if
+
+		call set_kMaxND(corrMod, kMax) !Defining kMax according to corrMod
+		kDelta  = 2*pi/(periodMult*(xMaxGlob - xMinGlob)) !Delta min in between two wave numbers to avoid periodicity
+		kNStep  = kAdjust*(ceiling(kMax/kDelta) + 1);
+		kNTotal = product(kNStep);
+
+		!if(rang == 0) write(*,*) "Nmc     = ", Nmc
+		!if(rang == 0) write(*,*) "kNTotal = ", kNTotal
+		!if(rang == 0) write(*,*) "kDelta  = ", kDelta
+		!if(rang == 0) write(*,*) "kNStep  = ", kNStep
+
+		if(kNTotal < 1) then
+			write(*,*) "ERROR - In 'createStandardGaussianFieldUnstruct': kNTotal should be a positive integer (possibly a truncation problem)"
+			call MPI_ABORT(effectComm, error, code)
+		endif
+
+		!Random Field
+		allocate(deltaK      (nDim));
+		allocate(kVec        (nDim));
+		allocate(kVecUnsigned(nDim));
+		allocate(kSign       (2**(nDim-1), nDim));
+		allocate(phiN        (size(kSign,1), kNTotal));
+
+		!write(*,*) "Flag5 inside"
+
+
+		if (size(randField, 1) /= xNTotal .or. size(randField, 2) /= Nmc) then
+			write(*,*) "ERROR - In 'createStandardGaussianFieldUnstruct': randfield dimensions are imcompatible with the coordinates (xPoints)"
+			write(*,*) "shape(randfield(:,:)) = ", size(randField, 1), size(randField, 2)
+			call MPI_ABORT(effectComm, error, code)
+		end if
+
+		randField(:,:) = 0;
+		deltaK(:)      = 0;
+	    deltaK(:)      = (kMax)/(kNStep-1); !Defines deltaK
+		call set_kSign(kSign) !Set the sign permutations for kVec
+
+		!write(*,*) "Flag6 inside"
+		!Initializing the seed
+		if(present(chosenSeed)) then
+			call init_random_seed(chosenSeed)
+		else
+			call init_random_seed()
+		end if
+
+		!write(*,*) "Flag7 inside"
+		!Generating random field samples
+		do k = 1, Nmc
+			if(effectCalc(k)) then
+				call random_number(phiN(:,:))
+				do j = 1, kNTotal
+					call get_Permutation(j, kMax, kNStep, kVecUnsigned);
+				    do m = 1, size(kSign,1)
+				    	kVec           = kVecUnsigned * kSign(m, :)
+						Sk             = get_SpectrumND(kVec, corrMod);
+						randField(:,k) = sqrt(Sk) * cos(matmul(xPointsNorm(:,:), kVec(:)) &
+										 + 2*pi*phiN(m, j)) &
+										 + randField(:,k)
+	!					if(rang == 0 .and. (k*j*m<50)) write(*,*) "Sk  = ", Sk
+	!					if(rang == 0 .and. (k*j*m<50)) write(*,*) "cos(matmul(xPoints(:,:), kVec(:))  = ", matmul(xPoints(:,:), kVec(:))
+	!					if(rang == 0 .and. (k*j*m<50)) write(*,*) "2*pi*phiN(m, j)  = ", 2*pi*phiN(m, j)
+	!					if(rang == 0 .and. (k*j*m<50)) write(*,*) "Contrib  = ", sqrt(Sk) * cos(matmul(xPoints(:,:), kVec(:)) &
+	!									 										+ 2*pi*phiN(m, j))
+					end do
+				end do
+			else
+				randField(:,k) = 0.0
+			end if
+		end do
+
+		if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
+
+		randField(:,:) = 2*sqrt(product(deltaK)/((2*pi)**(nDim)))&
+						 * randField(:,:) !Obs: sqrt(product(corrL)) is not needed because of normalization
+
+		if(allocated(deltaK))       deallocate(deltaK);
+		if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);
+		if(allocated(kVec))         deallocate(kVec);
+		if(allocated(kMax))         deallocate(kMax);
+		if(allocated(kNStep))       deallocate(kNStep);
+		if(allocated(kDelta))       deallocate(kDelta);
+		if(allocated(kSign))        deallocate(kSign);
+		if(allocated(phiN))         deallocate(phiN);
+		if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);
+		if(allocated(xMinGlob))     deallocate(xMinGlob);
+        if(allocated(xMaxGlob))     deallocate(xMaxGlob);
+        if(allocated(xPointsNorm))  deallocate (xPointsNorm);
+
+	end subroutine createStandardGaussianFieldUnstruct
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	subroutine createStandardGaussianFieldUnstructVictor (xPoints, corrL, corrMod, Nmc, randField, &
+	                                                      chosenSeed, MinBound, MaxBound, communicator, calculate)
+
+		!INPUT
+        double precision, dimension(1:, 1:), intent(in) :: xPoints;
+        double precision, dimension(1:)    , intent(in) :: corrL;
+        integer                            , intent(in) :: Nmc;
+        character (len=*)                  , intent(in) :: corrMod;
+        integer, dimension(1:), optional   , intent(in) :: chosenSeed
+        real   , dimension(1:), optional   , intent(in) :: MinBound, MaxBound
+        integer               , optional   , intent(in) :: communicator
+        logical, dimension(1:), optional   , intent(in) :: calculate
+        !OUTPUT
+        double precision, dimension(1:, 1:), intent(out) :: randField;
+
+        !LOCAL VARIABLES
+        double precision, dimension(:,:), allocatable :: xPointsNorm;
+        double precision, dimension(:)  , allocatable :: gammaN, phiN, thetaN, psiN;
+        double precision, dimension(:)  , allocatable :: rVec;
+        double precision, dimension(:)  , allocatable :: xMaxGlob, xMinGlob, amplitudeVec;
+        logical         , dimension(:)  , allocatable :: effectCalc;
+        double precision, dimension(1)                :: rMax
+        integer          :: effectComm
+        integer          :: i, j, k, m, nDim;
+        integer          :: xNTotal, rNTotal;
+        integer          :: nb_procs, rang, code, error;
+        integer          :: pointsPerCorrl
+        double precision :: Sk, deltaKprod, step, rDelta;
+        double precision :: pi = 3.1415926535898, zero = 0d0;
+        double precision, dimension(:), allocatable :: dgemm_mult;
+
+
+		write(*,*) "INSIDE 'createStandardGaussianFieldUnstruct'"
+
+		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
+		call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
+
+		nDim    = size(xPoints, 2);
+		xNTotal = size(xPoints, 1);
+
+		allocate(xPointsNorm (xNTotal, nDim))
+		allocate(rVec   (nDim));
+		allocate(xMinGlob(nDim))
+        allocate(xMaxGlob(nDim))
+        allocate(amplitudeVec(nDim))
+        allocate(dgemm_mult(xNTotal))
+
+		allocate(effectCalc(Nmc))
+		effectCalc(:) = .true.
+		if(present(calculate)) effectCalc = calculate
+
+		if(present(communicator)) then
+			effectComm = communicator
+		else
+			effectComm = MPI_COMM_WORLD
+		end if
+
+		!Normalization
+		xPointsNorm = xPoints
+		do i = 1, nDim
+			if(corrL(i) /= 1) xPointsNorm(:,i) = xPointsNorm (:,i)/corrL(i)
+		end do
+
+		if((present(MinBound) .and. (.not.present(MaxBound))) .or. &
+		   (present(MaxBound) .and. (.not.present(MinBound)))) then
+			write(*,*) "ERROR - In 'createStandardGaussianFieldUnstruct': both or none of the bounds should be defined"
+			if(.not.present(MinBound)) write(*,*) "MinBound not present"
+			if(.not.present(MaxBound)) write(*,*) "MaxBound not present"
+			call MPI_ABORT(effectComm  , error, code)
+		endif
+
+		!Communicating normalized extremes
+
+		if(.not.present(MinBound)) then
+			write(*,*) "Min bound not present, the extremes will be calculated automatically"
+			call set_Extremes(xPointsNorm, xMinGlob, xMaxGlob, effectComm)
+		else
+			do i = 1, nDim
+				!write(*,*) "i = ", i
+				xMinGlob(i) = MinBound(i)/corrL(i)
+				xMaxGlob(i) = MaxBound(i)/corrL(i)
+			end do
+		end if
+		!!
+
+		!TODO look at this criteria closely
+		pointsPerCorrl = 10
+		write(*,*) "xMaxGlob = ", xMaxGlob;
+		write(*,*) "xMinGlob = ", xMinGlob;
+		write(*,*) "(xMaxGlob - xMinGlob)**2) = ", (xMaxGlob - xMinGlob)**2;
+		write(*,*) "sum((xMaxGlob - xMinGlob)**2) = ", sum((xMaxGlob - xMinGlob)**2)
+
+
+		!Setting kMax e kStep
+		call set_rMax(corrMod, rMax)
+		rDelta  = 2*pi/(periodMult*sqrt(sum((xMaxGlob - xMinGlob)**2))) !Delta min in between two wave numbers to avoid periodicity
+		rNTotal = rAdjust*(ceiling(rMax(1)/rDelta) + 1);
+
+		!rNTotal = ceiling(rMax(1) * dble(pointsPerCorrl))
+		!rMax(1)        = sqrt(sum((xMaxGlob - xMinGlob)**2))
+		!rNTotal        = N
+		!rCrit          = maxval(xMaxGlob - xMinGlob)
+		!rNTotal        = ceiling(sqrt(dble(N)))
+
+		if(rang == 0) write(*,*) "rMax(1) = ",rMax(1);
+		if(rang == 0) write(*,*) "rNTotal = ",rNTotal;
+
+		!Random Field
+		randField = 0;
+		step      = rMax(1)/rNTotal
+
+		!Initializing the seed
+		if(present(chosenSeed)) then
+			call init_random_seed(chosenSeed)
+		else
+			call init_random_seed()
+		end if
+
+		if (nDim == 2) then
+			allocate(psiN        (rNTotal)); !Out of phase
+			allocate(thetaN      (rNTotal));
+			allocate(gammaN      (rNTotal));
+			do k = 1, Nmc
+				if(effectCalc(k)) then
+					!if(rang == 0) write(*,*) "k = ",k;
+					!write(*,*) "rNTotal = ",rNTotal;
+					call random_number(psiN(:))
+					call random_number(thetaN(:))
+					call random_number(gammaN(:))
+					psiN   = 2*pi*psiN
+					thetaN = 2*pi*psiN
+					gammaN = 2*pi*gammaN
+
+					do j = 1, rNTotal
+					!do j = 1, 5 !WARNING, this is just for the test, the line above is the right one
+						rVec           = [cos(thetaN(j)) * j*step, &
+						                  sin(thetaN(j)) * j*step]
+						Sk             = get_SpectrumND([j*step], corrMod);
+						randField(:,k) = sqrt(Sk*j*(step**2)) * gammaN(j) &
+						                 * cos(matmul(xPointsNorm(:,:), rVec(:)) + psiN(j)) &
+										 + randField(:,k)
+	!					if(rang == 0) write(*,*) "rN = ",j, "rVec = ", rVec;
+	!					if(rang == 0) write(*,*) "randField(1,k) = ",randField(1,k), "Sk = ", Sk;
+!					!!START TEST
+!						!OLD (!WARNING WITHOUT last term only for test)
+!						randField(:,k) = sqrt(Sk*j*(step**2)) * gammaN(j) &
+!						                 * cos(matmul(xPointsNorm(:,:), rVec(:)) + psiN(j))
+!						call dispCarvalhol(randField(:,k), "randField(:,k) WITH MATMUL")
+!						!NEW
+!						call DGEMM ( "N", "N", size(xPoints,1), 1, size(xPoints,2), &
+!		             				 1.0d0, xPoints, size(xPoints,1), rVec, size(rVec), 0.0d0, dgemm_mult, size(xPoints,1))
+!						randField(:,k) = sqrt(Sk*j*(step**2)) * gammaN(j) &
+!						                 * cos(dgemm_mult + psiN(j))
+!						call dispCarvalhol(randField(:,k), "randField(:,k) WITH DGEMM")
+!					!!END TEST
+					end do
+				else
+					randField(:,k) = 0.0
+				end if
+			end do
+
+
+
+		else if (nDim == 3) then
+			!write(*,*) "nDim = 3 !!!"
+			!write(*,*) "k = ",k;
+			allocate(psiN   (rNTotal));
+			allocate(thetaN (rNTotal));
+			allocate(phiN   (rNTotal));
+			allocate(gammaN (rNTotal));
+			do k = 1, Nmc
+				if(effectCalc(k)) then
+					!write(*,*) "k = ",k;
+					!write(*,*) "rNTotal = ",rNTotal;
+					call random_number(phiN(:))
+					call random_number(thetaN(:))
+					call random_number(gammaN(:))
+					call random_number(psiN(:))
+
+					psiN   = 2*pi*psiN
+					thetaN = 2*pi*psiN
+					phiN   = pi*phiN
+					gammaN = 2*pi*gammaN
+
+					do j = 1, rNTotal
+!					do j = 1, 5 !WARNING, this is just for the test, the line above is the right one
+						!write(*,*) "j = ", j
+						rVec           = [cos(thetaN(j))*sin(phiN(j)) * j*step, &
+						                  sin(thetaN(j))*sin(phiN(j)) * j*step, &
+						                  cos(phiN(j))                * j*step]
+						Sk             = get_SpectrumND([j*step], corrMod);
+!						randField(:,k) = sqrt(Sk*sin(phiN(j))*step*(j*step)**2) * gammaN(j) &
+!						                 * cos(                                             &
+!						                       matmul(xPoints(:,:), rVec(:))                &
+!						                       + psiN(j)									&
+!						                       ) 											&
+!										 + randField(:,k)
+					!!START TEST
+						!OLD (!WARNING WITHOUT last term only for test)
+						randField(:,k) = sqrt(Sk*sin(phiN(j))*step*(j*step)**2) * gammaN(j) &
+						                 * cos(                                             &
+						                       matmul(xPoints(:,:), rVec(:))                &
+						                       + psiN(j)									&
+						                       )
+						call dispCarvalhol(randField(:,k), "randField(:,k) WITH MATMUL")
+						!NEW
+						call DGEMM ( "N", "N", size(xPoints,1), 1, size(xPoints,2), &
+		             				 1.0d0, xPoints, size(xPoints,1), rVec, size(rVec), 0.0d0, dgemm_mult, size(xPoints,1))
+						randField(:,k) = sqrt(Sk*sin(phiN(j))*step*(j*step)**2) * gammaN(j) &
+						                 * cos(                                             &
+						                       dgemm_mult                                   &
+						                       + psiN(j)									&
+						                       )
+						call dispCarvalhol(randField(:,k), "randField(:,k) WITH DGEMM")
+					!!END TEST
+
+	!					if(rang == 0) write(*,*) "rN = ",j, "rVec = ", rVec;
+	!					if(rang == 0) write(*,*) "randField(1,k) = ",randField(1,k), "Sk = ", Sk;
+					end do
+				else
+					randField(:,k) = 0.0
+				end if
+			end do
+		else
+			write(*,*) "The number of dimensions is not accepted in this method (Victor). nDim = ", nDim;
+			call MPI_ABORT(MPI_COMM_WORLD, error, code)
+		end if
+
+		if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
+
+
+		!TEST = matmul(xPoints(:,:), rVec(:))
+!		call dispCarvalhol(matmul(xPoints(:,:), rVec(:)), "TEST WITH MATMUL")
+      !!DGEMM ( TRANSA, TRANSB, M, N, K,
+      !!        ALPHA, A, LDA, B, LDB, BETA, C, LDC )
+!		call DGEMM ( "N", "N", size(xPoints,1), 1, size(xPoints,2), &
+!		             1.0d0, xPoints, size(xPoints,1), rVec, size(rVec), 0.0d0, TEST, size(xPoints,1))
+		!call dispCarvalhol(TEST, "TEST WITH DGEM")
+
+		!call dispCarvalhol(randField, "randField")
+	!!END TEST
+
+		if(allocated(dgemm_mult))   deallocate(dgemm_mult)
+		if(allocated(phiN))         deallocate(phiN);
+		if(allocated(psiN))         deallocate(psiN);
+		if(allocated(thetaN))       deallocate(thetaN);
+		if(allocated(gammaN))       deallocate(gammaN);
+		if(allocated(xMinGlob))     deallocate(xMinGlob);
+        if(allocated(xMaxGlob))     deallocate(xMaxGlob);
+        if(allocated(xPointsNorm))  deallocate (xPointsNorm);
+        if(allocated(rVec))         deallocate(rVec);
+        if(allocated(amplitudeVec)) deallocate(amplitudeVec)
+
+	end subroutine createStandardGaussianFieldUnstructVictor
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

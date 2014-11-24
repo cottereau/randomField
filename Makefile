@@ -45,10 +45,20 @@ OBJS += ./displayCarvalhol.o \
 ./readFile_RF.o \
 ./spectra_RF.o \
 ./statistics_RF.o \
-./writeResultFile_RF.o
+./writeResultFile_RF.o \
+./BLASCarvalhol.o
 
 LIBS = $(LIBHDF5) $(LIBMPI) 
 INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI)
+
+#Dependencies
+main_RandomField.o   : displayCarvalhol.o statistics_RF.o obsolete_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o
+writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o obsolete_RF.o 
+randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o obsolete_RF.o BLASCarvalhol.o
+obsolete_RF.o        : displayCarvalhol.o math_RF.o  
+statistics_RF.o      : displayCarvalhol.o math_RF.o
+spectra_RF.o         : displayCarvalhol.o math_RF.o
+math_RF.o            : displayCarvalhol.o
 
 # Making all the ".o" from the ".f90"
 %.o: ../randomField/%.f90
@@ -57,15 +67,6 @@ INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI)
 	$(FC) -o "$@" $(INCLUDE) -c "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
-
-#Dependencies
-main_RandomField.o   : displayCarvalhol.o statistics_RF.o obsolete_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o
-writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o obsolete_RF.o 
-randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o obsolete_RF.o 
-obsolete_RF.o        : displayCarvalhol.o math_RF.o  
-statistics_RF.o      : displayCarvalhol.o math_RF.o
-spectra_RF.o         : displayCarvalhol.o math_RF.o
-math_RF.o            : displayCarvalhol.o
 
 # All Target
 all: randomField

@@ -36,11 +36,11 @@ contains
 
         !INPUT
         integer                       , intent(in)           :: pos;
-        double precision, dimension(:), intent(in)           :: qmax;
-        double precision, dimension(:), intent(in), optional :: qmin;
-        integer,          dimension(:), intent(in)           :: nStep;
+        double precision, dimension(1:), intent(in)           :: qmax;
+        double precision, dimension(1:), intent(in), optional :: qmin;
+        integer,          dimension(1:), intent(in)           :: nStep;
         !OUTPUT
-        double precision, dimension(:), intent(out) :: pVec;
+        double precision, dimension(1:), intent(out) :: pVec;
         !LOCAL VARIABLES
         integer :: i, j;
         integer :: seedStep, nDim;
@@ -74,8 +74,8 @@ contains
 
         !INPUT
         integer                       , intent(in)    :: rang, nb_procs;
-        double precision, dimension(:), intent(inout) :: xMax;
-        double precision, dimension(:), intent(inout) :: xMin;
+        double precision, dimension(1:), intent(inout) :: xMax;
+        double precision, dimension(1:), intent(inout) :: xMin;
         !OUTPUT
 
         !LOCAL VARIABLES
@@ -113,34 +113,47 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine set_ExtremesUnstruct(xPoints, xMinGlob, xMaxGlob)
+    subroutine set_ExtremesUnstruct(xPoints, xMinGlob, xMaxGlob, communicator)
 
         implicit none
 
         !INPUT
-        double precision, dimension(:, :), intent(in) :: xPoints;
+        double precision, dimension(1:, 1:), intent(in) :: xPoints;
+        integer         , optional         , intent(in) :: communicator
         !OUTPUT
-        double precision, dimension(:), allocatable, intent(out) :: xMinGlob, xMaxGlob;
+        double precision, dimension(1:), intent(out) :: xMinGlob, xMaxGlob;
         !LOCAL
         integer :: code, nDim, i;
         double precision, dimension(:), allocatable :: xMinLoc, xMaxLoc;
+        integer :: effectComm
 
 		!write(*,*) ">>>>>>>>> Communicating Extremes (unstructured) "
+
+		if(present(communicator)) then
+			effectComm = communicator
+		else
+			effectComm = MPI_COMM_WORLD
+		end if
+
         nDim = size(xPoints, 2)
 
-        allocate(xMinGlob(nDim))
-        allocate(xMaxGlob(nDim))
         allocate(xMinLoc(nDim))
         allocate(xMaxLoc(nDim))
 
         xMinLoc = minval(xPoints, 1)
         xMaxLoc = maxval(xPoints, 1)
 
+        !call dispCarvalhol(xMinGlob, "xMinGlob")
+        !call dispCarvalhol(xMaxGlob, "xMaxGlob")
+        !call dispCarvalhol(xMinLoc, "xMinLoc")
+        !call dispCarvalhol(xMaxLoc, "xMaxLoc")
+
 		do i = 1, nDim
+			!write(*,*) "i = ", i
         	call MPI_ALLREDUCE (xMinLoc(i), xMinGlob(i), 1, MPI_DOUBLE_PRECISION, &
-        						MPI_MIN, MPI_COMM_WORLD, code)
+        						MPI_MIN, effectComm, code)
         	call MPI_ALLREDUCE (xMaxLoc(i), xMaxGlob(i), 1, MPI_DOUBLE_PRECISION, &
-        						MPI_MAX, MPI_COMM_WORLD, code)
+        						MPI_MAX, effectComm, code)
         end do
 
         deallocate(xMinLoc)
@@ -156,7 +169,7 @@ contains
         implicit none
 
         !INPUT
-        double precision, dimension(:), intent(in)    :: xMinLoc, xMaxLoc;
+        double precision, dimension(1:), intent(in)    :: xMinLoc, xMaxLoc;
         !OUTPUT
         double precision, dimension(:), allocatable, intent(out) :: xMinGlob, xMaxGlob;
         !LOCAL
@@ -195,13 +208,66 @@ contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	subroutine init_random_seed(seedIn)
+       ! POST: The seed for the random number generation method random_number() has been reset
+
+		implicit none
+
+        integer :: clock
+        integer, dimension(:), allocatable :: seed
+        integer, dimension(1:), optional, intent(in) :: seedIn
+
+		if(.not. present(seedIn)) then
+	        call calculate_random_seed(seed)
+	        call random_seed(PUT = seed)
+	        deallocate(seed)
+	    else
+	        call random_seed(PUT = seedIn)
+		end if
+
+	end subroutine init_random_seed
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	subroutine calculate_random_seed(seed, seedStart)
+
+        implicit none
+		!INPUT
+		integer, optional, intent(in) :: seedStart
+		!OUTPUT
+        integer, dimension(:), allocatable, intent(out) :: seed
+		!LOCAL
+        integer :: i
+        integer :: n
+        integer :: clock, tempClock
+
+        if(.not.allocated(seed)) then
+        	call random_seed(size = n)
+        	allocate(seed(n))
+        end if
+        call system_clock(COUNT=clock)
+        tempClock = clock
+        do while (clock == tempClock)
+        	call system_clock(COUNT=clock)
+        end do
+
+        if(present(seedStart)) then
+        	seed = 72 + seedStart*18 + 37*(/ (i - 1, i = 1, n) /)
+        else
+        	seed = clock + 37*(/ (i - 1, i = 1, n) /)
+        end if
+
+	end subroutine calculate_random_seed
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     subroutine get_SequenceParam(axis, nPlane, nStep, beg, step, end)
 
         implicit none
 
         !INPUT
         integer,               intent(in) :: axis, nPlane
-        integer, dimension(:), intent(in) :: nStep;
+        integer, dimension(1:), intent(in) :: nStep;
 
         !OUTPUT
         integer, intent(out) :: beg, step, end;

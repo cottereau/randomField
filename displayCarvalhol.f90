@@ -10,47 +10,87 @@ module displayCarvalhol
 		                 Disp1Dint,    &
 		                 Disp2Dint,    &
 		                 Disp1Dchar,   &
-		                 Disp2Dchar
+		                 Disp2Dchar,   &
+		                 Disp1Dbool,   &
+		                 Disp2Dbool
 	end interface DispCarvalhol
 
 contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    subroutine Ordering_MPI_Start()
+    subroutine Ordering_MPI_Start(comm)
 
 		implicit none
 
+		!INPUT
+		integer, optional, intent(in) :: comm
+
         !LOCAL VARIABLES
         integer, dimension( MPI_STATUS_SIZE ) :: statut
-        integer :: rang, code, id = 15, rangCount = 0
+        integer :: rang, code, nb_procs, id = 15, passageCount = 0, effectComm
+        integer :: sender
 
-		call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
 
-        if (rang /= 0) call MPI_RECV (rangCount,1, MPI_INTEGER, &
-        						      rang-1, id, MPI_COMM_WORLD ,statut,code)
+		call MPI_COMM_RANK(effectComm, rang, code)
+		call MPI_COMM_SIZE(effectComm, nb_procs, code)
+
+
+		if(rang == 0) then
+			sender = nb_procs - 1
+		else
+			sender = rang - 1
+		end if
+
+        if (passageCount == 0 .and. rang == 0) then
+		else
+        	call MPI_RECV (passageCount, 1, MPI_INTEGER, &
+        				   sender, id, effectComm ,statut,code)
+        end if
+
+        passageCount = passageCount + 1
+
         write(*,*) "RANG ", rang, "-------"
 
     end subroutine Ordering_MPI_Start
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    subroutine Ordering_MPI_End()
+    subroutine Ordering_MPI_End(comm)
 
     	implicit none
+
+		!INPUT
+		integer, optional, intent(in) :: comm
+
         !LOCAL VARIABLES
-        integer :: rang, code, nb_procs, id = 15, rangCount
+        integer :: rang, code, nb_procs, id = 15, passageCount = 0, effectComm
+        integer :: receiver
 
-    	call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
-    	call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
 
-        if (rang /= nb_procs - 1) call MPI_SEND (rang + 1, 1, MPI_INTEGER , &
-        			                             rang + 1, id, MPI_COMM_WORLD ,code)
+    	call MPI_COMM_RANK(effectComm, rang, code)
+    	call MPI_COMM_SIZE(effectComm, nb_procs, code)
+
+		if(rang == nb_procs - 1) then
+			receiver = 0
+		else
+			receiver = rang + 1
+		end if
+
+        call MPI_SEND (passageCount, 1, MPI_INTEGER , &
+        			   receiver, id, effectComm ,code)
+
+        passageCount = passageCount + 1
+
     end subroutine Ordering_MPI_End
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    subroutine DispScalDble(scalar, title, format, nColumns, mpi)
+    subroutine DispScalDble(scalar, title, format, nColumns, mpi, comm)
         ! Displays Scalar
 
 		implicit none
@@ -60,15 +100,20 @@ contains
         character (len=*), optional, intent(in) :: title, format
         integer,           optional, intent(in) :: nColumns
         logical,           optional, intent(in) :: mpi
+        integer          , optional, intent(in) :: comm
 
         !LOCAL VARIABLES
         double precision, dimension(:,:), allocatable :: matrix2d
+        integer :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
 
 		allocate(matrix2D(1,1));
 		matrix2d = scalar;
 
 		if(present(mpi)) then
-			call Disp2Ddble(matrix2D, title, format, nColumns, mpi);
+			call Disp2Ddble(matrix2D, title, format, nColumns, mpi, effectComm);
 		else
 			call Disp2Ddble(matrix2D, title, format, nColumns);
 		end if
@@ -81,7 +126,42 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine Disp1Ddble(vector, title, format, nColumns, mpi)
+    subroutine Disp1Dbool(vector, title, format, nColumns, mpi, comm)
+        ! Displays 1D Matrix (Vector)
+
+		implicit none
+
+        !INPUT
+        logical,             dimension(:)          , intent(in) :: vector
+        character (len=*),                 optional, intent(in) :: title, format
+        integer,                           optional, intent(in) :: nColumns
+        logical                          , optional, intent(in) :: mpi
+        integer                          , optional, intent(in) :: comm
+
+        !LOCAL VARIABLES
+        logical, dimension(:,:), allocatable :: matrix2d
+        integer :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+
+		allocate(matrix2D(size(vector),1));
+		matrix2d(:,1) = vector;
+
+		if(present(mpi)) then
+			call Disp2Dbool(matrix2D, title, format, nColumns, mpi, effectComm);
+		else
+			call Disp2Dbool(matrix2D, title, format, nColumns);
+		end if
+
+		deallocate(matrix2D);
+
+    end subroutine Disp1Dbool
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    subroutine Disp1Ddble(vector, title, format, nColumns, mpi, comm)
         ! Displays 1D Matrix (Vector)
 
 		implicit none
@@ -90,16 +170,21 @@ contains
         double precision,     dimension(:),          intent(in) :: vector
         character (len=*),                 optional, intent(in) :: title, format
         integer,                           optional, intent(in) :: nColumns
-        logical, optional, intent(in) :: mpi
+        logical                          , optional, intent(in) :: mpi
+        integer                          , optional, intent(in) :: comm
 
         !LOCAL VARIABLES
         double precision, dimension(:,:), allocatable :: matrix2d
+        integer :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
 
 		allocate(matrix2D(size(vector),1));
 		matrix2d(:,1) = vector;
 
 		if(present(mpi)) then
-			call Disp2Ddble(matrix2D, title, format, nColumns, mpi);
+			call Disp2Ddble(matrix2D, title, format, nColumns, mpi, effectComm);
 		else
 			call Disp2Ddble(matrix2D, title, format, nColumns);
 		end if
@@ -111,7 +196,7 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine Disp1Dint(vector, title, format, nColumns, mpi)
+    subroutine Disp1Dint(vector, title, format, nColumns, mpi, comm)
         ! Displays 1D Matrix (Vector)
 
 		implicit none
@@ -120,16 +205,22 @@ contains
         integer,            dimension(:),            intent(in) :: vector
         character (len=*),                 optional, intent(in) :: title, format
         integer,                           optional, intent(in) :: nColumns
-        logical, optional, intent(in) :: mpi
+        logical                          , optional, intent(in) :: mpi
+        integer                          , optional, intent(in) :: comm
 
         !LOCAL VARIABLES
         integer, dimension(:,:), allocatable :: matrix2D
+        integer :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+
 
 		allocate(matrix2D(size(vector),1));
 		matrix2d(:,1) = vector;
 
 		if(present(mpi)) then
-			call Disp2Dint(matrix2D, title, format, nColumns, mpi);
+			call Disp2Dint(matrix2D, title, format, nColumns, mpi, effectComm);
 		else
 			call Disp2Dint(matrix2D, title, format, nColumns);
 		end if
@@ -141,7 +232,7 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine Disp1Dchar(vector, title, format, nColumns, mpi)
+    subroutine Disp1Dchar(vector, title, format, nColumns, mpi, comm)
         ! Displays 1D Matrix (Vector)
 
 		implicit none
@@ -150,16 +241,22 @@ contains
         character(len=*),   dimension(:),            intent(in) :: vector
         character (len=*),                 optional, intent(in) :: title, format
         integer,                           optional, intent(in) :: nColumns
-        logical, optional, intent(in) :: mpi
+        logical                          , optional, intent(in) :: mpi
+        integer                          , optional, intent(in) :: comm
 
         !LOCAL VARIABLES
         character(len=30), dimension(:,:), allocatable :: matrix2D
+        integer :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+
 
 		allocate(matrix2D(size(vector),1));
 		matrix2d(:,1) = vector;
 
 		if(present(mpi)) then
-			call Disp2Dchar(matrix2D, title, format, nColumns, mpi);
+			call Disp2Dchar(matrix2D, title, format, nColumns, mpi, effectComm);
 		else
 			call Disp2Dchar(matrix2D, title, format, nColumns);
 		end if
@@ -170,7 +267,7 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine Disp2Ddble(matrix2D, title, format, nColumns, mpi)
+    subroutine Disp2Ddble(matrix2D, title, format, nColumns, mpi, comm)
         ! Displays 2D Matrix, "div" columns at a time
 
 		implicit none
@@ -179,17 +276,25 @@ contains
         double precision, dimension(:, :),           intent(in) :: matrix2D
         character (len=*),                 optional, intent(in) :: title, format
         integer,                           optional, intent(in) :: nColumns
-        logical, optional, intent(in) :: mpi
+        logical                          , optional, intent(in) :: mpi
+        integer                          , optional, intent(in) :: comm
 
         !LOCAL VARIABLES
         integer            :: k, j, div;
         double precision   :: tol;
 		character (len=40) :: doubleFmt;
 		character (len=10) :: tempFmt;
+		integer            :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+
 
 		if(present(mpi)) then
-			if(mpi) call Ordering_MPI_Start()
+			if(mpi) call Ordering_MPI_Start(effectComm)
 		end if
+
+		!write(*,*) "Inside Disp2Ddble"
 
 		if(present(format))                     tempFmt = format;
 		if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
@@ -225,7 +330,7 @@ contains
         write(*,*)
 
         if(present(mpi)) then
-			if(mpi) call Ordering_MPI_End()
+			if(mpi) call Ordering_MPI_End(effectComm)
 		end if
 
     end subroutine Disp2Ddble
@@ -233,7 +338,7 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine Disp2Dint(matrix2D, title, format, nColumns, mpi)
+    subroutine Disp2Dint(matrix2D, title, format, nColumns, mpi, comm)
         ! Displays 2D Matrix, "div" columns at a time
 
 		implicit none
@@ -242,16 +347,22 @@ contains
         integer,           dimension(:, :),          intent(in) :: matrix2D
         character (len=*),                 optional, intent(in) :: title, format
         integer,                           optional, intent(in) :: nColumns
-        logical, optional, intent(in) :: mpi
+        logical                          , optional, intent(in) :: mpi
+        integer                          , optional, intent(in) :: comm
 
         !LOCAL VARIABLES
         integer            :: k, j, div;
         double precision   :: tol;
 		character (len=40) :: doubleFmt;
 		character (len=10) :: tempFmt;
+		integer            :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+
 
 		if(present(mpi)) then
-			if(mpi) call Ordering_MPI_Start()
+			if(mpi) call Ordering_MPI_Start(effectComm)
 		end if
 
 		if(present(format))                     tempFmt = format;
@@ -288,7 +399,7 @@ contains
         write(*,*)
 
         if(present(mpi)) then
-			if(mpi) call Ordering_MPI_End()
+			if(mpi) call Ordering_MPI_End(effectComm)
 		end if
 
     end subroutine Disp2Dint
@@ -296,7 +407,7 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine Disp2Dchar(matrix2D, title, format, nColumns, mpi)
+    subroutine Disp2Dchar(matrix2D, title, format, nColumns, mpi, comm)
         ! Displays 2D Matrix, "div" columns at a time
 
 		implicit none
@@ -305,16 +416,21 @@ contains
         character (len=*), dimension(:, :),          intent(in) :: matrix2D
         character (len=*),                 optional, intent(in) :: title, format
         integer,                           optional, intent(in) :: nColumns
-        logical, optional, intent(in) :: mpi
+        logical                          , optional, intent(in) :: mpi
+        integer                          , optional, intent(in) :: comm
 
         !LOCAL VARIABLES
         integer            :: k, j, div;
         double precision   :: tol;
 		character (len=40) :: charFmt;
 		character (len=10) :: tempFmt;
+		integer            :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
 
 		if(present(mpi)) then
-			if(mpi) call Ordering_MPI_Start()
+			if(mpi) call Ordering_MPI_Start(effectComm)
 		end if
 
 		if(present(format))                     tempFmt = format;
@@ -351,7 +467,7 @@ contains
         write(*,*)
 
         if(present(mpi)) then
-			if(mpi) call Ordering_MPI_End()
+			if(mpi) call Ordering_MPI_End(effectComm)
 		end if
 
     end subroutine Disp2Dchar
@@ -359,7 +475,79 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine Disp3Ddble(matrix, title, format, nColumns, mpi)
+    subroutine Disp2Dbool(matrix2D, title, format, nColumns, mpi, comm)
+        ! Displays 2D Matrix, "div" columns at a time
+
+		implicit none
+
+		!INPUT
+        logical, dimension(:, :),          intent(in) :: matrix2D
+        character (len=*),                 optional, intent(in) :: title, format
+        integer,                           optional, intent(in) :: nColumns
+        logical                          , optional, intent(in) :: mpi
+        integer                          , optional, intent(in) :: comm
+
+        !LOCAL VARIABLES
+        integer            :: k, j, div;
+        double precision   :: tol;
+		character (len=40) :: doubleFmt;
+		character (len=10) :: tempFmt;
+		integer            :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+
+
+		if(present(mpi)) then
+			if(mpi) call Ordering_MPI_Start(effectComm)
+		end if
+
+		!write(*,*) "Inside Disp2Ddble"
+
+		if(present(format))                     tempFmt = format;
+		if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
+		if(.not.present(format))    tempFmt = "L";
+		if(.not.present(nColumns))  div = 15;
+		write(doubleFmt, fmt="(I3, A)") div, tempFmt;
+
+		write(*,*) ""
+		if(present(title)) write(*,*) "/////// ", title, " ///////";
+
+		tol = 1E-10;
+
+        write(*,*) ""
+        do k=1, size(matrix2D,2)/div
+            write(*,*)
+            write(*,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
+            write(*,*)
+            do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                write(*,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
+            enddo
+        enddo
+
+        if ((DBLE(size(matrix2D,2))/DBLE(div))-size(matrix2D,2)/div > tol) then
+            write(*,*)
+            write(*,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", ubound(matrix2D,2);
+            write(*,*)
+
+            do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                write(*,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:)
+            enddo
+        end if
+
+        write(*,*)
+
+        if(present(mpi)) then
+			if(mpi) call Ordering_MPI_End(effectComm)
+		end if
+
+    end subroutine Disp2Dbool
+
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    subroutine Disp3Ddble(matrix, title, format, nColumns, mpi, comm)
         ! Displays 1D Matrix (Vector)
 
 		implicit none
@@ -368,14 +556,20 @@ contains
         double precision , dimension(:,:,:),          intent(in) :: matrix
         character (len=*),                  optional, intent(in) :: title, format
         integer,                            optional, intent(in) :: nColumns
-        logical, optional, intent(in) :: mpi
+        logical                           , optional, intent(in) :: mpi
+        integer                           , optional, intent(in) :: comm
 
         !LOCAL VARIABLES
         integer :: i
+        integer :: effectComm
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+
 		do i = 1, size(matrix, 3)
 			write(*,*) "---------Slice ", i, "----------"
 			if(present(mpi)) then
-				call Disp2Ddble(matrix(:,:,i), title, format, nColumns, mpi);
+				call Disp2Ddble(matrix(:,:,i), title, format, nColumns, mpi, effectComm);
 			else
 				call Disp2Ddble(matrix(:,:,i), title, format, nColumns);
 			end if
