@@ -20,6 +20,7 @@ program main_RandomField
     character (len=15)                             :: corrMod, margiFirst, meshType, meshMod;
     double precision,   dimension(:),  allocatable :: corrL;
     double precision                               :: fieldAvg, fieldVar;
+    logical                                        :: calculateStat = .true.
 
 	!OUTPUTS (in this case variables to be filled in in the proces)
 	integer         , dimension(:)   , allocatable :: xNStep, kNStep;
@@ -166,16 +167,17 @@ program main_RandomField
 		if(rang == 0) write(*,*) ">>>>>>>>> Creating xPoints for unstructured mesh";
 		pointsPerCorrL = 10
 		call set_XPoints(corrL, xMin, xMax, xPoints, pointsPerCorrL)
-		call dispCarvalhol(xPoints(1:20, :), "xPoints(1:20, :)")
+		!call dispCarvalhol(transpose(xPoints(:, 1:20)), "transpose(xPoints(:, 1:20))")
 
-		allocate(randField(size(xPoints,1), Nmc))
+		!CHANGE WITH TRANSPOSITION
+		allocate(randField(size(xPoints,2), Nmc))
 
 		!Calculating a part of the random field in each processor
-		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Random field (unstructured)";
-		!call createRandomField(xPoints, corrMod, margiFirst, corrL, fieldAvg, fieldVar, Nmc, randField);
-		call createStandardGaussianFieldUnstructVictor(xPoints, corrL, corrMod, Nmc, randField);
-		call dispCarvalhol(xPoints(1:20, :), "xPoints(1:20, :)")
-		call dispCarvalhol(randField(1:20, :), "randField(1:20, :)")
+		!if(rang == 0) write(*,*) ">>>>>>>>> Calculating Random field (unstructured)";
+		call createStandardGaussianFieldUnstructShinozuka(xPoints, corrL, corrMod, Nmc, randField)
+		!call createStandardGaussianFieldUnstructVictor(xPoints, corrL, corrMod, Nmc, randField);
+		!call dispCarvalhol(xPoints(1:20, :), "xPoints(1:20, :)")
+		!call dispCarvalhol(randField(1:20, :), "randField(1:20, :)")
 
 		if(rang == 0) write(*,*) ">>>>>>>>> Writing Result File";
 		path = trim(adjustL(outputFolder))//"/"//outputName
@@ -184,15 +186,17 @@ program main_RandomField
 		call write_ResultHDF5(xPoints, randField, outputName, rang, outputFolder, &
     						  MPI_COMM_WORLD, ["proc"], [rang], HDF5Name(1))
 		if(rang == 0) write(*,*) ">>>>>>>>> Write XMF";
-		call writeXMF_RF_MPI(Nmc, HDF5Name, [size(randField,1)], outputName, rang, outputFolder, &
+		call writeXMF_RF_MPI(Nmc, HDF5Name, [size(randField,1)], nDim, outputName, rang, outputFolder, &
     						 MPI_COMM_WORLD, ".")
 
-!		!Calculating Statistics
-!		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics MPI (unstructured)";
-!		call set_Statistics_MPI(randField, xPoints, rang,             &
-!							 	evntAvg, evntStdDev, procCorrL,       &
-!							 	globalAvg, globalStdDev, globalCorrL)
-!
+		!Calculating Statistics
+		if(calculateStat) then
+			if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics MPI (unstructured)";
+			call set_Statistics_MPI(randField, xPoints, rang,             &
+							 		evntAvg, evntStdDev, procCorrL,       &
+							 		globalAvg, globalStdDev, globalCorrL)
+		end if
+
 !		!Writing results and comparison statistics (To be deleted)
 !		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Comparison Statistics (unstructured)";
 !		call set_allRandField(randField, xPoints, rang,    &
@@ -203,7 +207,7 @@ program main_RandomField
 !			call set_CompStatistics(all_RandField, all_xPoints,                   &
 !			                        compEvntAvg, compEvntStdDev,                  &
 !			                        compGlobAvg, compGlobStdDev, compGlobCorrL)
-		end if
+!		end if
 !
 !		if (rang == 0 .and. nDim == 1) then
 !			path = trim(adjustL(outputFolder))//"/"//outputName
@@ -250,34 +254,35 @@ program main_RandomField
 !		write(*,*) "ERROR - meshtype not accepted"
 !		write(*,*) "meshtype = ", meshtype
 !		call MPI_ABORT(MPI_COMM_WORLD, error, code)
-!	end if
+	end if
 
-!	if(rang == 0) then
-!		write(*,*) "Showing Statistics------------------------------- "
-!		write(*,*) ""
-!		if(Nmc < 11) then
-!			write(*,*) ">>BY EVENT"
-!			call DispCarvalhol(evntAvg, "    MPI Avg = ")
-!			if (calcComp) call DispCarvalhol(compEvntAvg, "   Comp Avg = ")
-!			call DispCarvalhol(evntStdDev**2, "    MPI Var = ")
-!			if (calcComp) call DispCarvalhol(compEvntStdDev**2, "   Comp Var = ")
-!		end if
-!
-!		write(*,*) ">>GLOBAL"
-!		write(*,*) "  INPUT Avg = ", fieldAvg
-!		if (calcComp) write(*,*) "   Comp Avg = ", compGlobAvg;
-!		write(*,*) "    MPI Avg = ", globalAvg;
-!		write(*,*) " "
-!		write(*,*) "  INPUT Var = ", fieldVar
-!		if (calcComp) write(*,*) "   Comp Var = ", compGlobStdDev**2;
-!		write(*,*) "    MPI Var = ", globalStdDev**2;
-!		write(*,*) " "
+	if(rang == 0 .and. calculateStat) then
+		calcComp = .false.
+		write(*,*) "Showing Statistics------------------------------- "
+		write(*,*) ""
+		if(Nmc < 11) then
+			write(*,*) ">>BY EVENT"
+			call DispCarvalhol(evntAvg, "    MPI Avg = ")
+			if (calcComp) call DispCarvalhol(compEvntAvg, "   Comp Avg = ")
+			call DispCarvalhol(evntStdDev**2, "    MPI Var = ")
+			if (calcComp) call DispCarvalhol(compEvntStdDev**2, "   Comp Var = ")
+		end if
+
+		write(*,*) ">>GLOBAL"
+		write(*,*) "  INPUT Avg = ", fieldAvg
+		if (calcComp) write(*,*) "   Comp Avg = ", compGlobAvg;
+		write(*,*) "    MPI Avg = ", globalAvg;
+		write(*,*) " "
+		write(*,*) "  INPUT Var = ", fieldVar
+		if (calcComp) write(*,*) "   Comp Var = ", compGlobStdDev**2;
+		write(*,*) "    MPI Var = ", globalStdDev**2;
+		write(*,*) " "
 !		write(*,*) "INPUT CorrL = ", corrL
 !		if (calcComp) write(*,*) " Comp CorrL = ", compGlobCorrL;
 !		write(*,*) "  MPI CorrL = ", globalCorrL;
-!		!call DispCarvalhol(globalCorrL, "  MPI CorrL ")
-!		!call DispCarvalhol(compGlobCorrL, " Comp CorrL = ")
-!	end if
+		!call DispCarvalhol(globalCorrL, "  MPI CorrL ")
+		!call DispCarvalhol(compGlobCorrL, " Comp CorrL = ")
+	end if
 
 
 	!Deallocating
