@@ -5,7 +5,7 @@
 
 This library aims to generate random fields with prescribed first-order marginal distribution and correlation structure over structured grids or non-structured point arrays. Currently the library offers:
 
-1. Random field generation using the spectral method by Shinozuka and Deodatis and a variation suited for isotropic media.
+1. Random field generation using the spectral method by Shinozuka and Deodatis [1,2] and a variation suited for isotropic media.
 
 This software is mainly developed at laboratoire MSSMat (Ecole Centrale Paris - CNRS).
 
@@ -26,7 +26,7 @@ Original references for the theory are:
 
 ### Requirements
 
-There are two librairies needed to build the Random Fields Generation Library: 
+There are two libraries needed to build the Random Fields Generation Library: 
 
 HDF5 : www.hdfgroup.org is a library used to manage big size files
 MPI  : a MPI library
@@ -57,7 +57,7 @@ The syntax to call the function is:
 
 `createStandardGaussianFieldUnstruct(xPoints, corrMod, margiFirst, corrL, fieldAvg, fieldVar, Nmc, method, randField)`
 
-
+It should be observed that all the variables should be allocated before the call
 Where:
 
 xPoints - is a matrix where each column contains X, Y and Z coordinates (real numbers) for each point.
@@ -81,15 +81,20 @@ fieldAvg - real number containing the field average
 
 fieldVar - positive real number containing the field variance
 
-Nmc - integer representing the number of realisations
+Nmc - integer representing the number of realizations
 
 method - generation method (integer). The options are "2" for Shinozuka and Deodatis method and "1" for the isotropic spectrum optimized version
 
-randField - matrix tha will store the results. Each column has a realization. If each realization is represented by a letter and each point by a number it would be a matrix like:
+randField - matrix tha will store the results. For a call with "xPoints" dimension 3xn and Nmc = N the size of the matrix is n x N. 
 
-          |A1 B1 C1 ..... |
-          |A2 B2 C2 ..... |
-          |A3 B3 C3 ..... |
+          |A1 B1 C1 ... N1|
+          |A2 B2 C2 ... N2|
+          |A3 B3 C3 ... N3|
+          | .  .  . .    .|
+          | .  .  .   .  .|
+          |An Bn Cn ... Nn|
 
-Obs: all the variables should be allocated before the call
+Obs: Each realization is represented by a letter and each point by a number it would be a matrix like:
+
+
 
