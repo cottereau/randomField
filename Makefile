@@ -39,6 +39,7 @@ SRCS = $(wildcard *.f90)
 #OBJS = $(SRCS:.f90=.o) #SYNTAX NOT WORKING
 OBJS += ./displayCarvalhol.o \
 ./main_RandomField.o \
+./test_func_RF.o \
 ./math_RF.o \
 ./obsolete_RF.o \
 ./randomFieldND.o \
@@ -52,7 +53,8 @@ LIBS = $(LIBHDF5) $(LIBMPI)
 INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI)
 
 #Dependencies
-main_RandomField.o   : displayCarvalhol.o statistics_RF.o obsolete_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o
+main_RandomField.o   : displayCarvalhol.o statistics_RF.o obsolete_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o test_func_RF.o
+test_func_RF.o       : displayCarvalhol.o statistics_RF.o obsolete_RF.o randomFieldND.o  writeResultFile_RF.o readFile_RF.o
 writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o obsolete_RF.o 
 randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o obsolete_RF.o BLASCarvalhol.o
 obsolete_RF.o        : displayCarvalhol.o math_RF.o  

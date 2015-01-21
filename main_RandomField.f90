@@ -7,6 +7,7 @@ program main_RandomField
 	use readFile_RF
 	use displayCarvalhol
 	use mpi
+	use test_func_RF
 
     implicit none
 
@@ -21,29 +22,37 @@ program main_RandomField
     double precision,   dimension(:),  allocatable :: corrL;
     double precision                               :: fieldAvg, fieldVar;
     logical                                        :: calculateStat = .true.
+    integer         , parameter                    :: pointsPerCorrL = 10;
+    integer         , parameter                    :: method = 1; !1 for Victor, 2 for Shinozuka
 
 	!OUTPUTS (in this case variables to be filled in in the proces)
 	integer         , dimension(:)   , allocatable :: xNStep, kNStep;
     integer         , dimension(:, :), allocatable :: all_xNStep;
-	double precision, dimension(:)   , allocatable :: kMax, xMax, xMin;
+	double precision, dimension(:)   , allocatable :: kMax, xMax, xMin, xStep;
     double precision, dimension(:, :), allocatable :: randField, xPoints;
     double precision, dimension(:, :), allocatable :: all_RandField, all_xPoints;
     double precision, dimension(:, :), allocatable :: all_xMin, all_xMax;
     double precision, dimension(:)   , allocatable :: evntAvg, evntStdDev, procCorrL, globalCorrL;
     double precision, dimension(:)   , allocatable :: compEvntAvg, compEvntStdDev, compGlobCorrL;
     double precision                               :: globalAvg, globalStdDev, compGlobAvg, compGlobStdDev;
+!    double precision  , dimension(:) , allocatable :: tests_average_Gauss, tests_stdDev_Gauss, &
+!    												  tests_average_Trans, tests_stdDev_Trans, &
+!    												  changeProp;
 
 	!LOCAL VARIABLES
-    logical           :: structured = .false., calcComp = .false.
-    integer           :: i, baseStep, pointsPerCorrL;
-    integer           :: code, rang, error, nb_procs;
-    double precision  :: pi = 3.1415926535898;
-    character(len=30) :: rangChar;
+    logical            :: structured = .false., calcComp = .false.
+    integer            :: i, baseStep, testSize;
+    integer            :: code, rang, error, nb_procs;
+    double precision   :: pi = 3.1415926535898;
+    character(len=30)  :: rangChar;
+    character(len=200) :: path
     character(len=110), dimension(:)  , allocatable :: HDF5Name
     character(len=30) , dimension(:,:), allocatable :: dataTable;
-    character(len=100) :: path
+    integer            :: nIterations
+    double precision   :: mult_Step, add_Step;
+    logical            :: variate_Nmc = .false., variate_xStep = .false.
     double precision  , dimension(:)  , allocatable :: sumRF, sumRFsquare, &
-                                                      totalSumRF, totalSumRFsquare;
+                                                       totalSumRF, totalSumRFsquare;
 
 	call MPI_INIT(code)
 	call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
@@ -100,6 +109,7 @@ program main_RandomField
 				if (nb_procs == baseStep**nDim) then
 					call read_DataTable(dataTable, "Max", xMax)
 					call read_DataTable(dataTable, "Min", xMin)
+					call read_DataTable(dataTable, "Step", xStep)
 					call set_ProcMaxMin(xMin, xMax, rang, nb_procs)
 				else
 					write(*,*) "In meshing automatic mode the number of processors should be an integer like (N)**nDim, where N is an integer and nDim is the number of dimensions"
@@ -124,6 +134,7 @@ program main_RandomField
 		write(*,*) "meshMod        = ", meshMod
 		write(*,*) "xMin           = ", xMin
 		write(*,*) "xMax           = ", xMax
+		write(*,*) "xStep          = ", xStep
 		write(*,*) ""
 		write(*,*) "##EVENTS"
 		write(*,*) "nDim           = ", nDim
@@ -148,36 +159,156 @@ program main_RandomField
 		call MPI_ABORT(MPI_COMM_WORLD, error, code)
 	end if
 	do i = 1, nDim
-		if(corrL(i) < 0.001) then
+		if(corrL(i) <= 0.0d0) then
 			write(*,*) ""
-			write(*,*) "ERROR - corrL should be a positive number greater than 0.001"
+			write(*,*) "ERROR - corrL should be a positive number greater than 0.0"
 			write(*,*) "corrL ", i, "of proc ", rang, " is ", corrL(i)
 			call MPI_ABORT(MPI_COMM_WORLD, error, code)
 		end if
 	end do
 
+	path = trim(adjustL(outputFolder))//"/"//outputName
+	!write(*,*) "Path before = ", path
+
+	!/////////////TESTING BLOCK
+    variate_Nmc   = .true.
+    variate_xStep = .false.
+    nIterations   = 10
+    mult_Step     = 2
+    add_Step      = 0
+
+	call func_test_001_convergence(xMin, xMax, xStep,               &
+								   corrL, corrMod, pointsPerCorrL,  &
+							 	   margiFirst, fieldAvg, fieldVar,  &
+							 	   Nmc, method,                     &
+							 	   variate_Nmc, variate_xStep,      &
+							 	   nIterations,                     &
+							 	   mult_Step, add_Step,             &
+							 	   path)
+
+!	!///////////// START COVERGENCE TEST BLOCK
+!	!Creating Standard Gaussian Field
+!	testSize = 20
+!	allocate(tests_average_Gauss(testSize), tests_stdDev_Gauss(testSize))
+!	allocate(tests_average_Trans(testSize), tests_stdDev_Trans(testSize))
+!	allocate(changeProp(testSize))
+!
+!	!Put here what is contant over interactions
+!	if(rang == 0) write(*,*) ">>>>>>>>> Creating xPoints";
+!	call set_XPoints(corrL, xMin, xMax, xStep, xPoints, pointsPerCorrL)
+!	call dispCarvalhol(transpose(xPoints(:, 1:20)), "transpose(xPoints(:, 1:20))")
+!
+!	!Put here the starting point of what will change over interactions
+!	allocate(randField(size(xPoints,2), Nmc))
+!	randField = 0.0
+!	call dispCarvalhol(randField(1:20, :), "randField(1:20, :) before loop")
+!
+!	do i = 1, testSize
+!
+!		changeProp(i) = dble(Nmc)
+!
+!		if(rang == 0) write(*,*) ">>>>>>>>> Creating Standard Gaussian Random field (unstructured)";
+!		call createStandardGaussianFieldUnstruct(xPoints,                                        &
+!		                                         corrMod, margiFirst, corrL, fieldAvg, fieldVar, &
+!		                                         Nmc, method, randField);
+!		if(calculateStat) then
+!			if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics Before Transformation (unstructured)";
+!			call set_Statistics_MPI(randField, xPoints, rang,             &
+!							 		evntAvg, evntStdDev, procCorrL,       &
+!							 		tests_average_Gauss(i), tests_stdDev_Gauss(i), globalCorrL)
+!		end if
+!
+!		if(rang == 0) write(*,*) ">>>>>>>>> Transforming Random field (unstructured)";
+!		call multiVariateTransformation (margiFirst, fieldAvg, fieldVar, randField)
+!		if(calculateStat) then
+!			if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics After Transformation (unstructured)";
+!			call set_Statistics_MPI(randField, xPoints, rang,             &
+!							 		evntAvg, evntStdDev, procCorrL,       &
+!							 		tests_average_Trans(i), tests_stdDev_Trans(i), globalCorrL)
+!		end if
+!
+!		!Put here what change in each interaction
+!		Nmc = 2*Nmc
+!		deallocate(randField)
+!		allocate(randField(size(xPoints,2), Nmc))
+!		!!!!!!!!!!!!!!
+!
+!	end do
+!
+!	!Printing
+!	write(*,'(A4, A10, A1, 4A20)') "Iter", "Nmc", ")", "Avg-Gauss", "StdDev-Gauss", &
+!		 											  "Avg-Trans", "StdDev-Trans"
+!	do i = 1, testSize
+!
+!		write(*,'(I4, F10.0, A1, 4F20.8)') i,     changeProp(i) , ")", tests_average_Gauss(i), tests_stdDev_Gauss(i), &
+!														   tests_average_Trans(i), tests_stdDev_Trans(i)
+!	end do
+!
+!	call dispCarvalhol(tests_average_Gauss, "tests_average_Gauss")
+!	call dispCarvalhol(tests_stdDev_Gauss, "tests_stdDev_Gauss")
+!	call dispCarvalhol(tests_average_Trans, "tests_average_Trans")
+!	call dispCarvalhol(tests_stdDev_Trans, "tests_stdDev_Trans")
+!
+!	deallocate(tests_average_Gauss, tests_stdDev_Gauss)
+!	deallocate(tests_average_Trans, tests_stdDev_Trans)
+!	deallocate(changeProp)
+!	!///////////// END COVERGENCE TEST BLOCK
+
 	!--------------------------------------------------------------------------------------
 	!------------------------------UNSTRUCTURED--------------------------------------------
 	!--------------------------------------------------------------------------------------
 
-	if(meshType == "unstructured") then
+	!if(meshType == "unstructured") then
+	if(.false.) then
 
 		!Creating x points for each processor (in the future this would be one of the inputs)
 		write(*,*) ""
 		if(rang == 0) write(*,*) ">>>>>>>>> Creating xPoints for unstructured mesh";
-		pointsPerCorrL = 10
-		call set_XPoints(corrL, xMin, xMax, xPoints, pointsPerCorrL)
+		!allocate(xNStep(nDim))
+		!xNStep  = pointsPerCorrL*ceiling((xMax-xMin)/corrL);
+		!call set_XPoints(corrL, xMin, xMax, xPoints, pointsPerCorrL)
 		!call dispCarvalhol(transpose(xPoints(:, 1:20)), "transpose(xPoints(:, 1:20))")
 
 		!CHANGE WITH TRANSPOSITION
-		allocate(randField(size(xPoints,2), Nmc))
+		!allocate(randField(size(xPoints,2), Nmc))
 
 		!Calculating a part of the random field in each processor
 		!if(rang == 0) write(*,*) ">>>>>>>>> Calculating Random field (unstructured)";
-		call createStandardGaussianFieldUnstructShinozuka(xPoints, corrL, corrMod, Nmc, randField)
-		!call createStandardGaussianFieldUnstructVictor(xPoints, corrL, corrMod, Nmc, randField);
+		!call createStandardGaussianFieldUnstructShinozuka(xPoints, corrL, corrMod, Nmc, randField)
+		call createStandardGaussianFieldUnstructVictor(xPoints, corrL, corrMod, Nmc, randField);
+		if(calculateStat) then
+			if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics Before Transformation (unstructured)";
+			call set_Statistics_MPI(randField, xPoints, rang,             &
+							 		evntAvg, evntStdDev, procCorrL,       &
+							 		globalAvg, globalStdDev, globalCorrL)
+			if(rang == 0) then
+				write(*,*) "    STD Avg = ", 0.0d0;
+				write(*,*) "    MPI Avg = ", globalAvg;
+				write(*,*) " "
+				write(*,*) "    STD Var = ", 1.0d0;
+				write(*,*) "    MPI Var = ", globalStdDev**2;
+				write(*,*) " "
+			end if
+		end if
+		call multiVariateTransformation (margiFirst, fieldAvg, fieldVar, randField)
 		!call dispCarvalhol(xPoints(1:20, :), "xPoints(1:20, :)")
 		!call dispCarvalhol(randField(1:20, :), "randField(1:20, :)")
+				!Calculating Statistics
+		if(calculateStat) then
+			if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics After Transformation (unstructured)";
+			call set_Statistics_MPI(randField, xPoints, rang,             &
+							 		evntAvg, evntStdDev, procCorrL,       &
+							 		globalAvg, globalStdDev, globalCorrL)
+			if(rang == 0) then
+				write(*,*) "  INPUT Avg = ", fieldAvg
+				write(*,*) "    MPI Avg = ", globalAvg;
+				write(*,*) " "
+				write(*,*) "  INPUT Var = ", fieldVar
+				write(*,*) "    MPI Var = ", globalStdDev**2;
+				write(*,*) " "
+			end if
+		end if
+
 
 		if(rang == 0) write(*,*) ">>>>>>>>> Writing Result File";
 		path = trim(adjustL(outputFolder))//"/"//outputName
@@ -189,13 +320,7 @@ program main_RandomField
 		call writeXMF_RF_MPI(Nmc, HDF5Name, [size(randField,1)], nDim, outputName, rang, outputFolder, &
     						 MPI_COMM_WORLD, ".")
 
-		!Calculating Statistics
-		if(calculateStat) then
-			if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics MPI (unstructured)";
-			call set_Statistics_MPI(randField, xPoints, rang,             &
-							 		evntAvg, evntStdDev, procCorrL,       &
-							 		globalAvg, globalStdDev, globalCorrL)
-		end if
+
 
 !		!Writing results and comparison statistics (To be deleted)
 !		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Comparison Statistics (unstructured)";
@@ -219,70 +344,40 @@ program main_RandomField
 !	!--------------------------------------------------------------------------------------
 !
 !	else if(meshType == "structured") then
-!		!Calculating a part of the random field in each processor
-!		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Random field (structured)";
-!		call createRandomField(xMin, xMax, corrMod, corrL, Nmc, xNStep, randField);
-!		!Calculating Statistics
-!		if(rang == 0) write(*,*) ">>>>>>>>> Calculating Statistics MPI (structured)";
-!		call set_Statistics_MPI(randField, xMin, xMax, xNStep, rang, &
-!							 	evntAvg, evntStdDev, procCorrL,      &
-!							 	globalAvg, globalStdDev, globalCorrL)
 !
-!		if(rang == 0) write(*,*) ">>>>>>>>> Writing Result File";
-!		path = trim(adjustL(outputFolder))//"/"//outputName
-!		call write_ResultHDF5(xMin, xMax, xNStep, randField, path, rang) !HDF5 of this processor
-!
-!		!Writing results and comparison statistics (To be deleted)
-!		if (calcComp) then
-!			if(rang == 0) write(*,*) ">>>>>>>>> Calculating Comparison Statistics (structured)";
-!			call set_allRandField(randField, xMin, xMax, xNStep, rang,    &
-!							      all_xMin, all_xMax, all_xNStep,         &
-!							      all_RandField, all_xPoints)
-!			if(rang == 0) then
-!				call set_CompStatistics(all_RandField, all_xPoints,                   &
-!										all_xMin, all_xMax, all_xNStep,               &
-!				                        compEvntAvg, compEvntStdDev,                  &
-!				                        compGlobAvg, compGlobStdDev, compGlobCorrL)
-!			end if
-!		end if
-!
-!	!--------------------------------------------------------------------------------------
-!	!--------------------------------------------------------------------------------------
-!	!--------------------------------------------------------------------------------------
-
 !	else
 !		write(*,*) "ERROR - meshtype not accepted"
 !		write(*,*) "meshtype = ", meshtype
 !		call MPI_ABORT(MPI_COMM_WORLD, error, code)
 	end if
 
-	if(rang == 0 .and. calculateStat) then
-		calcComp = .false.
-		write(*,*) "Showing Statistics------------------------------- "
-		write(*,*) ""
-		if(Nmc < 11) then
-			write(*,*) ">>BY EVENT"
-			call DispCarvalhol(evntAvg, "    MPI Avg = ")
-			if (calcComp) call DispCarvalhol(compEvntAvg, "   Comp Avg = ")
-			call DispCarvalhol(evntStdDev**2, "    MPI Var = ")
-			if (calcComp) call DispCarvalhol(compEvntStdDev**2, "   Comp Var = ")
-		end if
-
-		write(*,*) ">>GLOBAL"
-		write(*,*) "  INPUT Avg = ", fieldAvg
-		if (calcComp) write(*,*) "   Comp Avg = ", compGlobAvg;
-		write(*,*) "    MPI Avg = ", globalAvg;
-		write(*,*) " "
-		write(*,*) "  INPUT Var = ", fieldVar
-		if (calcComp) write(*,*) "   Comp Var = ", compGlobStdDev**2;
-		write(*,*) "    MPI Var = ", globalStdDev**2;
-		write(*,*) " "
-!		write(*,*) "INPUT CorrL = ", corrL
-!		if (calcComp) write(*,*) " Comp CorrL = ", compGlobCorrL;
-!		write(*,*) "  MPI CorrL = ", globalCorrL;
-		!call DispCarvalhol(globalCorrL, "  MPI CorrL ")
-		!call DispCarvalhol(compGlobCorrL, " Comp CorrL = ")
-	end if
+!	if(rang == 0 .and. calculateStat) then
+!		calcComp = .false.
+!		write(*,*) "Showing Statistics------------------------------- "
+!		write(*,*) ""
+!		if(Nmc < 11) then
+!			write(*,*) ">>BY EVENT"
+!			call DispCarvalhol(evntAvg, "    MPI Avg = ")
+!			if (calcComp) call DispCarvalhol(compEvntAvg, "   Comp Avg = ")
+!			call DispCarvalhol(evntStdDev**2, "    MPI Var = ")
+!			if (calcComp) call DispCarvalhol(compEvntStdDev**2, "   Comp Var = ")
+!		end if
+!
+!		write(*,*) ">>GLOBAL"
+!		write(*,*) "  INPUT Avg = ", fieldAvg
+!		if (calcComp) write(*,*) "   Comp Avg = ", compGlobAvg;
+!		write(*,*) "    MPI Avg = ", globalAvg;
+!		write(*,*) " "
+!		write(*,*) "  INPUT Var = ", fieldVar
+!		if (calcComp) write(*,*) "   Comp Var = ", compGlobStdDev**2;
+!		write(*,*) "    MPI Var = ", globalStdDev**2;
+!		write(*,*) " "
+!		!write(*,*) "INPUT CorrL = ", corrL
+!		!if (calcComp) write(*,*) " Comp CorrL = ", compGlobCorrL;
+!		!write(*,*) "  MPI CorrL = ", globalCorrL;
+!		!call DispCarvalhol(globalCorrL, "  MPI CorrL ")
+!		!call DispCarvalhol(compGlobCorrL, " Comp CorrL = ")
+!	end if
 
 
 	!Deallocating

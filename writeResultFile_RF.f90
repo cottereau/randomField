@@ -276,7 +276,6 @@ contains
 
 			!Building file
 	        file=21;
-			write(*,*) "Flag 2"
 	        open (unit = file , file = fullPathXMF, action = 'write')
 
 				write (file,'(A)'      )'<?xml version="1.0" ?>'

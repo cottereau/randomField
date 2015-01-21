@@ -31,12 +31,39 @@ contains
         double precision                 , intent(in)    :: fieldAvg, fieldVar;
 
         !OUTPUT
-        double precision, dimension(:, :), allocatable, intent(out) :: randField;
+        double precision, dimension(:, :), intent(out) :: randField;
 
 		!call createStandardGaussianFieldUnstructShinozuka (xPoints, corrL, corrMod, Nmc, randField)
 		!call multiVariateTransformation (margiFirst, fieldAvg, fieldVar, randField)
 
     end subroutine createRandomFieldUnstruct
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	subroutine createStandardGaussianFieldUnstruct(xPoints,                                        &
+		                                           corrMod, margiFirst, corrL, fieldAvg, fieldVar, &
+		                                           Nmc, method, randField);
+        implicit none
+
+        !INPUT
+        double precision, dimension(1:, 1:), intent(in)    :: xPoints;
+        double precision, dimension(1:)    , intent(in)    :: corrL;
+        character (len=*)                  , intent(in)    :: corrMod, margiFirst;
+        integer                            , intent(in)    :: Nmc, method;
+        double precision                   , intent(in)    :: fieldAvg, fieldVar;
+
+        !OUTPUT
+        double precision, dimension(:, :)  , intent(out) :: randField;
+
+        !call dispCarvalhol(randField(1:20, :), "randField(1:20, :) before method choice")
+
+		if(method == 2) then
+			call createStandardGaussianFieldUnstructShinozuka (xPoints, corrL, corrMod, Nmc, randField)
+		else
+			call createStandardGaussianFieldUnstructVictor (xPoints, corrL, corrMod, Nmc, randField)
+		end if
+
+    end subroutine createStandardGaussianFieldUnstruct
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -59,6 +86,8 @@ contains
 			case("gaussian")
 				normalVar = fieldVar
 				normalAvg = fieldAvg
+				randField(:,:) = randField(:,:) * sqrt(normalVar) &
+						          + normalAvg;
 			case("lognormal")
 				if(fieldAvg <= 0) then
 					write(*,*) ""
@@ -67,21 +96,17 @@ contains
 				end if
 				normalVar = log(1 + fieldVar/(fieldAvg**2))
 				normalAvg = log(fieldAvg) - normalVar/2
+				randField(:,:) = exp(randField(:,:) * sqrt(normalVar) &
+						              + normalAvg)
 		end select
-
-		randField(:,:) = randField(:,:) * sqrt(normalVar) &
-						 + normalAvg;
-
-		if (margiFirst == "lognormal") then
-			randField(:,:) = exp(randField(:,:))
-		end if
 
 	end subroutine
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	subroutine createStandardGaussianFieldUnstructShinozuka (xPoints, corrL, corrMod, Nmc, randField, &
-	                                                         chosenSeed, MinBound, MaxBound, communicator, calculate)
+	                                                         chosenSeed, MinBound, MaxBound, communicator, &
+	                                                         calculate, verbose)
 
 		!INPUT
         double precision, dimension(1:, 1:), intent(in) :: xPoints;
@@ -92,7 +117,7 @@ contains
         real   , dimension(1:), optional   , intent(in) :: MinBound, MaxBound
         integer               , optional   , intent(in) :: communicator
         logical, dimension(1:), optional   , intent(in) :: calculate
-
+		logical               , optional   , intent(in) :: verbose
         !OUTPUT
         double precision, dimension(:, :), intent(out) :: randField;
 
@@ -105,6 +130,7 @@ contains
         double precision, dimension(:)  , allocatable :: xMaxGlob, xMinGlob;
         logical         , dimension(:)  , allocatable :: effectCalc;
         integer          :: effectComm
+        logical          :: effecVerb
         integer          :: i, j, k, m, nDim;
         integer          :: xNTotal, kNTotal;
         integer          :: nb_procs, rang, code, error;
@@ -113,7 +139,12 @@ contains
         double precision, dimension(:), allocatable :: dgemm_mult;
         !integer, dimension(:), allocatable :: testSeed!TEST
 
-		write(*,*) "INSIDE 'createStandardGaussianFieldUnstructShinozuka'"
+		effecVerb = .false.
+		if(present(verbose)) then
+			if(verbose) effecVerb = .true.
+		end if
+
+		if(effecVerb) write(*,*) "INSIDE 'createStandardGaussianFieldUnstructShinozuka'"
 
 		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
 		call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
@@ -165,7 +196,7 @@ contains
         allocate(xMinGlob(nDim))
         allocate(xMaxGlob(nDim))
 		if(.not.present(MinBound)) then
-			write(*,*) "Min bound not present, the extremes will be calculated automatically"
+			if(effecVerb) write(*,*) "Min bound not present, the extremes will be calculated automatically"
 			call set_Extremes(xPointsNorm, xMinGlob, xMaxGlob, effectComm)
 		else
 			do i = 1, nDim
@@ -180,12 +211,14 @@ contains
 		kNStep  = kAdjust*(ceiling(kMax/kDelta) + 1);
 		kNTotal = product(kNStep);
 
-		if(rang == 0) write(*,*) "Nmc     = ", Nmc
-		if(rang == 0) write(*,*) "kNTotal = ", kNTotal
-		if(rang == 0) write(*,*) "kDelta  = ", kDelta
-		if(rang == 0) write(*,*) "kNStep  = ", kNStep
-		if(rang == 0) write(*,*) "xMinGlob  = ", xMinGlob
-		if(rang == 0) write(*,*) "xMaxGlob  = ", xMaxGlob
+		if(effecVerb) then
+			if(rang == 0) write(*,*) "Nmc     = ", Nmc
+			if(rang == 0) write(*,*) "kNTotal = ", kNTotal
+			if(rang == 0) write(*,*) "kDelta  = ", kDelta
+			if(rang == 0) write(*,*) "kNStep  = ", kNStep
+			if(rang == 0) write(*,*) "xMinGlob  = ", xMinGlob
+			if(rang == 0) write(*,*) "xMaxGlob  = ", xMaxGlob
+		end if
 
 		if(kNTotal < 1) then
 			write(*,*) "ERROR - In 'createStandardGaussianFieldUnstruct': kNTotal should be a positive integer (possibly a truncation problem)"
@@ -214,11 +247,11 @@ contains
 		!Initializing the seed
 		!call calculate_random_seed(testSeed, 0) !TEST
 		!call init_random_seed(testSeed) !TEST
-!		if(present(chosenSeed)) then
-!			call init_random_seed(chosenSeed)
-!		else
-!			call init_random_seed()
-!		end if
+		if(present(chosenSeed)) then
+			call init_random_seed(chosenSeed)
+		else
+			call init_random_seed()
+		end if
 
 		!Generating random field samples
 		do k = 1, Nmc
@@ -244,7 +277,7 @@ contains
 			end if
 		end do
 
-		if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
+		if(effecVerb .and. rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
 
 		randField(:,:) = 2*sqrt(product(deltaK)/((2*pi)**(nDim))) &
 						 * randField(:,:) !Obs: sqrt(product(corrL)) is not needed because of normalization
@@ -271,7 +304,8 @@ contains
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 	subroutine createStandardGaussianFieldUnstructVictor (xPoints, corrL, corrMod, Nmc, randField, &
-	                                                      chosenSeed, MinBound, MaxBound, communicator, calculate)
+	                                                      chosenSeed, MinBound, MaxBound, communicator, &
+	                                                      calculate, verbose)
 
 		!INPUT
         double precision, dimension(1:, 1:), intent(in) :: xPoints;
@@ -282,8 +316,9 @@ contains
         real   , dimension(1:), optional   , intent(in) :: MinBound, MaxBound
         integer               , optional   , intent(in) :: communicator
         logical, dimension(1:), optional   , intent(in) :: calculate
+        logical               , optional   , intent(in) :: verbose
         !OUTPUT
-        double precision, dimension(1:, 1:), intent(out) :: randField;
+        double precision, dimension(1:, 1:), intent(inout) :: randField;
 
         !LOCAL VARIABLES
         double precision, dimension(:,:), allocatable :: xPointsNorm;
@@ -298,11 +333,16 @@ contains
         integer          :: nb_procs, rang, code, error;
         double precision :: Sk, deltaKprod, step, rDelta;
         double precision :: pi = 3.1415926535898, zero = 0d0;
+        logical          :: effecVerb
         double precision, dimension(:), allocatable :: dgemm_mult;
         !integer, dimension(:), allocatable :: testSeed!TEST
 
+		effecVerb = .false.
+		if(present(verbose)) then
+			if(verbose) effecVerb = .true.
+		end if
 
-		write(*,*) "INSIDE 'createStandardGaussianFieldUnstructVictor'"
+		if(effecVerb) write(*,*) "INSIDE 'createStandardGaussianFieldUnstructVictor'"
 
 		call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
 		call MPI_COMM_RANK(MPI_COMM_WORLD, rang, code)
@@ -310,8 +350,8 @@ contains
 		nDim    = size(xPoints, 1);
 		xNTotal = size(xPoints, 2);
 
-		write(*,*) "nDim =", nDim
-		write(*,*) "xNTotal =", xNTotal
+		if(effecVerb) write(*,*) "nDim =", nDim
+		if(effecVerb) write(*,*) "xNTotal =", xNTotal
 		!call dispCarvalhol(xPoints, "xPoints")
 
 		allocate(xPointsNorm (nDim, xNTotal))
@@ -347,7 +387,7 @@ contains
 
 		!Communicating normalized extremes
 		if(.not.present(MinBound)) then
-			write(*,*) "Min bound not present, the extremes will be calculated automatically"
+			if(effecVerb) write(*,*) "Min bound not present, the extremes will be calculated automatically"
 			call set_Extremes(xPointsNorm, xMinGlob, xMaxGlob, effectComm)
 		else
 			do i = 1, nDim
@@ -358,8 +398,8 @@ contains
 		end if
 		!!
 
-		write(*,*) "xMaxGlob = ", xMaxGlob;
-		write(*,*) "xMinGlob = ", xMinGlob;
+		if(effecVerb) write(*,*) "xMaxGlob = ", xMaxGlob;
+		if(effecVerb) write(*,*) "xMinGlob = ", xMinGlob;
 
 
 		!Setting kMax e kStep
@@ -367,20 +407,16 @@ contains
 		rDelta  = 2*pi/(periodMult*sqrt(sum((xMaxGlob - xMinGlob)**2))) !Delta min in between two wave numbers to avoid periodicity
 		rNTotal = rAdjust*(ceiling(rMax(1)/rDelta) + 1);
 
-		!rNTotal = ceiling(rMax(1) * dble(pointsPerCorrl))
-		!rMax(1)        = sqrt(sum((xMaxGlob - xMinGlob)**2))
-		!rNTotal        = N
-		!rCrit          = maxval(xMaxGlob - xMinGlob)
-		!rNTotal        = ceiling(sqrt(dble(N)))
-
 		!Random Field
-		randField = 0;
+		randField = 0.0;
 		step      = rMax(1)/dble(rNTotal)
 
-		if(rang == 0) write(*,*) "rMax(1) = ",rMax(1);
-		if(rang == 0) write(*,*) "rNTotal = ",rNTotal;
-		if(rang == 0) write(*,*) "rDelta  = ",rDelta;
-		if(rang == 0) write(*,*) "step    = ",step;
+		if(effecVerb) then
+			if(rang == 0) write(*,*) "rMax(1) = ",rMax(1);
+			if(rang == 0) write(*,*) "rNTotal = ",rNTotal;
+			if(rang == 0) write(*,*) "rDelta  = ",rDelta;
+			if(rang == 0) write(*,*) "step    = ",step;
+		end if
 
 		!Initializing the seed
 		!call calculate_random_seed(testSeed, 0)!TEST
@@ -403,7 +439,7 @@ contains
 					call random_number(thetaN(:))
 					call random_number(gammaN(:))
 					psiN   = 2*pi*psiN
-					thetaN = 2*pi*psiN
+					thetaN = 2*pi*thetaN
 					gammaN = 2*pi*gammaN
 
 					do j = 1, rNTotal
@@ -442,7 +478,7 @@ contains
 					call random_number(psiN(:))
 
 					psiN   = 2*pi*psiN
-					thetaN = 2*pi*psiN
+					thetaN = 2*pi*thetaN
 					phiN   = pi*phiN
 					gammaN = sqrt(12.0)*(gammaN -0.5d0)
 
@@ -470,7 +506,7 @@ contains
 			call MPI_ABORT(MPI_COMM_WORLD, error, code)
 		end if
 
-		if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
+		if(effecVerb .and. rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
 
 		randField(:,:) = sqrt((1.0d0)/((2.0d0*pi)**(nDim)))&
 						 * randField(:,:)
@@ -681,25 +717,38 @@ contains
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    subroutine set_XPoints(corrL, xMin, xMax, xPoints, nPoinsPerCorrL)
+    subroutine set_XPoints(corrL, xMin, xMax, xStep, xPoints, pointsPerCorrL)
     	implicit none
 
     	!INPUT
-    	double precision, dimension(:), intent(in) :: corrL, xMin, xMax;
-    	integer                       , intent(in) :: nPoinsPerCorrL !Number of points by correlation length
+    	double precision, dimension(:), intent(in) :: corrL, xMin, xMax, xStep;
+    	integer                       , intent(in) :: pointsPerCorrL
+
     	!OUTPUT
-    	double precision, dimension(:,:), allocatable, intent(OUT) :: xPoints;
+    	double precision, dimension(:,:), allocatable, intent(out) :: xPoints;
     	!LOCAL VARIABLES
     	integer :: nDim, i, xNTotal;
     	integer , dimension(:) , allocatable :: xNStep;
 
-    	nDim    = size(corrL)
-    	allocate(xNStep(nDim))
-		xNStep  = nPoinsPerCorrL*ceiling((xMax-xMin)/corrL);
+		nDim    = size(corrL)
+		allocate(xNStep(nDim))
+		do i = 1, nDim
+			if(xStep(i) > 0) then
+				xNStep(i)  = ceiling((xMax(i)-xMin(i))/xStep(i));
+			else
+				xNStep(i)  = dble(pointsPerCorrL) * ceiling((xMax(i)-xMin(i))/corrL(i));
+			end if
+		end do
 		xNTotal = product(xNStep)
+		if(allocated(xPoints)) then
+			deallocate(xPoints)
+		end if
 		allocate(xPoints(nDim, xNTotal))
 
-		!call DispCarvalhol(xNStep,"xNStep")
+		!write(*,*) "xNStep = ", xNStep
+		!write(*,*) "xMax   = ", xMax
+		!write(*,*) "xMin   = ", xMin
+		!call DispCarvalhol(xPoints,"xPoints inside set_XPoints")
 
 		do i = 1, xNTotal
 			call get_Permutation(i, xMax, xNStep, xPoints(:,i), xMin);
