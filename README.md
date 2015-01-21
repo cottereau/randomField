@@ -60,32 +60,32 @@ The syntax to call the function is:
 It should be observed that all the variables should be allocated before the call
 Where:
 
-'xPoints' - is a matrix where each column contains X, Y and Z coordinates (real numbers) for each point.
+`xPoints` - is a matrix where each column contains X, Y and Z coordinates (real numbers) for each point.
 
           |X1  X2  X3  ...... Xn|
           |Y1  Y2  Y3  ...... Yn|
           |Z1  Z2  Z3  ...... Zn|
 
 
-'corrMod' - string containing the name of the correlation model. Only the "gaussian" option is implemented.
+`corrMod` - string containing the name of the correlation model. Only the "gaussian" option is implemented.
 
-'margiFirst' - string containing the name of the first-order marginal law. The options are "gaussian" or "lognormal"
+`margiFirst` - string containing the name of the first-order marginal law. The options are "gaussian" or "lognormal"
 
-'corrL' - vector of positive real numbers containing the correlation length in each direction
+`corrL` - vector of positive real numbers containing the correlation length in each direction
 
           |Correlation Length in X|
           |Correlation Length in Y|
           |Correlation Length in Z|
 
-'fieldAvg' - real number containing the field average
+`fieldAvg` - real number containing the field average
 
-'fieldVar' - positive real number containing the field variance
+`fieldVar` - positive real number containing the field variance
 
-'Nmc' - integer representing the number of realizations
+`Nmc` - integer representing the number of realizations
 
-'method' - generation method (integer). The options are "2" for Shinozuka and Deodatis method and "1" for the isotropic spectrum optimized version
+`method` - generation method (integer). The options are "2" for Shinozuka and Deodatis method and "1" for the isotropic spectrum optimized version
 
-'randField' - matrix tha will store the results. For a call with "xPoints" dimension 3xn and Nmc = N the size of the matrix is n x N. 
+`randField` - matrix tha will store the results. For a call with "xPoints" dimension 3xn and Nmc = N the size of the matrix is n x N. 
 
           |A1 B1 C1 ... N1|
           |A2 B2 C2 ... N2|
