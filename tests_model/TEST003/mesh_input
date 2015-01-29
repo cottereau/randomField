@@ -1,0 +1,12 @@
+!$$ For scalar entries!
+!$  For vector entries!
+!   Comments are in between two exclamation points !
+
+$$meshType unstructured
+$$meshMod  automatic
+
+$Min     $Max    $Step
+ 0.0      1.0     0.1
+ 0.0      2.0     0.2
+ 0.0      4.0     0.4     
+ 

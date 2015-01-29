@@ -1,0 +1,33 @@
+$$Nmc     10
+$$corrMod gaussian
+$$margiFirst gaussian
+$corrL
+   0.01
+$$fieldAvg
+   0.0
+$$fieldVar
+   1.0
+$$method
+   2
+
+
+!
+
+INPUTS ###########################
+<OPTION>: <DESCRIPTION> -> <TYPE> [: <OPTIONS>]
+
+Nmc: number of Monte Carlo realizations -> integer
+corrMod: correlation model -> text : gaussian
+margiFirst : first order marginal law  -> text : gaussian, lognormal
+corrL : correlation length vector XYZ -> nDimensions double
+fieldAvg : field average vector XYZ -> nDimensions double
+fieldVar : field variance vector XYZ -> nDimensions double
+method: method of field generation -> <integer> : 1 for Isotropic, 2 for Shinozuka
+
+FILE SYNTAX RULES ###########################
+
+$$Scalar_Name For scalar entries
+$Vector_Name  For vector entries
+Comments are in between two exclamation points 
+
+!
