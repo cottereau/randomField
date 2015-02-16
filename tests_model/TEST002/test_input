@@ -1,3 +1,32 @@
+!---------------MANDATORY---------------------------------------------------------------!
+$$step_variate T
+$$nmc_variate T
+$$corrL_variate T
+
+!---------------IF step_variate = T---------------------------------------------------------------!
+$$step_speedUp F
+$step_initial 1.0 1.0
+$step_div 2 2
+$step_mult 0.5 0.5
+$step_add 0.0 0.0
+$$step_nIter 6
+
+!---------------IF nmc_variate = T---------------------------------------------------------------!
+$$nmc_speedUp F
+$$nmc_initial 10
+$$nmc_mult 2.0
+$$nmc_add 0.0
+$$nmc_nIter 6
+
+!---------------IF corrL_variate = T---------------------------------------------------------------!
+$$corrL_fix_pointsPerCorrL T
+$$corrL_pointsPerCorrL 10
+$corrL_initial 10.0 10.0
+$corrL_mult 0.5 0.5
+$corrL_add 0.0 0.0
+$$corrL_nIter 6
+
+!SYNTAX--------------------------------------------------------------------------------------------!
 ! $$scalarName For scalar entries!
 ! $vectorName  For vector entries!
 !   Comments are in between two exclamation points !
@@ -8,15 +37,3 @@ On the 3D case Step_mult could be for instance 0.5 0.1 1
 
 the variables "*_initial" will overwrite the ones set in "mesh_input"
 !
-
-$$step_variate T
-$step_initial 0.1 0.2
-$step_mult 0.5 0.5
-$step_add 0.0 0.0
-$$step_nIter 3
-
-$$nmc_variate F
-$$nmc_initial 3
-$$nmc_mult 10
-$$nmc_add 0.0
-$$nmc_nIter 4

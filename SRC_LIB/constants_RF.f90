@@ -4,6 +4,7 @@ module constants_RF
 
 	double precision, parameter :: PI = 3.1415926535898d0;
 	double precision, parameter :: ZERO = 0d0;
+	double precision, parameter :: TOLERANCE = 0.0000000000001
 	integer, parameter :: ISOTROPIC = 1, &
 	                      SHINOZUKA = 2
 

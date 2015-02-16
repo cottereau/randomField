@@ -5,6 +5,8 @@ module writeResultFile_RF
     use math_RF
     use hdf5
     use mpi
+    use constants_RF
+    use write_Log_File
 
 contains
 
@@ -18,13 +20,13 @@ contains
         implicit none
 
         !INPUTS
-        double precision,  dimension(1:,1:), intent(in) :: xPoints, randField;
-        character (len=*)                , intent(in) :: filename;
-        integer                          , intent(in) :: rang;
-        character(len=*)                 , intent(in) :: folderPath
-        integer                          , intent(in) :: communicator
-        character(len=*) , dimension(1:), optional  , intent(in) :: labels
-        integer          , dimension(1:), optional  , intent(in) :: indexes
+        double precision, dimension(1:,1:), intent(in) :: xPoints, randField;
+        character(len=*)                  , intent(in) :: filename;
+        integer                           , intent(in) :: rang;
+        character(len=*)                  , intent(in) :: folderPath
+        integer                           , intent(in) :: communicator
+        character(len=*), dimension(1:), optional, intent(in) :: labels
+        integer         , dimension(1:), optional, intent(in) :: indexes
 
         !OUTPUTS
         character(len=110) , optional  , intent(out) ::HDF5Name
@@ -43,24 +45,16 @@ contains
         integer :: nDim, Nmc, nPoints, i
         integer :: effectComm
         character (len=12) :: numberStr, rangStr;
-        !double precision, dimension(:,:), allocatable :: grid_data
 
-        !        if(rang == 0) then
-        !                write(*,*) "";
-        !               write(*,*) "------------START Writing result HDF5 file (MPI)-----------------------";
-        !               write(*,*) "";
-        !          end if
 
-          !if(rang == 0) then
-              !write (*,*) "lbound(xPoints) = ", lbound(xPoints)
-              !write (*,*) "lbound(randField) = ", lbound(randField)
-              !write (*,*) "size(xPoints,1) = ", size(xPoints,1)
-              !write (*,*) "size(xPoints,2) = ", size(xPoints,2)
-              !write (*,*) "xPoints(1, 1) = ", xPoints(1, 1)
-              !write (*,*) "xPoints(1:10, :) = ", xPoints(1:10, :)
-              !call dispCarvalhol(xPoints(:,:)  , "xPoints(:,:)"  , "F30.5")
-              !call dispCarvalhol(randField(:,:), "randField(:,:)", "F30.5")
-          !end if
+        write(get_fileId(),*) "------------START Writing result HDF5 file (MPI)-----------------------";
+        !write(get_fileId(),*) "lbound(xPoints) = ", lbound(xPoints)
+        !write(get_fileId(),*) "lbound(randField) = ", lbound(randField)
+        write(get_fileId(),*) "shape(xPoints)   = ", shape(xPoints)
+        write(get_fileId(),*) "shape(randField) = ", shape(randField)
+        write(get_fileId(),*) "fileName         = ", fileName
+        write(get_fileId(),*) "folderPath       = ", folderPath
+
 
         effectComm = communicator
         nDim       = size(xPoints , 1)
@@ -68,10 +62,8 @@ contains
         Nmc        = size(randField, 2)
 
         !Creating file name
-        !write(*,*) "fileName = ", fileName
         !write(*,*) "labels = ", labels
         !write(*,*) "indexes = ", indexes
-        !write(*,*) "folderPath = ", folderPath
 
         if(.not. present(labels)) then
             write(rangStr,'(I8)'  ) rang
@@ -89,7 +81,7 @@ contains
         fileHDF5Name = string_join(fileHDF5Name,".h5")
         fullPath     = string_join(folderPath,"/"//fileHDF5Name)
 
-        !write(*,*) "'inside write HDF5' -- fileHDF5Name = ", fileHDF5Name
+        write(get_fileId(),*) "' fileHDF5Name = ", fileHDF5Name
 
         if (nDim > 3) then
             write(*,*) "Dimension exceeds 3, HDF file won't be created"
@@ -140,15 +132,10 @@ contains
         if(present(HDF5Name)) then
             HDF5Name = trim(adjustL(fileHDF5Name))
             HDF5Name = adjustL(HDF5Name)
-            !write(*,*) "'inside write HDF5' -- HDF5Name = "
-            !write(*,*) HDF5Name
+            write(get_fileId(),*) "'inside write HDF5' output -- HDF5Name = ", HDF5Name
         end if
 
-    !        if(rang == 0) then
-    !            write(*,*) "";
-    !            write(*,*) "------------END Writing result HDF5 file (MPI)-----------------------";
-    !            write(*,*) "";
-    !        end if
+        write(get_fileId(),*) "------------END Writing result HDF5 file (MPI)-----------------------";
 
     end subroutine write_ResultHDF5Unstruct_MPI
 
@@ -186,18 +173,14 @@ contains
 
         effectComm = communicator
 
-!        if(rang == 0) then
-!            write(*,*) "";
-!            write(*,*) "------------START Writing result XMF file-----------------------";
-!            write(*,*) "";
-!        end if
+
+        write(get_fileId(),*) "------------START Writing result XMF file-----------------------";
 
         call MPI_COMM_SIZE(effectComm, nb_procs, code)
 
         !Common parameters
         Nmc         = nSamples
-        !write(*,*) "rang = ", rang
-        !write(*,*) "HDF5nameList = ", HDF5nameList
+        write(get_fileId(),*) "HDF5nameList = ", HDF5nameList
 
         if(rang == 0) then
             allocate(all_nPointList(nb_procs*size(HDF5nameList)))
@@ -218,18 +201,18 @@ contains
                         all_mask, size(mask), MPI_LOGICAL,     &
                         0      , effectComm       , code)
 
-        !write(*,*) "all_nPointList   = ", all_nPointList
-        !write(*,*) "all_HDF5nameList = ", all_HDF5nameList
-        !write(*,*) "all_mask = ", all_mask
+        if(rang == 0) write(get_fileId(),*) "all_nPointList   = ", all_nPointList
+        if(rang == 0) write(get_fileId(),*) "all_HDF5nameList = ", all_HDF5nameList
+        if(rang == 0) write(get_fileId(),*) "all_mask = ", all_mask
 
-        if(rang == 0 .and. (nDim == 2 .or. nDim == 3)) then
+        if(rang == 0 .and. (nDim == 1 .or. nDim == 2 .or. nDim == 3)) then
 
             fileXMFName = string_join(fileName,".xmf")
             fullPathXMF = string_join(folderPath, "/"//fileXMFName)
             !if(rang == 0) write(*,*) "all_nPointList in rang 0 = ", all_nPointList
             !if(rang == 0) write(*,*) "all_HDF5nameList in rang 0 = ", all_HDF5nameList
-            if(rang == 0) write(*,*) "fileXMFName = ", fileXMFName
-            if(rang == 0) write(*,*) "fullPathXMF = ", fullPathXMF
+            write(get_fileId(),*) "fileXMFName = ", fileXMFName
+            write(get_fileId(),*) "fullPathXMF = ", fullPathXMF
             !Optional inputs
             !write(*,*) "treating attName"
             if(present(attName)) then
@@ -248,6 +231,8 @@ contains
             else
                 effecHDF5path = "./"
             end if
+
+            write(get_fileId(),*) "effecHDF5path   = ", effecHDF5path
 
             !Building file
             file=21;
@@ -280,6 +265,7 @@ contains
                     write (file,'(3A)'     )'   <Grid Name="',trim(meshName),'" GridType="Uniform">' !START Writing the data of one subdomain
                     write (file,'(3A)'     )'    <Topology Type="Polyvertex" NodesPerElements="1" NumberOfElements="',trim(numb2String(all_nPointList(j))),'">'
                     write (file,'(A)'      )'    </Topology>'
+                    if(nDim == 1) write (file,'(A)'      )'     <Geometry GeometryType="X">'
                     if(nDim == 2) write (file,'(A)'      )'     <Geometry GeometryType="XY">'
                     if(nDim == 3) write (file,'(A)'      )'     <Geometry GeometryType="XYZ">'
                     write (file,'(5A)'     )'      <DataItem Name="Coordinates" Format="HDF" DataType="Float" Precision="8" Dimensions="',trim(numb2String(all_nPointList(j))), ' ',trim(numb2String(nDim))  ,'">'
@@ -306,6 +292,7 @@ contains
             close(file)
         else if(rang == 0) then
             write(*,*) "No XDMF Model prepared for this dimension"
+            write(*,*) "nDim = ", nDim
             write(*,*) "The file won't be created"
         end if
 
@@ -313,9 +300,9 @@ contains
             deallocate(all_nPointList)
             deallocate(all_HDF5nameList)
             deallocate(effectAttName)
-!            write(*,*) "";
-!            write(*,*) "------------END Writing result XMF file-----------------------";
-!            write(*,*) "";
+
+            write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
+
         end if
 
     end subroutine writeXMF_RF_MPI
@@ -417,6 +404,43 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    subroutine write_Mono_XMF_h5(xPoints, randField, fileName, rang, folderPath, &
+                                            communicator, labelsH5, indexesH5, indexXMF)
+
+        implicit none
+
+        !INPUTS
+        double precision, dimension(1:,1:), intent(in) :: xPoints, randField;
+        character(len=*)                  , intent(in) :: filename;
+        integer                           , intent(in) :: rang;
+        character(len=*)                  , intent(in) :: folderPath
+        integer                           , intent(in) :: communicator, indexXMF
+        character(len=*), dimension(1:)   , intent(in) :: labelsH5
+        integer         , dimension(1:)   , intent(in) :: indexesH5
+
+        !LOCAL
+        character(len=110) :: HDF5Name, XMFName
+
+
+
+        write(get_fileId(),*) "-> Writing h5 file in", trim(adjustL(folderPath))//"/h5";
+
+        call write_ResultHDF5Unstruct_MPI(xPoints, randField, fileName, rang, trim(adjustL(folderPath))//"/h5", &
+                                          MPI_COMM_WORLD, labelsH5, indexesH5, HDF5Name)
+
+        write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";
+        XMFName = stringNumb_join(trim(adjustL(fileName))//"it_", indexXMF)
+
+        call writeXMF_RF_MPI(1, [HDF5name], [size(xPoints,2)], [.true.], size(xPoints,1), XMFName, &
+                             rang, trim(adjustL(folderPath))//"/xmf", &
+                             MPI_COMM_WORLD, "../h5")
+
+    end subroutine write_Mono_XMF_h5
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     subroutine write_MatlabTable(randField, filename)
 
         implicit none
@@ -453,88 +477,67 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    function string_join(string1, string2) result(stringTot)
+    subroutine write_generation_spec(xMin, xMax, xStep,              &
+                                     corrL, corrMod,                 &
+                                     margiFirst, fieldAvg, fieldVar, &
+                                     Nmc, method, seed, rang, folderpath, name)
 
         implicit none
 
-        !INPUT
-        character (len=*)  , intent(in) :: string1, string2;
-
-        !OUTPUT
-        character (len=100) :: stringTot;
-
-        !write(*,*) "WRITE Flag string_join"
-
-        stringTot = trim(adjustL(string1))//trim(adjustL(string2))
-
-    end function string_join
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine jump_To_Line(fileUnit, line)
-
-        implicit none
-
-        !INPUT
-        integer, intent(in) :: fileUnit, line;
-        !LOCAL
-        integer :: i
-
-        do i = 1, line-1
-            read(fileUnit, *)
-        end do
-
-    end subroutine jump_To_Line
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    function stringNumb_join(string, number) result(stringTot)
-
-        implicit none
-
-        !INPUT
-        character (len=*)  , intent(in) :: string
-        integer            , intent(in) :: number
-
-        !OUTPUT
-        character (len=100) :: stringTot;
+        !INPUTS
+        double precision, dimension(:), intent(in) :: xMin, xMax;
+        double precision, dimension(:), intent(in) :: xStep
+        double precision, dimension(:), intent(in) :: corrL;
+        character (len=*)             , intent(in) :: corrMod, margiFirst;
+        double precision              , intent(in) :: fieldAvg, fieldVar;
+        integer                       , intent(in) :: Nmc, method;
+        integer         , dimension(:), intent(in) :: seed
+        integer                       , intent(in) :: rang;
+        character (len=*)             , intent(in) :: folderpath, name;
 
         !LOCAL
-        character (len=30)  :: nmbString
+        integer :: fileId, nDim
+        character (len=40) :: doubleFmt
 
-        !write(*,*) "WRITE Flag stringNumb_join"
+        if(rang == 0) then
+            fileId = 15
+            nDim = size(xMax)
 
-        write(nmbString, fmt='(I8)') number
-        stringTot = string_join(string, nmbString)
+            write(doubleFmt, fmt="(A,i1,A)") "(", nDim, "F30.15)";
+            !write(*,*) "doubleFmt = ", doubleFmt
 
-        !write(*,*) "WRITE Flag 2 stringNumb_join"
+            open (unit = fileId , file = string_vec_join([folderpath, "/", name]), action = 'write')
 
-    end function
+            write(fileId,*) "FILE:", name
+            write(fileId,*) "--xMin"
+            write(fileId,fmt = doubleFmt) xMin
+            write(fileId,*) "--xMax"
+            write(fileId,fmt = doubleFmt) xMax
+            write(fileId,*) "--xStep"
+            write(fileId,fmt = doubleFmt) xStep
+            write(fileId,*) "--corrL"
+            write(fileId,fmt = doubleFmt) corrL
+            write(fileId,*) "--corrMod"
+            write(fileId,*) corrMod
+            write(fileId,*) "--margiFirst"
+            write(fileId,*) margiFirst
+            write(fileId,*) "--fieldAvg"
+            write(fileId,fmt = doubleFmt) fieldAvg
+            write(fileId,*) "--fieldVar"
+            write(fileId,fmt = doubleFmt) fieldVar
+            write(fileId,*) "--Nmc"
+            write(fileId,fmt = "(I20)") Nmc
+            write(fileId,*) "--method"
+            if(method == ISOTROPIC) write(fileId,*) "isotropic"
+            if(method == SHINOZUKA) write(fileId,*) "shinozuka"
+            write(fileId,*) "--Seed"
+            write(fileId,fmt = "(I20)") seed
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    function numb2String(number) result(stringTot)
+            close(fileId)
 
-        implicit none
+        end if
 
-        !INPUT
-        integer, intent(in) :: number
 
-        !OUTPUT
-        character (len=30) :: stringTot;
-
-        !LOCAL
-        character (len=30)  :: nmbString
-
-        write(nmbString, fmt='(I8)') number
-        stringTot = trim(adjustL(nmbString))
-
-    end function
+    end subroutine write_generation_spec
 
 end module writeResultFile_RF

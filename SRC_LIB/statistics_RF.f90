@@ -3,6 +3,7 @@ module statistics_RF
     use displayCarvalhol
     use math_RF
     use mpi
+    use write_Log_File
 
 !    interface set_Statistics_MPI
 !       module procedure set_StatisticsStructured_MPI,   &
@@ -37,8 +38,10 @@ contains
         !LOCAL
         double precision, dimension(:), allocatable :: sumRF, sumRFsquare
         double precision, dimension(:), allocatable :: totalSumRF, totalSumRFsquare;
-        integer :: Nmc, xNTotal
+        integer :: Nmc, xNTotal, all_xNTotal
         integer :: code, nb_procs
+
+        write(get_fileId(),*) "Calculating Average and stdVar"
 
         Nmc     = size(randField, 2)
         xNTotal = size(randField, 1)
@@ -60,15 +63,20 @@ contains
                             MPI_SUM,comm,code)
         call MPI_ALLREDUCE (sumRFsquare,totalSumRFsquare,Nmc,MPI_DOUBLE_PRECISION, &
                             MPI_SUM,comm,code)
+        call MPI_ALLREDUCE (xNTotal, all_xNTotal,Nmc,MPI_INTEGER, &
+                            MPI_SUM,comm,code)
 
+        write(get_fileId(),*) "totalSumRF = ", totalSumRF
+        write(get_fileId(),*) "totalSumRFsquare = ", totalSumRFsquare
+        write(get_fileId(),*) "all_xNTotal = ", all_xNTotal
 
         !by Event
-        if(present(evntAvg))    evntAvg      = totalSumRF/dble(xNTotal*nb_procs);
-        if(present(evntStdDev)) evntStdDev   = sqrt(totalSumRFsquare/dble(xNTotal*nb_procs) &
+        if(present(evntAvg))    evntAvg      = totalSumRF/dble(all_xNTotal);
+        if(present(evntStdDev)) evntStdDev   = sqrt(totalSumRFsquare/dble(all_xNTotal) &
                                                - (evntAvg)**2)
         !Global
-        globalAvg    = sum(totalSumRF)/dble(xNTotal*nb_procs*Nmc);
-        globalStdDev = sqrt(sum(totalSumRFsquare)/dble(xNTotal*Nmc*nb_procs) &
+        globalAvg    = sum(totalSumRF)/dble(all_xNTotal*Nmc);
+        globalStdDev = sqrt(sum(totalSumRFsquare)/dble(all_xNTotal*Nmc) &
                        - (globalAvg)**2)
 
         !Deallocating

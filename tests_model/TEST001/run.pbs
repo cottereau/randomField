@@ -5,7 +5,7 @@
 #PBS -o output.txt
 #PBS -j oe
 #PBS -l walltime=00:15:00
-#PBS -l select=1:ncpus=1:mpiprocs=1:mem=2gb
+#PBS -l select=1:ncpus=16:mpiprocs=16:mem=2gb
 #PBS -q icexq 
 #PBS -M lucianopaludoecp@gmail.com
 
@@ -21,7 +21,7 @@ cd $PBS_O_WORKDIR
 cat $PBS_NODEFILE | uniq > mpd.hosts
 nb_nodes=`cat mpd.hosts|wc -l`
 
-mpirun --rsh=ssh -n $nb_nodes -f mpd.hosts -np 1 /home/carvalhol/Projects/RANDOM_FIELD/build/randomField.exe 
+mpirun --rsh=ssh -n $nb_nodes -f mpd.hosts -np 16 /home/carvalhol/Projects/RANDOM_FIELD/build/randomField.exe 
 
 #/home/carvalhol/workspace/randomField/Build/randomField.exe
 #mpirun --rsh=ssh -n $nb_nodes -f mpd.hosts -np 120 ./prog_mpi_intel 

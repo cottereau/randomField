@@ -6,6 +6,7 @@ module randomFieldND
     use constants_RF
     use mesh_RF
     use mpi
+    use write_Log_File
 
     implicit none
     !use blas
@@ -271,14 +272,22 @@ contains
 
         !write(*,*) "Inside Shinozuka 3"
 
+!        if (.true.) then
+!            write(*,*) "xGlobRange = ", xGlobRange
+!            write(*,*) "kNStep     = ", kNStep
+!            write(*,*) "kDelta     = ", kDelta
+!            call dispCarvalhol(transpose(xPointsNorm(:,:)), "transpose(xPointsNorm(:,:))")
+!        end if
+
         !Generating random field samples
         randField(:,:) = 0.0d0;
         call init_random_seed(seed)
         do k = 1, Nmc
             if(calculate(k)) then
                 call random_number(phiN(:,:))
+                !if (.true.) call dispCarvalhol(transpose(phiN(:,:)), "transpose(phiN(:,:))")
                 do j = 1, kNTotal
-                    call get_Permutation(j, kMax, kNStep, kVecUnsigned);
+                    call get_Permutation(j, kMax, kNStep, kVecUnsigned, snapExtremes = .true.);
                     do m = 1, size(kSign,1)
                         kVec           = kVecUnsigned * kSign(m, :)
                         Sk             = get_SpectrumND(kVec, corrMod);
@@ -299,8 +308,10 @@ contains
 
        !write(*,*) "Inside Shinozuka 4"
 
-        randField(:,:) = 2*sqrt(product(kDelta)/((2*pi)**(nDim))) &
+        randField(:,:) = 2.0d0*sqrt(product(kDelta)/((2.0d0*pi)**(nDim))) &
                          * randField(:,:) !Obs: sqrt(product(corrL)) is not needed because of normalization
+
+        call dispCarvalhol(randField(:,:), "randField(:,:)")
 
         if(allocated(dgemm_mult))   deallocate(dgemm_mult)
         if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);
@@ -387,16 +398,16 @@ contains
 
                     do j = 1, rNTotal
 !                        write(*,*) "Inside Isotropic 7"
-                        rVec           = [cos(thetaN(j)) * j*step, &
-                            sin(thetaN(j)) * j*step]
+                        rVec           = [cos(thetaN(j)) * (j-1)*step, &
+                            sin(thetaN(j)) * (j-1)*step]
 !                        write(*,*) "Inside Isotropic 8"
-                        Sk             = get_SpectrumND([j*step], corrMod);
+                        Sk             = get_SpectrumND([(j-1)*step], corrMod);
 !                        write(*,*) "Inside Isotropic 9"
                         call DGEMM ( "T", "N", xNTotal, 1, nDim, &
                             1.0d0, xPointsNorm, nDim, rVec, nDim, 0.0d0, dgemm_mult, xNTotal)
 !                        write(*,*) "Inside Isotropic 10"
                         !call dispCarvalhol(dgemm_mult(1:20), "dgemm_mult(1:20)")
-                        randField(:,k) = sqrt(Sk*j*(step**2)) * gammaN(j) &
+                        randField(:,k) = sqrt(Sk*(j-1)*(step**2)) * gammaN(j) &
                             * cos(                           &
                             dgemm_mult                &
                             + psiN(j)                 &
@@ -431,13 +442,13 @@ contains
 
                     do j = 1, rNTotal
                         !write(*,*) "j = ", j
-                        rVec           = [cos(thetaN(j))*sin(phiN(j)) * j*step, &
-                            sin(thetaN(j))*sin(phiN(j)) * j*step, &
-                            cos(phiN(j))                * j*step]
-                        Sk             = get_SpectrumND([j*step], corrMod);
+                        rVec           = [cos(thetaN(j))*sin(phiN(j)) * (j-1)*step, &
+                            sin(thetaN(j))*sin(phiN(j)) * (j-1)*step, &
+                            cos(phiN(j))                * (j-1)*step]
+                        Sk             = get_SpectrumND([(j-1)*step], corrMod);
                         call DGEMM ( "T", "N", xNTotal, 1, nDim, &
                             1.0d0, xPointsNorm, nDim, rVec, nDim, 0.0d0, dgemm_mult, xNTotal)
-                        randField(:,k) = sqrt(Sk*sin(phiN(j))*step*(j*step)**2) * gammaN(j) &
+                        randField(:,k) = sqrt(Sk*sin(phiN(j))*step*((j-1)*step)**2) * gammaN(j) &
                             * cos(                                             &
                             dgemm_mult                                   &
                             + psiN(j)                                    &

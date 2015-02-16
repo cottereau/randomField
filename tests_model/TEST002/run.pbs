@@ -4,8 +4,8 @@
 #PBS -N RF_TEST002
 #PBS -o output.txt
 #PBS -j oe
-#PBS -l walltime=00:15:00
-#PBS -l select=1:ncpus=1:mpiprocs=1:mem=2gb
+#PBS -l walltime=23:45:00
+#PBS -l select=1:ncpus=1:mpiprocs=1:mem=20gb
 #PBS -q icexq 
 #PBS -M lucianopaludoecp@gmail.com
 

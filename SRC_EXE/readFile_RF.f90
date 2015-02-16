@@ -38,7 +38,7 @@ contains
         character          :: comment, tagID;
         character (len=50), dimension(40)               :: foundedTags
         integer,            dimension(:),   allocatable :: tagPattern, lastLine;
-        character (len=50), dimension(:),   allocatable :: contentVector;
+        character (len=300), dimension(:),   allocatable :: contentVector;
 
 
         !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Treating optional arguments
@@ -145,6 +145,10 @@ contains
         if(dataTotal == 0 .or. tagTotal == 0) then
             write(*,*) "ERROR! In set_DataTable, no tags and/or data bad conditioned "
             stop "ERROR! In set_DataTable, no tags and/or data bad conditioned ";
+            write(*,*) "dataTotal = ", dataTotal
+            write(*,*) " tagTotal = ", tagTotal
+            call dispCarvalhol(foundedTags,"foundedTags")
+            call dispCarvalhol(contentVector, "contentVector")
         else if((tagTotal-unitTags) == 0) then
             !            write(*,*) "Only unit data"
             ratioTagData = 1;
@@ -154,6 +158,10 @@ contains
         else
             write(*,*) "ERROR! In set_DataTable, Tags and data dimensions don't match "
             stop "ERROR! In set_DataTable, Tags and data dimensions don't match ";
+            write(*,*) "dataTotal = ", dataTotal
+            write(*,*) " tagTotal = ", tagTotal
+            call dispCarvalhol(foundedTags,"foundedTags")
+            call dispCarvalhol(contentVector, "contentVector")
         endif
 
         !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Second loop: filling data table
@@ -221,6 +229,10 @@ contains
             end if
         end do
 
+        if(allocated(tagPattern))    deallocate(tagPattern)
+        if(allocated(lastLine))      deallocate(lastLine)
+        if(allocated(contentVector)) deallocate(contentVector)
+
     end subroutine set_DataTable
 
     !-----------------------------------------------------------------------------------------------
@@ -251,12 +263,14 @@ contains
 
         if(stat /= 0) then
             write(*,*) "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
-            stop "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
         if(.not.tagFounded) then
             write(*,*) "ERROR! in -read_DataTable- TAG not founded"
-            stop "ERROR! in -read_DataTable- TAG not founded"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
     end subroutine read_DataTable_DbleVec
@@ -288,13 +302,15 @@ contains
         end do
 
         if(stat /= 0) then
-            write(*,*) "ERROR! in -read_DataTable_IntVec- read failed (check types and Tag name)"
-            stop "ERROR! in -read_DataTable_IntVec- read failed (check types and Tag name)"
+            write(*,*) "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
         if(.not.tagFounded) then
             write(*,*) "ERROR! in -read_DataTable- TAG not founded"
-            stop "ERROR! in -read_DataTable- TAG not founded"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
     end subroutine read_DataTable_IntVec
@@ -326,13 +342,15 @@ contains
         end do
 
         if(stat /= 0) then
-            write(*,*) "ERROR! in -read_DataTable_CharVec- read failed (check types and Tag name)"
-            stop "ERROR! in -read_DataTable_CharVec- read failed (check types and Tag name)"
+            write(*,*) "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
         if(.not.tagFounded) then
             write(*,*) "ERROR! in -read_DataTable- TAG not founded"
-            stop "ERROR! in -read_DataTable- TAG not founded"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
     end subroutine read_DataTable_CharVec
@@ -362,13 +380,15 @@ contains
         end do
 
         if(stat /= 0) then
-            write(*,*) "ERROR! in -read_DataTable_DbleScal- read failed (check types and Tag name)"
-            stop "ERROR! in -read_DataTable_DbleScal- read failed (check types and Tag name)"
+            write(*,*) "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
         if(.not.tagFounded) then
             write(*,*) "ERROR! in -read_DataTable- TAG not founded"
-            stop "ERROR! in -read_DataTable- TAG not founded"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
     end subroutine read_DataTable_DbleScal
@@ -398,13 +418,15 @@ contains
         end do
 
         if(stat /= 0) then
-            write(*,*) "ERROR! in -read_DataTable_LogicalScal- read failed (check types and Tag name)"
-            stop "ERROR! in -read_DataTable_LogicalScal- read failed (check types and Tag name)"
+            write(*,*) "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
         if(.not.tagFounded) then
-            write(*,*) "ERROR! in -read_DataTable_LogicalScal- TAG not founded"
-            stop "ERROR! in -read_DataTable_LogicalScal- TAG not founded"
+            write(*,*) "ERROR! in -read_DataTable- TAG not founded"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
     end subroutine read_DataTable_LogicalScal
@@ -434,13 +456,15 @@ contains
         end do
 
         if(stat /= 0) then
-            write(*,*) "ERROR! in -read_DataTable_IntScal- read failed (check types and Tag name)"
-            stop "ERROR! in -read_DataTable_IntScal- read failed (check types and Tag name)"
+            write(*,*) "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
         if(.not.tagFounded) then
             write(*,*) "ERROR! in -read_DataTable- TAG not founded"
-            stop "ERROR! in -read_DataTable- TAG not founded"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
     end subroutine read_DataTable_IntScal
@@ -470,13 +494,15 @@ contains
         end do
 
         if(stat /= 0) then
-            write(*,*) "ERROR! in -read_DataTable_CharScal- read failed (check types)"
-            stop "ERROR! in -read_DataTable_CharScal- read failed (check types)"
+            write(*,*) "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
         if(.not.tagFounded) then
             write(*,*) "ERROR! in -read_DataTable- TAG not founded"
-            stop "ERROR! in -read_DataTable- TAG not founded"
+            write(*,*) "tagName = ", tagName
+            stop
         end if
 
     end subroutine read_DataTable_CharScal

@@ -1,6 +1,7 @@
 module spectra_RF
     use displayCarvalhol
     use math_RF
+    use write_Log_File
 contains
 
     !-----------------------------------------------------------------------------------------------

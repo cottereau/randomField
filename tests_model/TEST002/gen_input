@@ -1,14 +1,14 @@
 $$Nmc     10
 $$corrMod gaussian
-$$margiFirst gaussian
+$$margiFirst lognormal
 $corrL
    1.0 1.0
 $$fieldAvg
-   0.0
+   0.5
 $$fieldVar
    1.0
 $$method
-   1
+   2
 
    
 !
