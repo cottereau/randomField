@@ -105,7 +105,7 @@ contains
             allocate(randField(size(xPoints,2), Nmc))
 
             !call dispCarvalhol(randField(1:10, :), "randField(1:10, :) RAW")
-            call dispCarvalhol(transpose(xPoints(:, :)), "transpose(xPoints(:, :)) BEG")
+            !call dispCarvalhol(transpose(xPoints(:, :)), "transpose(xPoints(:, :)) BEG")
             !call dispCarvalhol(transpose(xPoints(:, size(xPoints,2)-20:)), "transpose(xPoints(:, size(xPoints,2)-20:)) END")
 
             call write_generation_spec(xMinGlob, xMaxGlob, xStep,              &
@@ -147,7 +147,7 @@ contains
                                                   avg_Trans(i), stdDev_Trans(i),               &
                                                   comm,                                        &
                                                   avg_Trans_evnt(i,:), stdDev_Trans_evnt(i,:))
-            call dispCarvalhol(randField(:, :), "randField(:, :) AFTER ALL")
+            !call dispCarvalhol(randField(:, :), "randField(:, :) AFTER ALL")
         end do
 
         !Writing

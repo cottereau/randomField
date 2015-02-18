@@ -308,10 +308,10 @@ contains
 
        !write(*,*) "Inside Shinozuka 4"
 
-        randField(:,:) = 2.0d0*sqrt(product(kDelta)/((2.0d0*pi)**(nDim))) &
+        randField(:,:) = 2.0d0*sqrt(product(kDelta)/((2.0d0*pi)**(dble(nDim)))) &
                          * randField(:,:) !Obs: sqrt(product(corrL)) is not needed because of normalization
 
-        call dispCarvalhol(randField(:,:), "randField(:,:)")
+        !call dispCarvalhol(randField(:,:), "randField(:,:)")
 
         if(allocated(dgemm_mult))   deallocate(dgemm_mult)
         if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);
@@ -366,7 +366,7 @@ contains
 
         !r Definition
         call set_rMax(corrMod, rMax)
-        rDelta  = 2*pi/(periodMult*sqrt(sum((xGlobRange)**2))) !Delta min in between two wave numbers to avoid periodicity
+        rDelta  = 2d0*pi/(periodMult*sqrt(sum((xGlobRange)**2))) !Delta min in between two wave numbers to avoid periodicity
         rNTotal = rAdjust*(ceiling(rMax(1)/rDelta) + 1);
 
 !        write(*,*) "Inside Isotropic 2"
@@ -392,9 +392,9 @@ contains
                     call random_number(psiN(:))
                     call random_number(thetaN(:))
                     call random_number(gammaN(:))
-                    psiN   = 2*pi*psiN
-                    thetaN = 2*pi*psiN
-                    gammaN = 2*pi*gammaN
+                    psiN   = 2d0*pi*psiN
+                    thetaN = 2d0*pi*psiN
+                    gammaN = 2d0*pi*gammaN
 
                     do j = 1, rNTotal
 !                        write(*,*) "Inside Isotropic 7"
@@ -407,7 +407,7 @@ contains
                             1.0d0, xPointsNorm, nDim, rVec, nDim, 0.0d0, dgemm_mult, xNTotal)
 !                        write(*,*) "Inside Isotropic 10"
                         !call dispCarvalhol(dgemm_mult(1:20), "dgemm_mult(1:20)")
-                        randField(:,k) = sqrt(Sk*(j-1)*(step**2)) * gammaN(j) &
+                        randField(:,k) = sqrt(Sk*(j-1)*(dble(step**2))) * gammaN(j) &
                             * cos(                           &
                             dgemm_mult                &
                             + psiN(j)                 &

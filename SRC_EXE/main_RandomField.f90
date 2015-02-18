@@ -221,7 +221,8 @@ program main_RandomField
             !date_time_label
             call date_and_time(strings(1), strings(2), strings(3), date_time)
             results_folder_name = strings(1)(3:8)//"_"//strings(2)(1:6)//"_res"
-            log_folder_name     = strings(1)(3:8)//"_"//strings(2)(1:6)//"_log"
+            !log_folder_name     = strings(1)(3:8)//"_"//strings(2)(1:6)//"_log"
+            log_folder_name     = trim(adjustL(results_folder_name))//"/log"
 
             !write(*,*) "results_folder_name = ", results_folder_name
 
