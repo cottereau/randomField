@@ -66,14 +66,14 @@ main_RandomField.o   : displayCarvalhol.o statistics_RF.o charFunctions.o \
 					   test_func_RF.o constants_RF.o mesh_RF.o write_Log_File.o
 test_func_RF.o       : displayCarvalhol.o statistics_RF.o randomFieldND.o \
 					   writeResultFile_RF.o readFile_RF.o mesh_RF.o mesh_RF.o\
-					   write_Log_File.o
+					   write_Log_File.o constants_RF.o
 writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o write_Log_File.o
 randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o dgemm.o \
 			           constants_RF.o mesh_RF.o write_Log_File.o
-statistics_RF.o      : displayCarvalhol.o math_RF.o write_Log_File.o
-spectra_RF.o         : displayCarvalhol.o math_RF.o write_Log_File.o
-mesh_RF.o            : math_RF.o write_Log_File.o
-math_RF.o            : displayCarvalhol.o write_Log_File.o
+statistics_RF.o      : displayCarvalhol.o math_RF.o write_Log_File.o constants_RF.o
+spectra_RF.o         : displayCarvalhol.o math_RF.o write_Log_File.o constants_RF.o
+mesh_RF.o            : math_RF.o write_Log_File.o constants_RF.o
+math_RF.o            : displayCarvalhol.o write_Log_File.o constants_RF.o
 write_Log_File.o     : charFunctions.o
 dgemm.o              : lsame.o xerbla.o
 

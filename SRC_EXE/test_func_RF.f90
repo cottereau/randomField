@@ -108,11 +108,7 @@ contains
             !call dispCarvalhol(transpose(xPoints(:, :)), "transpose(xPoints(:, :)) BEG")
             !call dispCarvalhol(transpose(xPoints(:, size(xPoints,2)-20:)), "transpose(xPoints(:, size(xPoints,2)-20:)) END")
 
-            call write_generation_spec(xMinGlob, xMaxGlob, xStep,              &
-                                       corrL, corrMod,                 &
-                                       margiFirst, fieldAvg, fieldVar, &
-                                       Nmc, method, seed,              &
-                                       rang, step_result_path, stringNumb_join("iteration_",i))
+
 
             write(get_fileId(),*) "-> Creating Standard Gaussian Random field (unstructured)";
             t1 = MPI_Wtime();
@@ -137,6 +133,12 @@ contains
             t3 = MPI_Wtime();
             call multiVariateTransformation (margiFirst, fieldAvg, fieldVar, randField)
             t4 = MPI_Wtime();
+
+            call write_generation_spec(xMinGlob, xMaxGlob, xStep,              &
+                                       corrL, corrMod,                 &
+                                       margiFirst, fieldAvg, fieldVar, &
+                                       Nmc, method, seed,              &
+                                       rang, step_result_path, stringNumb_join("iteration_",i), [t1,t2,t3,t4])
 
             write(get_fileId(),*) "-> Writing XMF and hdf5 files";
             call write_Mono_XMF_h5(xPoints, randField, "trans_", rang, step_result_path, &
@@ -225,6 +227,22 @@ contains
         integer :: Nmc_iter
         character (len=200) :: Nmc_result_path
 
+        write(get_fileId(),*) "-> INSIDE  func_test_002_speed_Nmc", xMin
+        write(get_fileId(),*) "xMin = ", xMin
+        write(get_fileId(),*) "xMax = ", xMax
+        write(get_fileId(),*) "corrL = ", corrL
+        write(get_fileId(),*) "corrMod = ", corrMod
+        write(get_fileId(),*) "margiFirst = ", margiFirst
+        write(get_fileId(),*) "fieldAvg = ", fieldAvg
+        write(get_fileId(),*) "xStep = ", xStep
+        write(get_fileId(),*) "method = ", method
+        write(get_fileId(),*) "nmc_initial = ", nmc_initial
+        write(get_fileId(),*) "nmc_nIter = ", nmc_nIter
+        write(get_fileId(),*) "nmc_mult = ", nmc_mult
+        write(get_fileId(),*) "nmc_add = ", nmc_add
+        write(get_fileId(),*) "xMinGlob = ", xMinGlob
+        write(get_fileId(),*) "xMaxGlob = ", xMaxGlob
+
         Nmc_result_path = string_vec_join([results_path,"/",results_folder_name,"/",Nmc_folder_name])
 
         nDim = size(xMax)
@@ -234,7 +252,7 @@ contains
         allocate(avg_Gauss(nmc_nIter), stdDev_Gauss(nmc_nIter))
         allocate(avg_Trans(nmc_nIter), stdDev_Trans(nmc_nIter))
 
-        write(get_fileId(),*) "-> Creating xPoints";
+        write(*,*) "-> Creating xPoints";
         call set_XPoints(xMin, xMax, xStep, xPoints)
 
         do i = 1, nmc_nIter
@@ -244,9 +262,16 @@ contains
             if(rang == 0) write(*,*) "ITERATION Nmc Speed",       i, "-----------------------------------------------";
             if(rang == 0) write(*,*) "-------------------------------------------------------------------------------";
 
+            write(get_fileId(),*) ""
+            write(get_fileId(),*) "------------------------------------------------------------------------";
+            write(get_fileId(),*) "ITERATION Nmc Speed",       i, "--------------------------------------------";
+            write(get_fileId(),*) "------------------------------------------------------------------------";
+
             !Putting everything to the initial condition
             if (allocated(randField)) deallocate(randField)
             call calculate_random_seed(seed, seedStart)
+
+            write(get_fileId(),*) "Calculated seed = ", seed
 
             Nmc = nmc_initial         &
                     *(nmc_mult)**(i-1) &
@@ -261,12 +286,6 @@ contains
             !call dispCarvalhol(randField(1:10, :), "randField(1:10, :) RAW")
             !call dispCarvalhol(transpose(xPoints(:, 1:20)), "transpose(xPoints(:, 1:20)) BEG")
             !call dispCarvalhol(transpose(xPoints(:, size(xPoints,2)-20:)), "transpose(xPoints(:, size(xPoints,2)-20:)) END")
-
-            call write_generation_spec(xMinGlob, xMaxGlob, xStep,              &
-                                       corrL, corrMod,                 &
-                                       margiFirst, fieldAvg, fieldVar, &
-                                       Nmc, method, seed,              &
-                                       rang, Nmc_result_path, stringNumb_join("iteration_",i))
 
             t1 = MPI_Wtime();
 
@@ -295,6 +314,12 @@ contains
             call multiVariateTransformation (margiFirst, fieldAvg, fieldVar, randField)
 
             t4 = MPI_Wtime();
+
+            call write_generation_spec(xMinGlob, xMaxGlob, xStep,              &
+                                       corrL, corrMod,                 &
+                                       margiFirst, fieldAvg, fieldVar, &
+                                       Nmc, method, seed,              &
+                                       rang, Nmc_result_path, stringNumb_join("iteration_",i), [t1,t2,t3,t4])
 
             write(get_fileId(),*) "-> Writing XMF and hdf5 files";
             call write_Mono_XMF_h5(xPoints, randField, "trans_", rang, nmc_result_path, &
@@ -677,10 +702,12 @@ contains
         call calculate_random_seed(seed, seedStart)
         allocate(randField(size(xPoints,2), Nmc))
 
-        if(rang == 0) write(*,*) "-> Creating Standard Gaussian Random field (unstructured)";
+        if(rang == 0) write(*,*) "-> Creating Standard Gaussian Random field";
         randField = 0.0
         call create_Std_Gaussian_Field_Unstruct (xPoints, corrL, corrMod, Nmc,  &
                                                   randField, method, seed)
+
+        !call dispCarvalhol(randField(1:10, :), "randField(1:10, :) GAUSS")
 
         !Calculating statistics of the Gaussian field
         if(rang == 0) write(*,*) "-> Calculating Statistics Before Transformation";
@@ -727,11 +754,13 @@ contains
             write(get_fileId(),*) "-> Writing XMF and hdf5 files";
             call write_Mono_XMF_h5(xPoints, randField(:,:Nmc_iter), "trans_", rang, nmc_result_path, &
                                             MPI_COMM_WORLD, ["it_", "_proc_"], [i, rang], i)
-
+            write(get_fileId(),*) "-> Calculating Statistics";
             call calculate_average_and_stdVar_MPI(randField(:,:Nmc_iter),                                   &
                                                   avg_Trans(i), stdDev_Trans(i),               &
                                                   comm)
         end do
+
+        write(*,*) " rang = ", rang
 
        if(rang == 0) then
            write(*,*) "-----CONVERGENCE TEST CHANGING Nmc-----"

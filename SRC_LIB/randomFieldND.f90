@@ -27,7 +27,9 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine create_Std_Gaussian_Field_Unstruct (xPoints, corrL, corrMod, Nmc, &
-                                                   randField, method, chosenSeed, calculate)
+                                                   randField, method, chosenSeed, calculate, randomK)
+
+        !Interface to discover global extremes and fill optional arguments
         implicit none
 
         !INPUT
@@ -38,6 +40,7 @@ contains
         integer, intent(in) :: method
         integer, dimension(1:), optional   , intent(in) :: chosenSeed
         logical, dimension(1:), optional   , intent(in) :: calculate
+        logical, optional, intent(in) :: randomK
 
         !OUTPUT
         double precision, dimension(:, :), intent(out) :: randField;
@@ -45,6 +48,9 @@ contains
         !LOCAL
         integer :: nDim
         double precision, dimension(:), allocatable :: xMinGlob, xMaxGlob
+        logical :: rand_K
+        logical, dimension(:), allocatable :: effectCalc;
+        integer, dimension(:), allocatable :: seed
 
         !Discovering Global Extremes
         nDim = size(xPoints,1)
@@ -52,29 +58,23 @@ contains
         allocate(xMaxGlob(nDim))
         call get_Global_Extremes_Mesh(xPoints, xMinGlob, xMaxGlob)
 
-        !Generating fields
-        if(present(chosenSeed) .and. present(calculate)) then
-            call gen_Std_Gauss (xPoints, corrL, corrMod, Nmc,  &
-                                xMinGlob, xMaxGlob, randField, &
-                                method, chosenSeed, calculate)
-        else if(present(calculate)) then
-            call gen_Std_Gauss (xPoints, corrL, corrMod, Nmc,  &
-                                xMinGlob, xMaxGlob, randField, &
-                                method, calculate = calculate)
-        else if(present(chosenSeed)) then
-            call gen_Std_Gauss (xPoints, corrL, corrMod, Nmc,  &
-                                xMinGlob, xMaxGlob, randField, &
-                                method, chosenSeed)
-        else if(present(chosenSeed)) then
-            call gen_Std_Gauss (xPoints, corrL, corrMod, Nmc,  &
-                                xMinGlob, xMaxGlob, randField, &
-                                method, chosenSeed)
-        else
-            call gen_Std_Gauss (xPoints, corrL, corrMod, Nmc,  &
-                                xMinGlob, xMaxGlob, randField, &
-                                method)
-        end if
+        !Optional arguments
+        allocate(effectCalc(Nmc))
+        effectCalc(:) = .true.
+        rand_K = .false.
+        call calculate_random_seed(seed)
 
+        if(present(calculate)) effectCalc = calculate
+        if(present(chosenSeed)) seed = chosenSeed
+        if(present(randomK)) rand_K = randomK
+
+        !Generating fields
+        call gen_Std_Gauss (xPoints, corrL, corrMod, Nmc,  &
+                            xMinGlob, xMaxGlob, randField, &
+                            method, seed, effectCalc, rand_K)
+
+        if(allocated(seed)) deallocate(seed)
+        if(allocated(effectCalc)) deallocate(effectCalc)
         if(allocated(xMinGlob)) deallocate(xMinGlob)
         if(allocated(xMaxGlob)) deallocate(xMaxGlob)
 
@@ -128,7 +128,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     subroutine gen_Std_Gauss (xPoints, corrL, corrMod, Nmc,  &
                               MinBound, MaxBound, randField, &
-                              method, chosenSeed, calculate)
+                              method, chosenSeed, calculate, randomK)
         implicit none
 
         !INPUT
@@ -137,8 +137,9 @@ contains
         integer                            , intent(in) :: Nmc, method;
         character (len=*)                  , intent(in) :: corrMod;
         double precision, dimension(1:)    , intent(in) :: MinBound, MaxBound
-        integer, dimension(1:), optional   , intent(in) :: chosenSeed
-        logical, dimension(1:), optional   , intent(in) :: calculate
+        integer, dimension(1:)             , intent(in) :: chosenSeed
+        logical, dimension(1:)             , intent(in) :: calculate
+        logical                            , intent(in) :: randomK
 
         !OUTPUT
         double precision, dimension(:, :), intent(out) :: randField;
@@ -146,8 +147,6 @@ contains
         !LOCAL VARIABLES
         double precision, dimension(:,:), allocatable :: xPointsNorm;
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
-        logical         , dimension(:), allocatable :: effectCalc;
-        integer         , dimension(:), allocatable :: seed
         integer          :: nDim
         integer          :: i;
         integer          :: xNTotal;
@@ -160,7 +159,6 @@ contains
 !        write(*,*) "Inside Unstruct General 2"
 
         !Allocation
-        allocate(effectCalc(Nmc))
         allocate(xPointsNorm (nDim, xNTotal))
         allocate(xMaxGlob(nDim))
         allocate(xMinGlob(nDim))
@@ -172,44 +170,26 @@ contains
             stop
         end if
 
-!        write(*,*) "Inside Unstruct General 3"
-
-        !Optional arguments
-        effectCalc(:) = .true.
-        if(present(calculate)) effectCalc = calculate
-        call calculate_random_seed(seed)
-        if(present(chosenSeed)) seed = chosenSeed
-
-!        write(*,*) "Inside Unstruct General 4"
-!        write(*,*) "Inside Unstruct General 5"
-!        write(*,*) "MinBound = ", MinBound
-!        write(*,*) "MaxBound = ", MaxBound
-!        write(*,*) "corrL    = ", corrL
-
         !Normalization
         do i = 1, nDim
-            if(corrL(i) /= 1d0) then
-                xPointsNorm(i,:) = xPoints(i,:)/corrL(i)
-                xMinGlob(i) = MinBound(i)/corrL(i)
-                xMaxGlob(i) = MaxBound(i)/corrL(i)
-            else
-                xPointsNorm(i,:) = xPoints(i,:)
-                xMinGlob(i) = MinBound(i)
-                xMaxGlob(i) = MaxBound(i)
-            end if
+            xPointsNorm(i,:) = xPoints(i,:)/corrL(i)
+            xMinGlob(i) = MinBound(i)/corrL(i)
+            xMaxGlob(i) = MaxBound(i)/corrL(i)
         end do
 
 !        write(*,*) "Inside Unstruct General 6"
 
         !Choosing a method ang generating the samples
         if (method == SHINOZUKA) then
-            call gen_Std_Gauss_Shinozuka(xPointsNorm, Nmc, (xMaxGlob - xMinGlob), corrMod, seed, effectCalc, randField)
+            call gen_Std_Gauss_Shinozuka(xPointsNorm, Nmc, (xMaxGlob - xMinGlob), corrMod, chosenSeed, calculate, randField, randomK)
         else if (method == ISOTROPIC) then
-            call gen_Std_Gauss_Isotropic(xPointsNorm, Nmc, (xMaxGlob - xMinGlob), corrMod, seed, effectCalc, randField)
+            call gen_Std_Gauss_Isotropic(xPointsNorm, Nmc, (xMaxGlob - xMinGlob), corrMod, chosenSeed, calculate, randField)
+        else if (method == RANDOMIZATION) then
+            !call gen_Std_Gauss_Shinozuka(xPointsNorm, Nmc, (xMaxGlob - xMinGlob), corrMod, chosenSeed, calculate, randField, .true.)
+            call gen_Std_Gauss_Randomization(xPointsNorm, Nmc, (xMaxGlob - xMinGlob), corrMod, chosenSeed, calculate, randField)
         end if
 
         if(allocated(xPointsNorm))  deallocate(xPointsNorm);
-        if(allocated(effectCalc))   deallocate(effectCalc);
         if(allocated(xMaxGlob))     deallocate(xMaxGlob)
         if(allocated(xMinGlob))     deallocate(xMinGlob)
 
@@ -219,7 +199,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine gen_Std_Gauss_Shinozuka(xPointsNorm, Nmc, xGlobRange, corrMod, seed, calculate, randField)
+    subroutine gen_Std_Gauss_Shinozuka(xPointsNorm, Nmc, xGlobRange, corrMod, seed, calculate, randField, randomK)
 
         implicit none
 
@@ -229,6 +209,7 @@ contains
         double precision, dimension(:)     , intent(in) :: xGlobRange;
         character (len=*)                  , intent(in) :: corrMod;
         logical, dimension(1:)             , intent(in) :: calculate
+        logical, intent(in) :: randomK
         integer, dimension(:), intent(in) :: seed
 
         !OUTPUT
@@ -241,14 +222,19 @@ contains
         double precision, dimension(:)  , allocatable :: kVec, kVecUnsigned; !Allocated in function
         double precision, dimension(:)  , allocatable :: kDelta;
         double precision, dimension(:)  , allocatable :: dgemm_mult;
+        double precision, dimension(:,:)  , allocatable :: kMat_rand;
+        double precision, dimension(:,:)  , allocatable :: kDelta_rand;
         double precision :: Sk, deltaKprod;
         integer :: xNTotal, kNTotal, nDim;
-        integer :: k, j, m
+        integer :: i, k, j, m
+        integer :: size_kArray
 
         !write(*,*) "Inside Shinozuka 1"
 
         nDim    = size(xPointsNorm, 1);
         xNTotal = size(xPointsNorm, 2);
+
+
 
         !Allocating
         allocate(kMax   (nDim));
@@ -282,34 +268,71 @@ contains
         !Generating random field samples
         randField(:,:) = 0.0d0;
         call init_random_seed(seed)
-        do k = 1, Nmc
-            if(calculate(k)) then
-                call random_number(phiN(:,:))
-                !if (.true.) call dispCarvalhol(transpose(phiN(:,:)), "transpose(phiN(:,:))")
-                do j = 1, kNTotal
-                    call get_Permutation(j, kMax, kNStep, kVecUnsigned, snapExtremes = .true.);
-                    do m = 1, size(kSign,1)
-                        kVec           = kVecUnsigned * kSign(m, :)
-                        Sk             = get_SpectrumND(kVec, corrMod);
-                        call DGEMM ( "T", "N", xNTotal, 1, nDim, &
-                            1.0d0, xPointsNorm, nDim, kVec, nDim, 0.0d0, dgemm_mult, xNTotal)
-                            randField(:,k) = sqrt(Sk)                 &
-                            * cos(                   &
-                            dgemm_mult        &
-                            + 2*pi*phiN(m, j) &
-                            )                  &
-                            + randField(:,k)
+
+        if(randomK) then
+            size_kArray = maxval(kNStep)
+            allocate(kMat_rand(size_kArray, nDim))
+            allocate(kDelta_rand(size_kArray, nDim))
+            kNTotal = size_kArray**nDim
+            do k = 1, Nmc
+                if(calculate(k)) then
+                    !random K definition
+                    do i = 1, nDim
+                        call set_kArray_rand(corrMod, kMat_rand(:,i), kMax(i), nDim)
+                        call set_kDelta_rand(kMat_rand(:,i), kDelta_rand(:,i));
                     end do
-                end do
-            else
-                randField(:,k) = 0.0d0
-            end if
-        end do
-
-       !write(*,*) "Inside Shinozuka 4"
-
-        randField(:,:) = 2.0d0*sqrt(product(kDelta)/((2.0d0*pi)**(dble(nDim)))) &
-                         * randField(:,:) !Obs: sqrt(product(corrL)) is not needed because of normalization
+                    call dispCarvalhol(kMat_rand, "kMat_rand")
+                    call dispCarvalhol(kDelta_rand, "kDelta_rand")
+                    !Calculations
+                    call random_number(phiN(:,:))
+                    do j = 1, kNTotal
+                        call get_Permutation_from_Mat(j, kMat_rand, nDim, kVecUnsigned);
+                        call get_Permutation_from_Mat(j, kDelta_rand, nDim, kDelta);
+                        do m = 1, size(kSign,1)
+                            kVec = kVecUnsigned * kSign(m, :)
+                            Sk = get_SpectrumND(kVec, corrMod);
+                            call DGEMM ( "T", "N", xNTotal, 1, nDim, &
+                                         1.0d0, xPointsNorm, nDim, kVec, nDim, 0.0d0, dgemm_mult, xNTotal)
+                            randField(:,k) = sqrt(Sk*product(kDelta)) &
+                                                  * cos(                       &
+                                                         dgemm_mult            &
+                                                         + 2.0D0*pi*phiN(m, j) &
+                                                       )                       &
+                                                 + randField(:,k)
+                        end do
+                    end do
+                else
+                    randField(:,k) = 0.0d0
+                end if
+            end do
+            randField(:,:) = 2.0d0*sqrt(1.0D0/((2.0d0*pi)**(dble(nDim)))) &
+                             * randField(:,:) !Obs: sqrt(product(corrL)) is not needed because of normalization
+        else
+            do k = 1, Nmc
+                if(calculate(k)) then
+                    call random_number(phiN(:,:))
+                    do j = 1, kNTotal
+                        call get_Permutation(j, kMax, kNStep, kVecUnsigned, snapExtremes = .true.);
+                        do m = 1, size(kSign,1)
+                            kVec           = kVecUnsigned * kSign(m, :)
+                            Sk             = get_SpectrumND(kVec, corrMod);
+                            call DGEMM ( "T", "N", xNTotal, 1, nDim, &
+                                1.0d0, xPointsNorm, nDim, kVec, nDim, 0.0d0, dgemm_mult, xNTotal)
+                                randField(:,k) = sqrt(Sk)                 &
+                                * cos(                   &
+                                dgemm_mult        &
+                                + 2.0D0*pi*phiN(m, j) &
+                                )                  &
+                                + randField(:,k)
+                        end do
+                    end do
+                else
+                    randField(:,k) = 0.0d0
+                end if
+            end do
+            randField(:,:) = 2.0d0*sqrt(product(kDelta)/((2.0d0*pi)**(dble(nDim)))) &
+                             * randField(:,:) !Obs: sqrt(product(corrL)) is not needed because of normalization
+        end if
 
         !call dispCarvalhol(randField(:,:), "randField(:,:)")
 
@@ -322,8 +345,112 @@ contains
         if(allocated(kSign))        deallocate(kSign);
         if(allocated(phiN))         deallocate(phiN);
         if(allocated(kVecUnsigned)) deallocate(kVecUnsigned);
+        if(allocated(kMat_rand))    deallocate(kMat_rand);
+        if(allocated(kDelta_rand))  deallocate(kDelta_rand);
 
     end subroutine gen_Std_Gauss_Shinozuka
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine gen_Std_Gauss_Randomization(xPointsNorm, Nmc, xGlobRange, corrMod, seed, calculate, randField)
+
+        implicit none
+
+        !INPUT
+        double precision, dimension(1:, 1:), intent(in) :: xPointsNorm;
+        integer                            , intent(in) :: Nmc;
+        double precision, dimension(:)     , intent(in) :: xGlobRange;
+        character (len=*)                  , intent(in) :: corrMod;
+        logical, dimension(1:)             , intent(in) :: calculate
+        integer, dimension(:), intent(in) :: seed
+        integer :: size_kArray = 1000
+
+        !OUTPUT
+        double precision, dimension(:, :), intent(out) :: randField;
+
+        !LOCAL
+        integer         , dimension(:)  , allocatable :: kNStep;
+        double precision, dimension(:)  , allocatable :: kVec
+        double precision, dimension(:)  , allocatable :: kDelta;
+        double precision, dimension(:)  , allocatable :: kDelta_rand;
+        double precision, dimension(:,:)  , allocatable :: kMat_rand;
+        double precision, dimension(:)  , allocatable :: dgemm_mult;
+        double precision :: Sk, deltaKprod;
+        integer :: xNTotal, kNTotal, nDim;
+        integer :: i, k, j, m
+        double precision :: test
+        double precision, dimension(:), allocatable :: phiN;
+        !real :: gennor
+        real :: av = 0.0
+        real :: gennor
+        real :: sd = 1.0
+        real :: test2
+
+        !test2 = gennor (av, sd)
+
+        !double precision ::  bound,mean,cdf_x,q,sd,x
+        !integer :: st, which
+
+        !write(*,*) "gennor (0.0, 1.0) = ", test2
+
+        nDim    = size(xPointsNorm, 1);
+        xNTotal = size(xPointsNorm, 2);
+        call init_random_seed(seed)
+
+        allocate(kVec(nDim))
+        allocate(kDelta(nDim))
+        allocate(dgemm_mult(xNTotal))
+        allocate(kMat_rand(size_kArray, nDim))
+
+        !call set_kDelta_rand(kArray_rand, kDelta_rand)
+
+
+
+        !call dispCarvalhol(kDelta_rand, "kDelta_rand")
+
+        kNTotal = size(kMat_rand,1)**nDim
+        allocate(phiN (kNTotal));
+        !Generating random field samples
+        randField(:,:) = 0.0d0;
+        do k = 1, Nmc
+            !K definition
+!            do i = 1, nDim
+!                call set_kArray_rand(corrMod, kMat_rand(:,i))
+!            end do
+            !if (k < 4) call dispCarvalhol(kMat_rand, "kMat_rand")
+
+            !Calculations
+            if(calculate(k)) then
+                call random_number(phiN(:))
+                phiN = phiN * 2.0D0 * PI
+                do j = 1, kNTotal
+                    call set_kArray_rand(corrMod, kVec, nDim = nDim);
+                    !write (*,*) kVec
+                    !Sk = get_SpectrumND(kVec, corrMod);
+                    call DGEMM ( "T", "N", xNTotal, 1, nDim, &
+                                 1.0d0, xPointsNorm, nDim, kVec, nDim, 0.0d0, dgemm_mult, xNTotal) ! matmul(transpose(xPointsNorm), kVec)
+                    !write (*,*) "dgemm_mult = ", dgemm_mult
+                    randField(:,k) = cos(dgemm_mult + phiN(j)) + randField(:,k)
+                end do
+            else
+                randField(:,k) = 0.0d0
+            end if
+        end do
+
+        randField(:,:) = sqrt(2.0D0)*randField(:,:)/(dble(kNTotal)**(0.5d0))
+
+        !call dispCarvalhol(randField(:,:), "randField(:,:)")
+
+        if(allocated(dgemm_mult))   deallocate(dgemm_mult)
+        if(allocated(kVec))         deallocate(kVec);
+        if(allocated(kDelta))       deallocate(kDelta);
+        if(allocated(kMat_rand))    deallocate(kMat_rand);
+        if(allocated(kDelta_rand))  deallocate(kDelta_rand);
+        if(allocated(phiN)) deallocate(phiN)
+
+    end subroutine gen_Std_Gauss_Randomization
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

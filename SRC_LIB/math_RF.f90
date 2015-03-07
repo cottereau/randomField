@@ -3,6 +3,8 @@ module math_RF
     use displayCarvalhol
     use mpi
     use write_Log_File
+    use constants_RF
+
     !All logic and math routines
 
 !    interface set_Extremes
@@ -14,7 +16,41 @@ contains
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    function isPowerOf(num, power) result(isPower)
 
+        implicit none
+        !INPUT
+        double precision, intent(in) :: num
+        integer, intent(in) :: power
+
+        !OUTPUT
+        logical :: isPower
+        !integer :: i
+        double precision :: compNum
+
+        compNum = 1.0D0
+        isPower = .false.
+        !i = 0;
+
+        !write(*,*) "FLAG1"
+        do while ((num - compNum) >= TOLERANCE)
+            !write(*,*) "i = ", i
+            !write(*,*) "compNum = ", compNum
+            compNum = compNum * dble(power)
+            !i = i+1
+        end do
+        !write(*,*) "FLAG2"
+
+        if(abs(compNum-num) < TOLERANCE) isPower = .true.
+
+    end function isPowerOf
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     function cyclicMod(pos, base) result(resPos)
 
         implicit none
@@ -74,6 +110,41 @@ contains
         end if
 
     end subroutine init_random_seed
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine reorder_vector(vector)
+       ! POST: The seed for the random number generation method random_number() has been reset
+
+        implicit none
+        !INPUT
+        double precision, dimension(1:), intent(inout) :: vector
+
+        !LOCAL
+        integer :: i
+        integer :: minPos
+        double precision :: temp
+        logical, dimension(:), allocatable :: mask
+
+        allocate(mask(size(vector)))
+
+        minPos = MINLOC(vector, dim=1 )
+        mask = .true.
+
+        do i = 1, size(vector)
+            minPos = MINLOC(vector, dim=1, mask =  mask)
+            temp   =  vector(i)
+            vector(i) = vector(minPos)
+            vector(minPos) = temp
+            mask(i) = .false.
+        end do
+
+        deallocate(mask)
+
+    end subroutine reorder_vector
+
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

@@ -246,7 +246,7 @@ contains
 
             do j = 1, size(all_HDF5nameList)
                 if(all_mask(j)) then
-                    write(*,*) trim(all_HDF5nameList(j))
+                    !write(*,*) trim(all_HDF5nameList(j))
                     !write(numberStr,'(I)'  ) j
                     !numberStr = adjustL(numberStr)
                     !write(meshName,'(2A)' ) "meshRF_", trim(adjustL(numberStr))
@@ -421,12 +421,11 @@ contains
         !LOCAL
         character(len=110) :: HDF5Name, XMFName
 
-
-
         write(get_fileId(),*) "-> Writing h5 file in", trim(adjustL(folderPath))//"/h5";
 
         call write_ResultHDF5Unstruct_MPI(xPoints, randField, fileName, rang, trim(adjustL(folderPath))//"/h5", &
                                           MPI_COMM_WORLD, labelsH5, indexesH5, HDF5Name)
+
 
         write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";
         XMFName = stringNumb_join(trim(adjustL(fileName))//"it_", indexXMF)
@@ -480,7 +479,13 @@ contains
     subroutine write_generation_spec(xMin, xMax, xStep,              &
                                      corrL, corrMod,                 &
                                      margiFirst, fieldAvg, fieldVar, &
-                                     Nmc, method, seed, rang, folderpath, name)
+                                     Nmc, method, seed, rang, folderpath, name, timeVec, &
+                                     avg_Gauss, stdDev_Gauss,                 &
+                                     avg_Trans, stdDev_Trans,                 &
+                                     avg_Gauss_evnt, stdDev_Gauss_evnt,   &
+                                     avg_Trans_evnt, stdDev_Trans_evnt,   &
+                                     avg_Gauss_point, stdDev_Gauss_point, &
+                                     avg_Trans_point, stdDev_Trans_point)
 
         implicit none
 
@@ -494,6 +499,13 @@ contains
         integer         , dimension(:), intent(in) :: seed
         integer                       , intent(in) :: rang;
         character (len=*)             , intent(in) :: folderpath, name;
+        double precision, dimension(:), intent(in), optional :: timeVec
+        double precision, intent(in), optional :: avg_Gauss, stdDev_Gauss,                 &
+                                                  avg_Trans, stdDev_Trans
+        double precision, dimension(:), intent(in), optional :: avg_Gauss_evnt, stdDev_Gauss_evnt,   &
+                                     avg_Trans_evnt, stdDev_Trans_evnt,   &
+                                     avg_Gauss_point, stdDev_Gauss_point, &
+                                     avg_Trans_point, stdDev_Trans_point
 
         !LOCAL
         integer :: fileId, nDim
@@ -509,29 +521,86 @@ contains
             open (unit = fileId , file = string_vec_join([folderpath, "/", name]), action = 'write')
 
             write(fileId,*) "FILE:", name
-            write(fileId,*) "--xMin"
+            write(fileId,*) "--xMin-----------------------"
             write(fileId,fmt = doubleFmt) xMin
-            write(fileId,*) "--xMax"
+            write(fileId,*) "--xMax-----------------------"
             write(fileId,fmt = doubleFmt) xMax
-            write(fileId,*) "--xStep"
+            write(fileId,*) "--xStep-----------------------"
             write(fileId,fmt = doubleFmt) xStep
-            write(fileId,*) "--corrL"
+            write(fileId,*) "--corrL-----------------------"
             write(fileId,fmt = doubleFmt) corrL
-            write(fileId,*) "--corrMod"
+            write(fileId,*) "--corrMod-----------------------"
             write(fileId,*) corrMod
-            write(fileId,*) "--margiFirst"
+            write(fileId,*) "--margiFirst-----------------------"
             write(fileId,*) margiFirst
-            write(fileId,*) "--fieldAvg"
+            write(fileId,*) "--fieldAvg-----------------------"
             write(fileId,fmt = doubleFmt) fieldAvg
-            write(fileId,*) "--fieldVar"
+            write(fileId,*) "--fieldVar-----------------------"
             write(fileId,fmt = doubleFmt) fieldVar
-            write(fileId,*) "--Nmc"
+            write(fileId,*) "--Nmc-----------------------"
             write(fileId,fmt = "(I20)") Nmc
-            write(fileId,*) "--method"
-            if(method == ISOTROPIC) write(fileId,*) "isotropic"
-            if(method == SHINOZUKA) write(fileId,*) "shinozuka"
-            write(fileId,*) "--Seed"
+            write(fileId,*) "--method-----------------------"
+            if(method == ISOTROPIC) write(fileId,*) "ISOTROPIC"
+            if(method == SHINOZUKA) write(fileId,*) "SHINOZUKA"
+            if(method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
+            write(fileId,*) "--Seed-----------------------"
             write(fileId,fmt = "(I20)") seed
+
+            if(present(timeVec)) then
+                write(fileId,*) "--timeVec-----------------------"
+                write(fileId,fmt = "(F30.15)") timeVec
+            end if
+
+            if(present(avg_Gauss)) then
+                write(fileId,*) "--avg_Gauss-----------------------"
+                write(fileId,fmt = "(F30.15)") avg_Gauss
+            end if
+            if(present(stdDev_Gauss)) then
+                write(fileId,*) "--stdDev_Gauss-----------------------"
+                write(fileId,fmt = "(F30.15)") stdDev_Gauss
+            end if
+            if(present(avg_Trans)) then
+                write(fileId,*) "--avg_Trans-----------------------"
+                write(fileId,fmt = "(F30.15)") avg_Trans
+            end if
+            if(present(stdDev_Trans)) then
+                write(fileId,*) "--stdDev_Trans-----------------------"
+                write(fileId,fmt = "(F30.15)") stdDev_Trans
+            end if
+
+            if(present(avg_Gauss_evnt)) then
+                write(fileId,*) "--avg_Gauss_evnt-----------------------"
+                write(fileId,fmt = "(F30.15)") avg_Gauss_evnt
+            end if
+            if(present(stdDev_Gauss_evnt)) then
+                write(fileId,*) "--stdDev_Gauss_evnt-----------------------"
+                write(fileId,fmt = "(F30.15)") stdDev_Gauss_evnt
+            end if
+            if(present(avg_Trans_evnt)) then
+                write(fileId,*) "--avg_Trans_evnt-----------------------"
+                write(fileId,fmt = "(F30.15)") avg_Trans_evnt
+            end if
+            if(present(stdDev_Trans_evnt)) then
+                write(fileId,*) "--stdDev_Trans_evnt-----------------------"
+                write(fileId,fmt = "(F30.15)") stdDev_Trans_evnt
+            end if
+
+            if(present(avg_Gauss_point)) then
+                write(fileId,*) "--avg_Gauss_point-----------------------"
+                write(fileId,fmt = "(F30.15)") avg_Gauss_point
+            end if
+            if(present(stdDev_Gauss_point)) then
+                write(fileId,*) "--stdDev_Gauss_point-----------------------"
+                write(fileId,fmt = "(F30.15)") stdDev_Gauss_point
+            end if
+            if(present(avg_Trans_point)) then
+                write(fileId,*) "--avg_Trans_point-----------------------"
+                write(fileId,fmt = "(F30.15)") avg_Trans_point
+            end if
+            if(present(stdDev_Trans_point)) then
+                write(fileId,*) "--stdDev_Trans_point-----------------------"
+                write(fileId,fmt = "(F30.15)") stdDev_Trans_point
+            end if
 
             close(fileId)
 

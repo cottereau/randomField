@@ -195,33 +195,84 @@ contains
 
         !LOCAL VARIABLES
         integer :: i, j, testRang = 0;
+        integer :: baseStep
         integer :: seedStep, nDim, basicStep;
+        integer, allocatable, dimension(:) :: bStepVec
         double precision, dimension(:), allocatable :: xProcDelta;
+        logical :: test
 
         nDim = size(xMin);
+        baseStep = nint(dble(nb_procs)**(1.0d0/nDim))
+        write(get_fileId(),*) "Setting Local Extremes"
         allocate (xProcDelta(nDim))
-        basicStep  = nint(dble(nb_procs)**(1.0d0/nDim))
-        xProcDelta = (xMaxGlob-xMinGlob)/basicStep
-
-        !        if(rang == testRang) write(*,*) "nDim = ", nDim
-        !        if(rang == testRang) write(*,*) "basicStep = ", basicStep
-        !        if(rang == testRang) write(*,*) "xProcDelta = ", xProcDelta
-        !        if(rang == testRang) write(*,*) "nb_procs = ", nb_procs
-        !        if(rang == testRang) write(*,*) "dble(nb_procs)**(1/nDim) = ", dble(nb_procs)**(1/nDim)
-        !        if(rang == testRang) write(*,*) "nint(dble(nb_procs)**(1/nDim)) = ", nint(dble(nb_procs)**(1/nDim))
-
-        do j = 1, nDim
-            seedStep = basicStep**(nDim-j);
-            i = cyclicMod(int(rang/seedStep) + 1, basicStep)
-            !if(rang == testRang) write(*,*) "i = ", i, " seedStep = ", seedStep, "seedStep", seedStep
-            xMin(j) = (dble(i-1))*xProcDelta(j);
-            xMax(j) = xMin(j) + xProcDelta(j)
-            !if(rang == testRang) write(*,*) "AFTER xMin ", j, " = ", xMin(j)
-        end do
 
 
+        if (nb_procs == baseStep**nDim) then
+            write(get_fileId(),*) "Exact Division"
+            basicStep  = nint(dble(nb_procs)**(1.0d0/nDim))
+            xProcDelta = (xMaxGlob-xMinGlob)/basicStep
+
+            !        if(rang == testRang) write(*,*) "nDim = ", nDim
+            !        if(rang == testRang) write(*,*) "basicStep = ", basicStep
+            !        if(rang == testRang) write(*,*) "xProcDelta = ", xProcDelta
+            !        if(rang == testRang) write(*,*) "nb_procs = ", nb_procs
+            !        if(rang == testRang) write(*,*) "dble(nb_procs)**(1/nDim) = ", dble(nb_procs)**(1/nDim)
+            !        if(rang == testRang) write(*,*) "nint(dble(nb_procs)**(1/nDim)) = ", nint(dble(nb_procs)**(1/nDim))
+
+            do j = 1, nDim
+                seedStep = basicStep**(nDim-j);
+                i = cyclicMod(int(rang/seedStep) + 1, basicStep)
+                !if(rang == testRang) write(*,*) "i = ", i, " seedStep = ", seedStep, "seedStep", seedStep
+                xMin(j) = (dble(i-1))*xProcDelta(j);
+                xMax(j) = xMin(j) + xProcDelta(j)
+                !if(rang == testRang) write(*,*) "AFTER xMin ", j, " = ", xMin(j)
+            end do
+
+
+
+            !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
 
         !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
+        !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
+
+        else if (isPowerOf(dble(nb_procs), 2)) then
+            write(get_fileId(),*) "Power of two"
+            allocate (bStepVec(nDim))
+
+            !Defining the basic Step for each dimension
+            bStepVec(:) = 1
+            if(nb_procs /= 1) then
+                do j = 1, nint(dble(nb_procs)**0.5)
+                    i = cyclicMod(j, nDim)
+                    bStepVec(i) = bStepVec(i)*2
+                    !write(*,*) "i = ", i
+                    !write(*,*) "bStepVec = ", bStepVec
+                end do
+            end if
+            !Defining coordinates in each proc
+            xProcDelta = (xMaxGlob-xMinGlob)/bStepVec
+            !write(*,*) "xMaxGlob = ", xMaxGlob
+            !write(*,*) "xMinGlob = ", xMinGlob
+            !write(*,*) "xProcDelta = ", xProcDelta
+            do j = 1, nDim
+                seedStep = product(bStepVec(j+1:));
+                if (j == nDim) seedStep = 1;
+                i = cyclicMod(int(rang/seedStep) + 1, bStepVec(j))
+                !if(rang == testRang) write(*,*) "i = ", i, " seedStep = ", seedStep, "seedStep", seedStep
+                xMin(j) = (dble(i-1))*xProcDelta(j);
+                xMax(j) = xMin(j) + xProcDelta(j)
+                !if(rang == testRang) write(*,*) "AFTER xMin ", j, " = ", xMin(j)
+            end do
+            deallocate (bStepVec)
+        else
+            stop "ERROR, no mesh division algorithm for this number of procs"
+        end if
+
+        do i = 1, nDim
+            write(get_fileId(),*) "Dim ", i
+            write(get_fileId(),fmt="(2A30)") "xMin", "xMax"
+            write(get_fileId(),fmt="(2F30.15)") xMin(i), xMax(i)
+        end do
 
         deallocate (xProcDelta)
 
@@ -395,6 +446,41 @@ contains
         end if
 
     end subroutine get_Permutation
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine get_Permutation_from_Mat(pos, matrix, nDim, pVec);
+
+        implicit none
+
+        !INPUT
+        integer                        , intent(in)           :: pos;
+        double precision, dimension(1:, 1:), intent(in)           :: matrix;
+        integer, intent(in) :: nDim
+
+        !OUTPUT
+        double precision, dimension(1:), intent(out) :: pVec;
+        !LOCAL VARIABLES
+        integer :: i, j;
+        integer :: seedStep;
+        integer, dimension(:), allocatable :: nStep;
+
+        allocate(nStep(nDim))
+
+        nStep = size(matrix,1)
+
+        do j = 1, nDim
+            if (j /= nDim) seedStep = product(nStep(j+1:));
+            if (j == nDim) seedStep = 1;
+            i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
+            pVec(j) = matrix(i, j);
+        end do
+
+        deallocate(nStep)
+
+    end subroutine get_Permutation_from_Mat
 
 end module mesh_RF
 !! Local Variables:

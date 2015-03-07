@@ -23,57 +23,141 @@ contains
     subroutine calculate_average_and_stdVar_MPI(randField,                &
                                                 globalAvg, globalStdDev,  &
                                                 comm, &
-                                                evntAvg, evntStdDev)
+                                                evntAvg, evntStdDev, &
+                                                pointAvg, pointStdDev)
 
         implicit none
 
         !INPUT
-        double precision, dimension(:, :), intent(in) :: randField;
+        double precision, dimension(1:, 1:), intent(in) :: randField;
         integer :: comm
 
         !OUTPUT
         double precision              , intent(out) :: globalAvg, globalStdDev;
-        double precision, dimension(:), intent(out), optional :: evntAvg, evntStdDev;
+        double precision, dimension(1:), intent(out), optional :: evntAvg, evntStdDev;
+        double precision, dimension(:), intent(out), optional :: pointAvg, pointStdDev;
 
         !LOCAL
         double precision, dimension(:), allocatable :: sumRF, sumRFsquare
         double precision, dimension(:), allocatable :: totalSumRF, totalSumRFsquare;
+        double precision, dimension(:), allocatable :: sumRF_point, sumRFsquare_point
+        !double precision, dimension(:), allocatable :: totalSumRF_point, totalSumRFsquare_point
         integer :: Nmc, xNTotal, all_xNTotal
-        integer :: code, nb_procs
+        integer, dimension(:), allocatable :: xNTotal_Vec, deplacement
+        integer :: code, nb_procs, rang
+        integer :: i
 
         write(get_fileId(),*) "Calculating Average and stdVar"
 
         Nmc     = size(randField, 2)
         xNTotal = size(randField, 1)
-        call MPI_COMM_SIZE(MPI_COMM_WORLD, nb_procs, code)
+
+!        write(*,*) "Nmc = ", Nmc
+!        write(*,*) "xNTotal = ", xNTotal
+        call MPI_COMM_SIZE(comm, nb_procs, code)
+        call MPI_COMM_RANK(comm ,rang,code)
 
         !Allocating
         allocate(sumRF(Nmc))
         allocate(sumRFsquare(Nmc))
-        allocate (totalSumRF(Nmc))
-        allocate (totalSumRFsquare(Nmc))
+        allocate(totalSumRF(Nmc))
+        allocate(totalSumRFsquare(Nmc))
+
+        allocate(sumRF_point(xNTotal))
+        allocate(sumRFsquare_point(xNTotal))
+        allocate(xNTotal_Vec(nb_procs))
+        allocate(deplacement(nb_procs))
+
+
 
         !Calculating
         sumRF(:)       = sum( randField    , dim = 1)
         sumRFsquare(:) = sum((randField)**2, dim = 1)
+        sumRF_point(:)       = sum( randField    , dim = 2)
+        sumRFsquare_point(:) = sum((randField)**2, dim = 2)
+
+        write(get_fileId(),*) "sumRF(1) = ", sumRF(1)
+        write(get_fileId(),*) "sumRFsquare(1) = ", sumRFsquare(1)
+        write(get_fileId(),*) "sumRF_point(1) = ", sumRF_point(1)
+        write(get_fileId(),*) "sumRFsquare_point(1) = ", sumRFsquare_point(1)
 
         !Transfering info
 
+        !Total number of points
+        call MPI_ALLGATHER (xNTotal, 1, MPI_INTEGER, &
+                            xNTotal_Vec, 1, MPI_INTEGER, &
+                            comm, code)
+        all_xNTotal = sum(xNTotal_Vec)
+
+        !By Event
         call MPI_ALLREDUCE (sumRF,totalSumRF,Nmc,MPI_DOUBLE_PRECISION, &
                             MPI_SUM,comm,code)
         call MPI_ALLREDUCE (sumRFsquare,totalSumRFsquare,Nmc,MPI_DOUBLE_PRECISION, &
                             MPI_SUM,comm,code)
-        call MPI_ALLREDUCE (xNTotal, all_xNTotal,Nmc,MPI_INTEGER, &
-                            MPI_SUM,comm,code)
 
-        write(get_fileId(),*) "totalSumRF = ", totalSumRF
-        write(get_fileId(),*) "totalSumRFsquare = ", totalSumRFsquare
-        write(get_fileId(),*) "all_xNTotal = ", all_xNTotal
+!        !By Point
+!        write(*,*) "HERE Point"
+!        write(*,*) "shape(sumRF_point) = ", shape(sumRF_point)
+!        write(*,*) "shape(totalSumRF_point) = ", shape(totalSumRF_point)
+!        write(*,*) "xNTotal = ", xNTotal
+!        !Number of points
+!        !write(*,*) "HERE Number of Points"
+!        call MPI_ALLREDUCE (xNTotal, all_xNTotal,1,MPI_INTEGER, &
+!                            MPI_SUM,comm,code)
+!
+!
+!
+!        allocate(totalSumRF_point(all_xNTotal))
+!        allocate(totalSumRFsquare_point(all_xNTotal))
+
+
+
+!        !write(*,*) "xNTotal_Vec = ", xNTotal_Vec
+!        call MPI_ALLREDUCE (sumRFsquare_point,totalSumRFsquare_point,xNTotal,MPI_DOUBLE_PRECISION, &
+!                            MPI_SUM,comm,code)
+!
+
+!        write(get_fileId(),*) "totalSumRF(1) = ", totalSumRF(1)
+!        write(get_fileId(),*) "totalSumRFsquare(1) = ", totalSumRFsquare(1)
+!        write(get_fileId(),*) "totalSumRF_point(1) = ", totalSumRF_point(1)
+!        write(get_fileId(),*) "totalSumRFsquare_point(1) = ", totalSumRFsquare_point(1)
+!        write(get_fileId(),*) "all_xNTotal = ", all_xNTotal
 
         !by Event
         if(present(evntAvg))    evntAvg      = totalSumRF/dble(all_xNTotal);
         if(present(evntStdDev)) evntStdDev   = sqrt(totalSumRFsquare/dble(all_xNTotal) &
                                                - (evntAvg)**2)
+
+        !by Point
+        if(present(pointAvg) .or. present(pointStdDev)) then
+            deplacement(1) = 0
+            do i = 2, nb_procs
+                deplacement(i) = sum(xNTotal_Vec(1:i-1))
+            end do
+
+!            if(rang == 0) write(*,*) "xNTotal_Vec =", xNTotal_Vec
+!            if(rang == 0) write(*,*) "deplacement =", deplacement
+        end if
+
+        if(present(pointAvg)) then
+            !allocate(pointAvg(all_xNTotal))
+            call MPI_ALLGATHERV (sumRF_point, xNTotal, MPI_DOUBLE_PRECISION, &
+                                 pointAvg, xNTotal_Vec, deplacement, MPI_DOUBLE_PRECISION, &
+                                 comm, code)
+            pointAvg(:) =  pointAvg(:)/Nmc
+        end if
+
+        if(present(pointStdDev).and.present(pointAvg)) then
+            !allocate(pointStdDev(all_xNTotal))
+            call MPI_ALLGATHERV (sumRFsquare_point, xNTotal, MPI_DOUBLE_PRECISION, &
+                                 pointStdDev, xNTotal_Vec, deplacement, MPI_DOUBLE_PRECISION, &
+                                 comm, code)
+
+            pointStdDev   = sqrt(pointStdDev/dble(Nmc) &
+                            - (pointAvg)**2)
+        end if
+
+
         !Global
         globalAvg    = sum(totalSumRF)/dble(all_xNTotal*Nmc);
         globalStdDev = sqrt(sum(totalSumRFsquare)/dble(all_xNTotal*Nmc) &
@@ -84,6 +168,13 @@ contains
         if(allocated(sumRFsquare)) deallocate(sumRFsquare)
         if(allocated(totalSumRF))       deallocate (totalSumRF)
         if(allocated(totalSumRFsquare)) deallocate (totalSumRFsquare)
+
+        if(allocated(sumRF_point)) deallocate(sumRF_point)
+        if(allocated(sumRFsquare_point)) deallocate(sumRFsquare_point)
+        !if(allocated(totalSumRF_point)) deallocate(totalSumRF_point)
+        !if(allocated(totalSumRFsquare_point)) deallocate(totalSumRFsquare_point)
+        if(allocated(xNTotal_Vec)) deallocate(xNTotal_Vec)
+        if(allocated(deplacement)) deallocate(deplacement)
 
     end subroutine calculate_average_and_stdVar_MPI
 

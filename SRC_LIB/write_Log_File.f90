@@ -19,7 +19,8 @@ contains
         integer :: fileId
 
         fileId = get_fileId (rang)
-        write(*,*) "fileId INSIDE = ", fileId
+        !write(*,*) "fileId INSIDE = ", fileId
+        !write(*,*) "filename INSIDE = ", filename
 
         open (unit = fileId , file = filename, action = 'write')
 
