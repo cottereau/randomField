@@ -3,72 +3,74 @@ module mesh_RF
     !use mpi
     use math_RF
     use write_Log_File
+    use type_RF
+    use type_MESH
 
 contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_XPoints(xMinInd, xMaxInd, xStep, xPoints, xMinGlob, xMaxGlob, cutExtremes)
+    subroutine set_XPoints(MSH, RDF, xPoints)
         implicit none
 
-        !INPUT
-        double precision, dimension(:), intent(in) :: xMinInd, xMaxInd
-        double precision, dimension(:), intent(in), optional :: xMinGlob, xMaxGlob
-        logical, optional, intent(in) :: cutExtremes
-
-        !OUTPUT
-        double precision, dimension(:), intent(in) :: xStep
-        double precision, dimension(:,:), allocatable, intent(OUT) :: xPoints;
+        !INPUT AND OUTPUT
+        type(MESH) :: MSH
+        type(RF)   :: RDF
+        double precision, dimension(:, :), allocatable, intent(out), target :: xPoints;
 
         !LOCAL VARIABLES
-        integer :: nDim, i, xNTotal;
-        integer , dimension(:) , allocatable :: xNStep;
-        double precision, dimension(:), allocatable :: xMin, xMax
-
-        nDim = size(xStep)
-        allocate(xNStep(nDim))
-        allocate(xMin(nDim))
-        allocate(xMax(nDim))
+        double precision, dimension(:), allocatable :: xBottom, xTop
+        integer :: i
+        double precision :: norm
 
         write(get_fileId(),*) "-> Creating xPoints";
 
-        xMin = xMinInd
-        xMax = xMaxInd
+        allocate(xBottom(MSH%nDim))
+        allocate(xTop(MSH%nDim))
 
-        write(get_fileId(),*) " xMin = ", xMin;
-        write(get_fileId(),*) " xMax = ", xMax;
-
-        if(present(cutExtremes)) then
-            if(cutExtremes) call cutBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
-        end if
-
-        do i = 1, size(xMax)
-            if(dble(ceiling((xMax(i) - xMin(i))/xStep(i))) /= (xMax(i) - xMin(i))/xStep(i)) then
-                write(*,*) "WARNING! xStep is not compatible with the extremes"
-                write(*,*) "    It will create an incomplete mesh"
-                write(*,*) "xMin = ", xMin
-                write(*,*) "xMax = ", xMax
-                write(*,*) "xStep = ", xStep
+        do i = 1, MSH%nDim
+            norm = (MSH%xMaxGlob(i)-MSH%xMinGlob(i))/MSH%xStep(i)
+            if(MSH%rang == 0 .and. (.not. areEqual(norm, dble(nint(norm))))) then
+                write(*,*) "WARNING!! In dimension ", i, "extremes and step are incompatible"
+                write(*,*) "   xMinGlob = ", MSH%xMinGlob(i)
+                write(*,*) "   xMaxGlob = ", MSH%xMaxGlob(i)
+                write(*,*) "   xStep    = ", MSH%xStep(i)
+            end if
+            xBottom(i) = (MSH%xStep(i) * intDivisor((MSH%xMin(i) - MSH%xMinGlob(i)), MSH%xStep(i), up = .true.)) &
+                         + MSH%xMinGlob(i)
+            xTop(i)    = (MSH%xStep(i) * intDivisor((MSH%xMax(i) - MSH%xMinGlob(i)), MSH%xStep(i), up = .false.)) &
+                         + MSH%xMinGlob(i)
+            if(areEqual(xTop(i), MSH%xMax(i))) then
+                if(.not. areEqual(xTop(i), MSH%xMaxGlob(i))) then
+                    xTop(i) = xTop(i) - MSH%xStep(i)
+                end if
             end if
         end do
 
-        !write(*,*) "-> Finding xNStep";
-        xNStep = find_xNStep(xMin, xMax, xStep)
+        write(get_fileId(),*) "xBottom = ", xBottom
+        write(get_fileId(),*) "   xTop = ", xTop
 
-        !write(*,*) "  xStep = ", xStep;
 
-        xNTotal = product(xNStep)
-        allocate(xPoints(nDim, xNTotal))
+        write(get_fileId(),*) "-> Finding xNStep";
+        MSH%xNStep = find_xNStep(xBottom, xTop, MSH%xStep)
+        MSH%xNTotal = product(MSH%xNStep)
+        RDF%xNTotal = MSH%xNTotal
 
-        !write(*,*) "-> Filling xNTotal";
-        do i = 1, xNTotal
-            call get_Permutation(i, xMax, xNStep, xPoints(:,i), xMin, snapExtremes = .true.);
+        allocate(xPoints(MSH%nDim, MSH%xNTotal))
+
+        write(get_fileId(),*) "-> Filling xPoints";
+        do i = 1, MSH%xNTotal
+            call get_Permutation(i, xTop, MSH%xNStep, xPoints(:,i), xBottom, snapExtremes = .true.);
         end do
 
-        deallocate(xNStep)
-        deallocate(xMin)
-        deallocate(xMax)
+        RDF%xPoints => xPoints
+
+        !call show_MESH(MSH)
+        !call dispCarvalhol(transpose(RDF%xPoints), "transpose(RDF%xPoints)")
+
+        deallocate(xBottom)
+        deallocate(xTop)
 
     end subroutine set_XPoints
 
@@ -76,60 +78,60 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine recalculate_xStep(xMin, xMax, xStep)
-        implicit none
-        !INPUT
-        double precision, dimension(:), intent(in) :: xMin, xMax
-        !OUTPUT
-        double precision, dimension(:), intent(inout) :: xStep
-        !LOCAL
-        integer :: i
-
-        do i = 1, size(xMax)
-            !write(*,*) "dble(ceiling((xMax(i) - xMin(i))/xStep(i))) = ", dble(ceiling((xMax(i) - xMin(i))/xStep(i)))
-            !write(*,*) "(xMax(i) - xMin(i))/xStep(i) = ", (xMax(i) - xMin(i))/xStep(i)
-            if(dble(ceiling((xMax(i) - xMin(i))/xStep(i))) /= (xMax(i) - xMin(i))/xStep(i)) then
-                write(get_fileId(),*) "WARNING! xStep (", i, ") was not compatible with the extremes"
-                write(get_fileId(),*) "    It will be recalculated"
-                write(get_fileId(),*) "xMin(", i, ") = ", xMin(i)
-                write(get_fileId(),*) "xMax(", i, ") = ", xMax(i)
-                write(get_fileId(),*) "old xStep (", i, ") = ", xStep(i)
-                xStep(i) = (xMax(i) - xMin(i))/dble(ceiling((xMax(i) - xMin(i))/xStep(i)))
-                write(get_fileId(),*) "new xStep (", i, ") = ", xStep(i)
-            end if
-        end do
-
-    end subroutine recalculate_xStep
+!    subroutine recalculate_xStep(xMin, xMax, xStep)
+!        implicit none
+!        !INPUT
+!        double precision, dimension(:), intent(in) :: xMin, xMax
+!        !OUTPUT
+!        double precision, dimension(:), intent(inout) :: xStep
+!        !LOCAL
+!        integer :: i
+!
+!        do i = 1, size(xMax)
+!            !write(*,*) "dble(ceiling((xMax(i) - xMin(i))/xStep(i))) = ", dble(ceiling((xMax(i) - xMin(i))/xStep(i)))
+!            !write(*,*) "(xMax(i) - xMin(i))/xStep(i) = ", (xMax(i) - xMin(i))/xStep(i)
+!            if(dble(ceiling((xMax(i) - xMin(i))/xStep(i))) /= (xMax(i) - xMin(i))/xStep(i)) then
+!                write(get_fileId(),*) "WARNING! xStep (", i, ") was not compatible with the extremes"
+!                write(get_fileId(),*) "    It will be recalculated"
+!                write(get_fileId(),*) "xMin(", i, ") = ", xMin(i)
+!                write(get_fileId(),*) "xMax(", i, ") = ", xMax(i)
+!                write(get_fileId(),*) "old xStep (", i, ") = ", xStep(i)
+!                xStep(i) = (xMax(i) - xMin(i))/dble(ceiling((xMax(i) - xMin(i))/xStep(i)))
+!                write(get_fileId(),*) "new xStep (", i, ") = ", xStep(i)
+!            end if
+!        end do
+!
+!    end subroutine recalculate_xStep
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine recalculate_corrL(xMin, xMax, corrL)
-        implicit none
-        !INPUT
-        double precision, dimension(:), intent(in) :: xMin, xMax
-        !OUTPUT
-        double precision, dimension(:), intent(inout) :: corrL
-        !LOCAL
-        integer :: i
-
-        do i = 1, size(xMax)
-            !write(*,*) "dble(ceiling((xMax(i) - xMin(i))/xStep(i))) = ", dble(ceiling((xMax(i) - xMin(i))/xStep(i)))
-            !write(*,*) "(xMax(i) - xMin(i))/xStep(i) = ", (xMax(i) - xMin(i))/xStep(i)
-            if(dble(ceiling((xMax(i) - xMin(i))/corrL(i))) /= (xMax(i) - xMin(i))/corrL(i)) then
-                write(get_fileId(),*) "WARNING! corrL (", i, ") was not compatible with the extremes"
-                write(get_fileId(),*) "    It will be recalculated"
-                write(get_fileId(),*) "xMin(", i, ") = ", xMin(i)
-                write(get_fileId(),*) "xMax(", i, ") = ", xMax(i)
-                write(get_fileId(),*) "old corrL (", i, ") = ", corrL(i)
-                corrL(i) = (xMax(i) - xMin(i))/dble(ceiling((xMax(i) - xMin(i))/corrL(i)))
-                write(get_fileId(),*) "new corrL (", i, ") = ", corrL(i)
-            end if
-        end do
-
-    end subroutine recalculate_corrL
-    !-----------------------------------------------------------------------------------------------
+!    subroutine recalculate_corrL(xMin, xMax, corrL)
+!        implicit none
+!        !INPUT
+!        double precision, dimension(:), intent(in) :: xMin, xMax
+!        !OUTPUT
+!        double precision, dimension(:), intent(inout) :: corrL
+!        !LOCAL
+!        integer :: i
+!
+!        do i = 1, size(xMax)
+!            !write(*,*) "dble(ceiling((xMax(i) - xMin(i))/xStep(i))) = ", dble(ceiling((xMax(i) - xMin(i))/xStep(i)))
+!            !write(*,*) "(xMax(i) - xMin(i))/xStep(i) = ", (xMax(i) - xMin(i))/xStep(i)
+!            if(dble(ceiling((xMax(i) - xMin(i))/corrL(i))) /= (xMax(i) - xMin(i))/corrL(i)) then
+!                write(get_fileId(),*) "WARNING! corrL (", i, ") was not compatible with the extremes"
+!                write(get_fileId(),*) "    It will be recalculated"
+!                write(get_fileId(),*) "xMin(", i, ") = ", xMin(i)
+!                write(get_fileId(),*) "xMax(", i, ") = ", xMax(i)
+!                write(get_fileId(),*) "old corrL (", i, ") = ", corrL(i)
+!                corrL(i) = (xMax(i) - xMin(i))/dble(ceiling((xMax(i) - xMin(i))/corrL(i)))
+!                write(get_fileId(),*) "new corrL (", i, ") = ", corrL(i)
+!            end if
+!        end do
+!
+!    end subroutine recalculate_corrL
+!    !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -155,7 +157,7 @@ contains
         allocate(xStep(nDim))
 
         xStep = corrL/dble(pointsPerCorrL-1)
-        call recalculate_xStep(xMin, xMax, xStep)
+        !call recalculate_xStep(xMin, xMax, xStep)
 
         write(*,*) "xStep = ", xStep
         write(*,*) "xMax  = ", xMax
@@ -163,15 +165,15 @@ contains
         write(*,*) "corrL = ", corrL
         write(*,*) "pointsPerCorrL = ", pointsPerCorrL
 
-        if(present(cutExtremes)) then
-            if(cutExtremes) call cutBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
-        end if
+!        if(present(cutExtremes)) then
+!            if(cutExtremes) call cutBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
+!        end if
 
-        call set_XPoints(xMin, xMax, xStep, xPoints)
+        !call set_XPoints(xMin, xMax, xStep, xPoints)
 
-        if(present(cutExtremes)) then
-            if(cutExtremes) call restoreBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
-        end if
+!        if(present(cutExtremes)) then
+!            if(cutExtremes) call restoreBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
+!        end if
 
         deallocate(xStep)
 
@@ -186,7 +188,7 @@ contains
         implicit none
 
         !INPUT
-        integer                       , intent(in)    :: rang, nb_procs;
+        integer                        , intent(in) :: rang, nb_procs;
         double precision, dimension(1:), intent(in) :: xMaxGlob;
         double precision, dimension(1:), intent(in) :: xMinGlob;
         !OUTPUT
@@ -199,7 +201,7 @@ contains
         integer :: seedStep, nDim, basicStep;
         integer, allocatable, dimension(:) :: bStepVec
         double precision, dimension(:), allocatable :: xProcDelta;
-        logical :: test
+        double precision :: procIterations
 
         nDim = size(xMin);
         baseStep = nint(dble(nb_procs)**(1.0d0/nDim))
@@ -242,7 +244,8 @@ contains
             !Defining the basic Step for each dimension
             bStepVec(:) = 1
             if(nb_procs /= 1) then
-                do j = 1, nint(dble(nb_procs)**0.5)
+                procIterations = log(dble(nb_procs))/log(2.0D0)
+                do j = 1, nint(procIterations)
                     i = cyclicMod(j, nDim)
                     bStepVec(i) = bStepVec(i)*2
                     !write(*,*) "i = ", i
@@ -251,9 +254,14 @@ contains
             end if
             !Defining coordinates in each proc
             xProcDelta = (xMaxGlob-xMinGlob)/bStepVec
-            !write(*,*) "xMaxGlob = ", xMaxGlob
-            !write(*,*) "xMinGlob = ", xMinGlob
-            !write(*,*) "xProcDelta = ", xProcDelta
+
+            write(get_fileId(),*) "procIterations = ", procIterations
+            write(get_fileId(),*) "xMaxGlob = ", xMaxGlob
+            write(get_fileId(),*) "xMinGlob = ", xMinGlob
+            write(get_fileId(),*) "nb_procs = ", nb_procs
+            write(get_fileId(),*) "bStepVec = ", bStepVec
+            write(get_fileId(),*) "xProcDelta = ", xProcDelta
+
             do j = 1, nDim
                 seedStep = product(bStepVec(j+1:));
                 if (j == nDim) seedStep = 1;
@@ -282,43 +290,43 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine cutBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
-        !To adjust the extremes in each proc so we don't have the same point in two processors on the interfaces
-        implicit none
-        !INPUT
-        double precision, dimension(1:), intent(in)  :: xMinGlob, xMaxGlob, xStep
-        !OUTPUT
-        double precision, dimension(1:), intent(inout) :: xMin, xMax;
-        !LOCAL
-        integer :: i
-
-        write(get_fileId(),*) "-> Cutting Borders";
-        do i = 1, size(xMax)
-            if(.not. xMax(i) == xMaxGlob(i)) xMax(i) = xMax(i) - xStep(i)
-        end do
-
-    end subroutine cutBorders
+!    subroutine cutBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
+!        !To adjust the extremes in each proc so we don't have the same point in two processors on the interfaces
+!        implicit none
+!        !INPUT
+!        double precision, dimension(1:), intent(in)  :: xMinGlob, xMaxGlob, xStep
+!        !OUTPUT
+!        double precision, dimension(1:), intent(inout) :: xMin, xMax;
+!        !LOCAL
+!        integer :: i
+!
+!        write(get_fileId(),*) "-> Cutting Borders";
+!        do i = 1, size(xMax)
+!            if(.not. xMax(i) == xMaxGlob(i)) xMax(i) = xMax(i) - xStep(i)
+!        end do
+!
+!    end subroutine cutBorders
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine restoreBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
-        !To reverse the operation of "cutBorders"
-        implicit none
-        !INPUT
-        double precision, dimension(1:), intent(in)  :: xMinGlob, xMaxGlob, xStep
-        !OUTPUT
-        double precision, dimension(1:), intent(inout) :: xMin, xMax;
-        !LOCAL
-        integer :: i
-
-        write(get_fileId(),*) "-> Restoring Borders";
-        do i = 1, size(xMax)
-            if(.not. xMax(i) == xMaxGlob(i)) xMax(i) = xMax(i) + xStep(i)
-        end do
-
-    end subroutine restoreBorders
+!    subroutine restoreBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
+!        !To reverse the operation of "cutBorders"
+!        implicit none
+!        !INPUT
+!        double precision, dimension(1:), intent(in)  :: xMinGlob, xMaxGlob, xStep
+!        !OUTPUT
+!        double precision, dimension(1:), intent(inout) :: xMin, xMax;
+!        !LOCAL
+!        integer :: i
+!
+!        write(get_fileId(),*) "-> Restoring Borders";
+!        do i = 1, size(xMax)
+!            if(.not. xMax(i) == xMaxGlob(i)) xMax(i) = xMax(i) + xStep(i)
+!        end do
+!
+!    end subroutine restoreBorders
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -392,60 +400,15 @@ contains
 
         allocate(xNStep(size(xStep)))
 
+!        write(*,*) "HERE find_xNStep"
+!        write(*,*) " (xMax-xMin) = ", (xMax-xMin)
+!        write(*,*) " (xStep) = ", (xStep)
+!        write(*,*) " nint((xMax-xMin)/(xStep)) = ", nint((xMax-xMin)/(xStep))
+!        write(*,*) " 1 + nint((xMax-xMin)/(xStep)) = ", 1 + nint((xMax-xMin)/(xStep))
+
         xNStep = 1 + nint((xMax-xMin)/(xStep));
 
     end function
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine get_Permutation(pos, qmax, nStep, pVec, qmin, snapExtremes)
-
-        implicit none
-
-        !INPUT
-        integer                        , intent(in)           :: pos;
-        double precision, dimension(1:), intent(in)           :: qmax;
-        double precision, dimension(1:), intent(in), optional :: qmin;
-        integer,          dimension(1:), intent(in)           :: nStep;
-        logical, optional, intent(in) :: snapExtremes
-        !OUTPUT
-        double precision, dimension(1:), intent(out) :: pVec;
-        !LOCAL VARIABLES
-        integer :: i, j;
-        integer :: seedStep, nDim;
-        double precision :: contrib
-
-        nDim = size(nStep);
-        contrib = 0.0d0
-
-        if (present(snapExtremes)) then
-            if(snapExtremes) then
-                contrib = 1.0d0
-            end if
-        end if
-
-        if (present(qmin)) then
-            do j = 1, nDim
-                seedStep = product(nStep(j+1:));
-                if (j == nDim) seedStep = 1;
-                i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
-                pVec(j) = (dble(i)-0.5d0-contrib/2.0d0)         &
-                          *(qmax(j)-qmin(j))/(nStep(j)-contrib) &
-                          + qmin(j);
-            end do
-        else
-            do j = 1, nDim
-                seedStep = product(nStep(j+1:));
-                if (j == nDim) seedStep = 1;
-                i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
-                pVec(j) = (dble(i)-0.5d0-contrib/2.0d0) &
-                          *(qmax(j))/(nStep(j)-contrib); !qmin = 0
-            end do
-        end if
-
-    end subroutine get_Permutation
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

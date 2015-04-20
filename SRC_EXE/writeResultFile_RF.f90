@@ -7,6 +7,9 @@ module writeResultFile_RF
     use mpi
     use constants_RF
     use write_Log_File
+    use type_RF
+    use type_MESH
+    use type_TEST
 
 contains
 
@@ -476,131 +479,137 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_generation_spec(xMin, xMax, xStep,              &
-                                     corrL, corrMod,                 &
-                                     margiFirst, fieldAvg, fieldVar, &
-                                     Nmc, method, seed, rang, folderpath, name, timeVec, &
-                                     avg_Gauss, stdDev_Gauss,                 &
-                                     avg_Trans, stdDev_Trans,                 &
-                                     avg_Gauss_evnt, stdDev_Gauss_evnt,   &
-                                     avg_Trans_evnt, stdDev_Trans_evnt,   &
-                                     avg_Gauss_point, stdDev_Gauss_point, &
-                                     avg_Trans_point, stdDev_Trans_point)
+    subroutine write_generation_spec(MSH, RDF, folderpath, name, timeVec)
 
         implicit none
 
         !INPUTS
-        double precision, dimension(:), intent(in) :: xMin, xMax;
-        double precision, dimension(:), intent(in) :: xStep
-        double precision, dimension(:), intent(in) :: corrL;
-        character (len=*)             , intent(in) :: corrMod, margiFirst;
-        double precision              , intent(in) :: fieldAvg, fieldVar;
-        integer                       , intent(in) :: Nmc, method;
-        integer         , dimension(:), intent(in) :: seed
-        integer                       , intent(in) :: rang;
+        type(RF)   :: RDF
+        type(MESH) :: MSH
         character (len=*)             , intent(in) :: folderpath, name;
         double precision, dimension(:), intent(in), optional :: timeVec
-        double precision, intent(in), optional :: avg_Gauss, stdDev_Gauss,                 &
-                                                  avg_Trans, stdDev_Trans
-        double precision, dimension(:), intent(in), optional :: avg_Gauss_evnt, stdDev_Gauss_evnt,   &
-                                     avg_Trans_evnt, stdDev_Trans_evnt,   &
-                                     avg_Gauss_point, stdDev_Gauss_point, &
-                                     avg_Trans_point, stdDev_Trans_point
 
         !LOCAL
-        integer :: fileId, nDim
+        integer :: fileId, code
         character (len=40) :: doubleFmt
+        integer(kind=8) :: sum_xNTotal, sum_kNTotal
 
-        if(rang == 0) then
+        !call show_RF(RDF, "RDF")
+
+        !call MPI_REDUCE (RDF%xNTotal,sum_xNTotal,1,MPI_INT,MPI_SUM,0,RDF%comm,code)
+        !call MPI_REDUCE (RDF%kNTotal,sum_kNTotal,1,MPI_INT,MPI_SUM,0,RDF%comm,code)
+
+        call MPI_REDUCE (RDF%xNTotal,sum_xNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
+        call MPI_REDUCE (RDF%kNTotal,sum_kNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
+
+        write(*,*) "RDF%rang = ", RDF%rang, "", "RDF%xNTotal = ", RDF%xNTotal, "RDF%kNTotal = ", RDF%kNTotal
+
+        if(RDF%rang == 0) then
             fileId = 15
-            nDim = size(xMax)
 
-            write(doubleFmt, fmt="(A,i1,A)") "(", nDim, "F30.15)";
+            write(doubleFmt, fmt="(A,i1,A)") "(", RDF%nDim, "F30.15)";
             !write(*,*) "doubleFmt = ", doubleFmt
 
             open (unit = fileId , file = string_vec_join([folderpath, "/", name]), action = 'write')
 
             write(fileId,*) "FILE:", name
-            write(fileId,*) "--xMin-----------------------"
-            write(fileId,fmt = doubleFmt) xMin
-            write(fileId,*) "--xMax-----------------------"
-            write(fileId,fmt = doubleFmt) xMax
+            write(fileId,*) "--nb_procs-----------------------"
+            write(fileId,fmt = "(I20)") RDF%nb_procs
+            write(fileId,*) "--nDim-----------------------"
+            write(fileId,fmt = "(I20)") RDF%nDim
+            write(fileId,*) "--xMinGlob-----------------------"
+            write(fileId,fmt = doubleFmt) MSH%xMinGlob
+            write(fileId,*) "--xMaxGlob-----------------------"
+            write(fileId,fmt = doubleFmt) MSH%xMaxGlob
+            write(fileId,*) "--xMin_Loc-----------------------"
+            write(fileId,fmt = doubleFmt) MSH%xMin
+            write(fileId,*) "--xMax_Loc-----------------------"
+            write(fileId,fmt = doubleFmt) MSH%xMax
+            write(fileId,*) "--kMax_Loc-----------------------"
+            write(fileId,fmt = doubleFmt) RDF%kMax
+            write(fileId,*) "--xNTotal_Loc-----------------------"
+            write(fileId,fmt = "(I20)") RDF%xNTotal
+            write(fileId,*) "--kNTotal_Loc-----------------------"
+            write(fileId,fmt = "(I20)") RDF%kNTotal
             write(fileId,*) "--xStep-----------------------"
-            write(fileId,fmt = doubleFmt) xStep
+            write(fileId,fmt = doubleFmt) MSH%xStep
+            write(fileId,*) "--sum_xNTotal-----------------------"
+            write(fileId,fmt = "(I20)") sum_xNTotal
+            write(fileId,*) "--sum_kNTotal-----------------------"
+            write(fileId,fmt = "(I20)") sum_kNTotal
             write(fileId,*) "--corrL-----------------------"
-            write(fileId,fmt = doubleFmt) corrL
+            write(fileId,fmt = doubleFmt) RDF%corrL
             write(fileId,*) "--corrMod-----------------------"
-            write(fileId,*) corrMod
+            write(fileId,*) RDF%corrMod
             write(fileId,*) "--margiFirst-----------------------"
-            write(fileId,*) margiFirst
+            write(fileId,*) RDF%margiFirst
             write(fileId,*) "--fieldAvg-----------------------"
-            write(fileId,fmt = doubleFmt) fieldAvg
+            write(fileId,fmt = doubleFmt) RDF%fieldAvg
             write(fileId,*) "--fieldVar-----------------------"
-            write(fileId,fmt = doubleFmt) fieldVar
+            write(fileId,fmt = doubleFmt) RDF%fieldVar
             write(fileId,*) "--Nmc-----------------------"
-            write(fileId,fmt = "(I20)") Nmc
+            write(fileId,fmt = "(I20)") RDF%Nmc
             write(fileId,*) "--method-----------------------"
-            if(method == ISOTROPIC) write(fileId,*) "ISOTROPIC"
-            if(method == SHINOZUKA) write(fileId,*) "SHINOZUKA"
-            if(method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
+            if(RDF%method == ISOTROPIC) write(fileId,*) "ISOTROPIC"
+            if(RDF%method == SHINOZUKA) write(fileId,*) "SHINOZUKA"
+            if(RDF%method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
             write(fileId,*) "--Seed-----------------------"
-            write(fileId,fmt = "(I20)") seed
-
+            write(fileId,fmt = "(I20)") RDF%seed
             if(present(timeVec)) then
                 write(fileId,*) "--timeVec-----------------------"
                 write(fileId,fmt = "(F30.15)") timeVec
             end if
 
-            if(present(avg_Gauss)) then
-                write(fileId,*) "--avg_Gauss-----------------------"
-                write(fileId,fmt = "(F30.15)") avg_Gauss
-            end if
-            if(present(stdDev_Gauss)) then
-                write(fileId,*) "--stdDev_Gauss-----------------------"
-                write(fileId,fmt = "(F30.15)") stdDev_Gauss
-            end if
-            if(present(avg_Trans)) then
-                write(fileId,*) "--avg_Trans-----------------------"
-                write(fileId,fmt = "(F30.15)") avg_Trans
-            end if
-            if(present(stdDev_Trans)) then
-                write(fileId,*) "--stdDev_Trans-----------------------"
-                write(fileId,fmt = "(F30.15)") stdDev_Trans
-            end if
-
-            if(present(avg_Gauss_evnt)) then
-                write(fileId,*) "--avg_Gauss_evnt-----------------------"
-                write(fileId,fmt = "(F30.15)") avg_Gauss_evnt
-            end if
-            if(present(stdDev_Gauss_evnt)) then
-                write(fileId,*) "--stdDev_Gauss_evnt-----------------------"
-                write(fileId,fmt = "(F30.15)") stdDev_Gauss_evnt
-            end if
-            if(present(avg_Trans_evnt)) then
-                write(fileId,*) "--avg_Trans_evnt-----------------------"
-                write(fileId,fmt = "(F30.15)") avg_Trans_evnt
-            end if
-            if(present(stdDev_Trans_evnt)) then
-                write(fileId,*) "--stdDev_Trans_evnt-----------------------"
-                write(fileId,fmt = "(F30.15)") stdDev_Trans_evnt
-            end if
-
-            if(present(avg_Gauss_point)) then
-                write(fileId,*) "--avg_Gauss_point-----------------------"
-                write(fileId,fmt = "(F30.15)") avg_Gauss_point
-            end if
-            if(present(stdDev_Gauss_point)) then
-                write(fileId,*) "--stdDev_Gauss_point-----------------------"
-                write(fileId,fmt = "(F30.15)") stdDev_Gauss_point
-            end if
-            if(present(avg_Trans_point)) then
-                write(fileId,*) "--avg_Trans_point-----------------------"
-                write(fileId,fmt = "(F30.15)") avg_Trans_point
-            end if
-            if(present(stdDev_Trans_point)) then
-                write(fileId,*) "--stdDev_Trans_point-----------------------"
-                write(fileId,fmt = "(F30.15)") stdDev_Trans_point
-            end if
+!            if(present(avg_Gauss)) then
+!                write(fileId,*) "--avg_Gauss-----------------------"
+!                write(fileId,fmt = "(F30.15)") avg_Gauss
+!            end if
+!            if(present(stdDev_Gauss)) then
+!                write(fileId,*) "--stdDev_Gauss-----------------------"
+!                write(fileId,fmt = "(F30.15)") stdDev_Gauss
+!            end if
+!            if(present(avg_Trans)) then
+!                write(fileId,*) "--avg_Trans-----------------------"
+!                write(fileId,fmt = "(F30.15)") avg_Trans
+!            end if
+!            if(present(stdDev_Trans)) then
+!                write(fileId,*) "--stdDev_Trans-----------------------"
+!                write(fileId,fmt = "(F30.15)") stdDev_Trans
+!            end if
+!
+!            if(present(avg_Gauss_evnt)) then
+!                write(fileId,*) "--avg_Gauss_evnt-----------------------"
+!                write(fileId,fmt = "(F30.15)") avg_Gauss_evnt
+!            end if
+!            if(present(stdDev_Gauss_evnt)) then
+!                write(fileId,*) "--stdDev_Gauss_evnt-----------------------"
+!                write(fileId,fmt = "(F30.15)") stdDev_Gauss_evnt
+!            end if
+!            if(present(avg_Trans_evnt)) then
+!                write(fileId,*) "--avg_Trans_evnt-----------------------"
+!                write(fileId,fmt = "(F30.15)") avg_Trans_evnt
+!            end if
+!            if(present(stdDev_Trans_evnt)) then
+!                write(fileId,*) "--stdDev_Trans_evnt-----------------------"
+!                write(fileId,fmt = "(F30.15)") stdDev_Trans_evnt
+!            end if
+!
+!            if(present(avg_Gauss_point)) then
+!                write(fileId,*) "--avg_Gauss_point-----------------------"
+!                write(fileId,fmt = "(F30.15)") avg_Gauss_point
+!            end if
+!            if(present(stdDev_Gauss_point)) then
+!                write(fileId,*) "--stdDev_Gauss_point-----------------------"
+!                write(fileId,fmt = "(F30.15)") stdDev_Gauss_point
+!            end if
+!            if(present(avg_Trans_point)) then
+!                write(fileId,*) "--avg_Trans_point-----------------------"
+!                write(fileId,fmt = "(F30.15)") avg_Trans_point
+!            end if
+!            if(present(stdDev_Trans_point)) then
+!                write(fileId,*) "--stdDev_Trans_point-----------------------"
+!                write(fileId,fmt = "(F30.15)") stdDev_Trans_point
+!            end if
 
             close(fileId)
 

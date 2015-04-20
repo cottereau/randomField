@@ -3,6 +3,7 @@ module spectra_RF
     use math_RF
     use write_Log_File
     use constants_RF
+    use type_RF
 
     implicit none
 contains
@@ -11,40 +12,126 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_kMaxND(corrMod, kMax, corrL);
+    subroutine set_kMaxND(corrMod, kMax);
         implicit none
         !INPUT
         character (len=*),                intent(in) :: corrMod;
-        double precision,   dimension(:),  intent(in), optional :: corrL;
+        !double precision,   dimension(:),  intent(in), optional :: corrL;
 
         !OUTPUT
         double precision, dimension(:),   intent(out) :: kMax;
 
         !LOCAL VARIABLES
         double precision :: pi = 3.1415926535898
-        integer          :: i
-        double precision, dimension(:), allocatable:: corrL_effec
+        integer          :: i, nDim
 
-        allocate(corrL_effec (size(kMax)))
-
-        if (present(corrL)) corrL_effec = corrL
-        if (.not. present(corrL)) corrL_effec = 1
-        !        do i = 1, 100
-        !            kMax = i/10.0 * corrL(:)
-        !            write(*,*) "kMax = ", kMax
-        !            write(*,*) "Spectrum = ", get_SpectrumND(kMax, corrMod, corrL)
-        !            call DispCarvalhol (kMax, "kMax")
-        !            call DispCarvalhol (get_SpectrumND(kMax, corrMod, corrL), "Spectrum")
-        !        end do
+        nDim = size(kMax)
 
         select case(trim(adjustL(corrMod)))
-        case("gaussian")
-            kMax(:) = 2*pi*corrL_effec(:); !CRITERIA STILL TO BE TESTED
+            case("gaussian")
+                select case(nDim)
+                    case(1)
+                        kMax(:) = 6.457D0; !Value to cover 99% Spectra area
+                    case(2)
+                        kMax(:) = 7.035D0; !Value to cover 99% Spectra area
+                    case(3)
+                        kMax(:) = 7.355D0; !Value to cover 99% Spectra area
+                end select
         end select
 
-        deallocate(corrL_effec)
+        write(get_fileId(),*) "kMax = ", kMax
+
 
     end subroutine set_kMaxND
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine set_kPoints(RDF, kDelta);
+        implicit none
+
+        !INPUT OUTPUT
+        type(RF) :: RDF
+        double precision, dimension(:,:), allocatable, intent(out) :: kDelta
+
+        !LOCAL
+        integer         , dimension(:)  , allocatable :: kNStep
+        integer :: i
+        double precision :: kAdjust    = 1.0D0 !"kNStep minimum" multiplier
+        double precision :: periodMult = 1.1D0 !"range" multiplier
+        double precision :: rAdjust    = 1.0D0 !"rNStep minimum" multiplier
+
+        select case (RDF%method)
+            case(ISOTROPIC)
+
+            case(SHINOZUKA)
+                allocate(kNStep (RDF%nDim))
+                allocate(kDelta (RDF%nDim,1))
+
+                call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
+                kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
+                kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/kDelta(:,1))); !Number of points in k
+                kDelta(:,1) = (RDF%kMax)/(kNStep-1); !Redefining kDelta after ceiling and adjust
+                RDF%kNTotal = product(kNStep);
+
+                write(get_fileId(),*) "kNStep = ", kNStep
+                write(get_fileId(),*) "RDF%kNTotal = ", RDF%kNTotal
+
+                allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
+
+                do i = 1, RDF%kNTotal
+                    call get_Permutation(i, RDF%kMax, kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
+                end do
+
+            case(RANDOMIZATION)
+                allocate(kNStep (RDF%nDim))
+                allocate(kDelta (RDF%nDim,1))
+
+                call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
+                kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
+                kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/kDelta(:,1))); !Number of points in k
+                kDelta(:,1) = (RDF%kMax)/(kNStep-1); !Redefining kDelta after ceiling and adjust
+                RDF%kNTotal = product(kNStep);
+
+                allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
+                call random_number(RDF%kPoints(:,:))
+                do i = 1, RDF%nDim
+                    RDF%kPoints(i,:) = RDF%kPoints(i,:) * RDF%kMax(i)
+                end do
+
+!                deallocate(kDelta)
+!                allocate(kDelta(RDF%nDim, RDF%kNTotal))
+!
+!                call set_DeltaMatrix(RDF%kPoints(:,:), kDelta(:,:))
+!                call dispCarvalhol(transpose(RDF%kPoints), "transpose(RDF%kPoints)")
+!                call dispCarvalhol(transpose(kDelta), "transpose(kDelta)")
+
+        end select
+
+        if(allocated(kNStep)) deallocate(kNStep)
+
+    end subroutine set_kPoints
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine set_SkVec(RDF);
+        implicit none
+
+        !OBS: corrL is supposed = 1. The complete formula is RDF%SkVec = product(corrL) * exp(-dot_product(kVector**2, corrL_effec**2)/(4.0d0*pi))
+        !INPUT OUTPUT
+        type(RF) :: RDF
+
+        allocate(RDF%SkVec(RDF%kNTotal))
+
+        select case(RDF%corrMod)
+            case("gaussian")
+                RDF%SkVec = exp(-sum(RDF%kPoints**(2.0D0), 1)/(4.0d0*pi))
+        end select
+
+    end subroutine set_SkVec
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

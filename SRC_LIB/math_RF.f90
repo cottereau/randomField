@@ -18,6 +18,129 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    subroutine get_Permutation(pos, qmax, nStep, pVec, qmin, snapExtremes)
+
+        implicit none
+
+        !INPUT
+        integer                        , intent(in)           :: pos;
+        double precision, dimension(1:), intent(in)           :: qmax;
+        double precision, dimension(1:), intent(in), optional :: qmin;
+        integer,          dimension(1:), intent(in)           :: nStep;
+        logical, optional, intent(in) :: snapExtremes
+        !OUTPUT
+        double precision, dimension(1:), intent(out) :: pVec;
+        !LOCAL VARIABLES
+        integer :: i, j;
+        integer :: seedStep, nDim;
+        double precision :: contrib
+
+        nDim = size(nStep);
+        contrib = 0.0d0
+
+        if (present(snapExtremes)) then
+            if(snapExtremes) then
+                contrib = 1.0d0
+            end if
+        end if
+
+        if (present(qmin)) then
+            do j = 1, nDim
+                seedStep = product(nStep(j+1:));
+                if (j == nDim) seedStep = 1;
+                i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
+                pVec(j) = (dble(i)-0.5d0-contrib/2.0d0)         &
+                          *(qmax(j)-qmin(j))/(nStep(j)-contrib) &
+                          + qmin(j);
+            end do
+        else
+            do j = 1, nDim
+                seedStep = product(nStep(j+1:));
+                if (j == nDim) seedStep = 1;
+                i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
+                pVec(j) = (dble(i)-0.5d0-contrib/2.0d0) &
+                          *(qmax(j))/(nStep(j)-contrib); !qmin = 0
+            end do
+        end if
+
+    end subroutine get_Permutation
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine DGEMM_simple(A, B, C, transA_in, transB_in, alpha_in, beta_in)
+        !INPUT
+        double precision, dimension(:,:), intent(in) :: A, B
+        character, optional :: transA_in, transB_in
+        double precision, optional, intent(in) :: alpha_in, beta_in
+        !INPUT OUTPUT
+        double precision, dimension(:,:), intent(inout) :: C
+        !LOCAL
+        character        :: transA, transB
+        double precision :: alpha, beta
+        integer :: M, N, K, LDA, LDB, LDC
+        integer :: Kb
+
+        transA = "N"
+        transB = "N"
+        alpha  = 1.0D0
+        beta   = 1.0D0
+        M   = size(A,1)
+        N   = size(B,2)
+        K   = size(A,2)
+        Kb  = size(B,1)
+        Mc  = size(C,1)
+        Nc  = size(C,2)
+        LDA = size(A,1)
+        LDB = size(B,1)
+        LDC = size(C,1)
+
+        if(present(transA_in)) transA = transA_in
+        if(present(transB_in)) transB = transB_in
+        if(present(alpha_in))  alpha = alpha_in
+        if(present(beta_in))   beta = beta_in
+
+        if(transA == "T" .or. transA == "C") then
+            M = size(A,2)
+            K = size(A,1)
+        end if
+
+        if(transB == "T" .or. transB == "C") then
+            N  = size(B,1)
+            Kb = size(B,2)
+        end if
+
+
+
+        if(K /= Kb .or. M /= Mc .or. N /= Nc) then
+            write(*,*) "ERROR! Inside DGEMM_simple  dimensions are not compatible"
+            write(*,*) "shape(A) = ", shape(A)
+            write(*,*) "shape(B) = ", shape(B)
+            write(*,*) "shape(C) = ", shape(C)
+            write(*,*) "transA   = ", transA
+            write(*,*) "transB   = ", transB
+            write(*,*) "K  = ", K
+            write(*,*) "Kb = ", Kb
+            write(*,*) "M  = ", M
+            write(*,*) "Mc = ", Mc
+            write(*,*) "N  = ", N
+            write(*,*) "Nc = ", Nc
+            stop
+        else
+            call DGEMM ( transA, transB, M, N, K, &
+                         alpha, &
+                         A, LDA, &
+                         B, LDB, &
+                         beta, C, LDC)
+        end if
+
+    end subroutine DGEMM_simple
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     function isPowerOf(num, power) result(isPower)
 
         implicit none
@@ -63,6 +186,57 @@ contains
         if(resPos == 0) resPos = base;
 
     end function cyclicMod
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    function areEqual(nmb1, nmb2, tol) result(ans)
+
+        implicit none
+        !INPUT
+        double precision, intent(in) :: nmb1, nmb2
+        double precision, intent(in), optional :: tol
+        !OUTPUT
+        logical :: ans
+        double precision :: effecTol
+
+        effecTol = TOLERANCE
+        if(present(tol)) effecTol = abs(tol)
+
+        ans = .false.
+        if(abs(nmb1-nmb2) < effecTol) ans = .true.
+
+    end function areEqual
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    function intDivisor(nmb, divisor, up) result(intDiv)
+
+        implicit none
+        !INPUT
+        double precision, intent(in) :: nmb, divisor
+        logical, intent(in) :: up
+        !OUTPUT
+        double precision :: intDiv
+        !LOCAL
+        double precision :: div
+
+        div = nmb/divisor
+
+        if(areEqual(div, dble(nint(div)))) then
+            intDiv = dble(nint(div))
+        else
+            if(up) then
+                intDiv = dble(ceiling(div))
+            else
+                intDiv = dble(floor(div))
+            end if
+        end if
+
+    end function intDivisor
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -236,8 +410,8 @@ contains
         nPoints     = size(xPoints, 2)
         deltaMatrix = 0;
 
-        allocate(minMask    (nPoints))
-        allocate(uniqMask   (nDim, nPoints))
+        allocate(minMask  (nPoints))
+        allocate(uniqMask (nDim, nPoints))
 
         !call DispCarvalhol(transpose(xPoints),"transpose(xPoints)", nColumns = 15)
 
