@@ -502,7 +502,7 @@ contains
         call MPI_REDUCE (RDF%xNTotal,sum_xNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
         call MPI_REDUCE (RDF%kNTotal,sum_kNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
 
-        write(*,*) "RDF%rang = ", RDF%rang, "", "RDF%xNTotal = ", RDF%xNTotal, "RDF%kNTotal = ", RDF%kNTotal
+        !write(*,*) "RDF%rang = ", RDF%rang, "", "RDF%xNTotal = ", RDF%xNTotal, "RDF%kNTotal = ", RDF%kNTotal
 
         if(RDF%rang == 0) then
             fileId = 15

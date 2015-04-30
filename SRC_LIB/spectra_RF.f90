@@ -62,15 +62,20 @@ contains
         double precision :: periodMult = 1.1D0 !"range" multiplier
         double precision :: rAdjust    = 1.0D0 !"rNStep minimum" multiplier
 
+        call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
+
+        allocate(kDelta (RDF%nDim,1))
+        if(RDF%independent) then
+            kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxBound - RDF%xMinBound)) !Delta max in between two wave numbers to avoid periodicity
+        else
+            kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
+        end if
+
         select case (RDF%method)
             case(ISOTROPIC)
 
             case(SHINOZUKA)
                 allocate(kNStep (RDF%nDim))
-                allocate(kDelta (RDF%nDim,1))
-
-                call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
-                kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
                 kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/kDelta(:,1))); !Number of points in k
                 kDelta(:,1) = (RDF%kMax)/(kNStep-1); !Redefining kDelta after ceiling and adjust
                 RDF%kNTotal = product(kNStep);
@@ -86,10 +91,6 @@ contains
 
             case(RANDOMIZATION)
                 allocate(kNStep (RDF%nDim))
-                allocate(kDelta (RDF%nDim,1))
-
-                call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
-                kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
                 kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/kDelta(:,1))); !Number of points in k
                 kDelta(:,1) = (RDF%kMax)/(kNStep-1); !Redefining kDelta after ceiling and adjust
                 RDF%kNTotal = product(kNStep);

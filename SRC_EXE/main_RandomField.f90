@@ -20,6 +20,7 @@ program main_RandomField
     implicit none
 
     !INPUTS
+    logical :: independent = .true.
     integer                                        :: nDim, Nmc;
     character (len=30), parameter                  :: mesh_input = "mesh_input"
     character (len=30), parameter                  :: gen_input  = "gen_input"
@@ -44,6 +45,7 @@ program main_RandomField
     character(len=110), dimension(:)  , allocatable :: HDF5Name
     character(len=30) , dimension(:,:), allocatable :: dataTable;
     integer, dimension(:), allocatable :: seed
+    logical, dimension(:), allocatable :: periods
 
     character(len=200) :: single_path
     double precision :: t1, t2, t3, t4, t5, t6;
@@ -58,6 +60,9 @@ program main_RandomField
     type(RF)   :: RDF
     type(MESH) :: MSH
     type(TEST) :: TST
+
+    RDF%independent = independent
+    MSH%independent = independent
 
 !    !TODO
 !    double precision  , dimension(:,:) , allocatable :: MatA
@@ -211,13 +216,13 @@ program main_RandomField
 	call deallocate_all()
 
 
-	if(rang == 0) then
-	    write(*,*) ""
-		write(*,*) "---------------------------------------------------------------------";
-	    write(*,*) "-----------------END RANDOM FIELD LIBRARY TEST-----------------------";
-		write(*,*) "---------------------------------------------------------------------";
-        write(*,*) ""
-	end if
+!	if(rang == 0) then
+!	    write(*,*) ""
+!		write(*,*) "---------------------------------------------------------------------";
+!	    write(*,*) "-----------------END RANDOM FIELD LIBRARY TEST-----------------------";
+!		write(*,*) "---------------------------------------------------------------------";
+!        write(*,*) ""
+!	end if
 
     !Finalizing MPI
 	call end_communication()
@@ -374,7 +379,6 @@ program main_RandomField
                         call read_DataTable(dataTable, "Max", MSH%xMaxGlob)
                         call read_DataTable(dataTable, "Min", MSH%xMinGlob)
                         call read_DataTable(dataTable, "Step", MSH%xStep)
-                        call set_Local_Extremes_Mesh (MSH%xMin, MSH%xMax, MSH%xMinGlob, MSH%xMaxGlob, MSH%rang, MSH%nb_procs)
                 end select
             else
                 write(*,*) "meshType not accepted: ", MSH%meshType
@@ -503,10 +507,78 @@ program main_RandomField
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
+        subroutine define_topography()
+
+            allocate(periods(MSH%nDim))
+            periods(:) = .false.
+
+            !write(*,*) "set_procPerDim"
+            call set_procPerDim (MSH)
+            !write(*,*) "MPI_CART_CREATE"
+            call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
+            !write(*,*) "MPI_CART_COORDS"
+            call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
+
+
+            if(independent) then
+                call redefine_Global_Inputs (MSH, RDF)
+                !write(*,*) "Independent"
+                call set_Local_Extremes_From_Coords (MSH)
+                !write(*,*) "set_neighbours"
+                call set_neighbours (MSH)
+                !write(*,*) "redefine_extremes"
+                !if(MSH%rang == 1) call show_MESH(MSH)
+                call redefine_extremes (MSH)
+
+!                if(MSH%rang == (MSH%nb_procs-1)/2) then
+!                    call show_MESH(MSH)
+!                end if
+
+            else
+                call set_Local_Extremes_Mesh (MSH%xMin, MSH%xMax, MSH%xMinGlob, MSH%xMaxGlob, MSH%rang, MSH%nb_procs)
+            end if
+
+            deallocate(periods)
+
+        end subroutine define_topography
+
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
         subroutine single_realization()
 
+            implicit none
+            double precision, dimension(:), allocatable :: seedStartVec
+
+            !write(*,*) "Defining Topography"
+            call define_topography()
+            !write(*,*) "Initializing Random Seed"
             call calculate_random_seed(RDF%seed, RDF%seedStart)
-            call set_XPoints(MSH, RDF, RDF%xPoints_Local)
+            call init_random_seed(RDF%seed)
+
+            !write(*,*) "RDF%seed BEFORE= ", RDF%seed
+
+            if(MSH%independent) then
+                !Define independent seed in each proc
+                allocate(seedStartVec(RDF%nb_procs))
+                call random_number(seedStartVec(:))
+                !if(RDF%rang == 0) call dispCarvalhol(seedStartVec, "seedStartVec")
+                !if(RDF%rang == 0) call dispCarvalhol(nint(100*RDF%nb_procs*seedStartVec), "nint(RDF%nb_procs*seedStartVec)")
+                RDF%seedStart = nint(10000*seedStartVec(RDF%rang+1))
+                deallocate(seedStartVec)
+                call calculate_random_seed(RDF%seed, RDF%seedStart)
+                call init_random_seed(RDF%seed)
+
+                !write(*,*) "RDF%seed AFTER= ", RDF%seed
+
+                !Building xPoints
+                call set_XPoints_independent(MSH, RDF, RDF%xPoints_Local)
+            else
+                !Building xPoints
+                call set_XPoints(MSH, RDF, RDF%xPoints_Local)
+            end if
+
             call allocate_randField(RDF, RDF%randField_Local)
 
             single_path = string_vec_join([results_path,"/",results_folder_name])
@@ -522,33 +594,24 @@ program main_RandomField
             call MPI_ALLREDUCE (t1, all_t1, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
             if(RDF%rang == 0) write(*,*) "Time Zero = ", all_t1
 
-
+!
 !            write(*,*) "START TEST"
 !            call create_RF_Unstruct_noInit (RDF%xPoints_Local, RDF%corrL, RDF%corrMod, RDF%Nmc,   &
 !                                            RDF%randField, RDF%method, RDF%seedStart,   &
 !                                            RDF%margiFirst, RDF%fieldAvg, RDF%fieldVar, &
-!                                            RDF%comm, RDF%rang, RDF%nb_procs)
+!                                            RDF%comm, RDF%rang, RDF%nb_procs, MSH)
 !            write(*,*) "END TEST"
-
-            call create_RF_Unstruct_Init (RDF)
+!
+            call create_RF_Unstruct_Init (RDF, MSH)
 
             t2 = MPI_Wtime();
             call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
             if(RDF%rang == 0) write(*,*) "Generation Time = ", all_t2 - all_t1
 
-!            allocate(avg_Gauss(nIter), stdDev_Gauss(nIter))
-!            allocate(avg_Trans(nIter), stdDev_Trans(nIter))
-!            allocate(avg_Gauss_evnt(nIter, Nmc), stdDev_Gauss_evnt(nIter, Nmc))
-!            allocate(avg_Trans_evnt(nIter, Nmc), stdDev_Trans_evnt(nIter, Nmc))
-!            allocate(avg_Gauss_point(all_xNTotal, nIter), stdDev_Gauss_point(all_xNTotal, nIter))
-!            allocate(avg_Trans_point(all_xNTotal, nIter), stdDev_Trans_point(all_xNTotal, nIter))
-
-    !        write(get_fileId(),*) "shape(avg_Gauss_point) = ", shape(avg_Gauss_point)
-    !        write(get_fileId(),*) "shape(stdDev_Gauss_point) = ", shape(stdDev_Gauss_point)
-
-            i = 1 !Iteration number
-
-            !---------------------------------------------------------------------------------
+!
+!            i = 1 !Iteration number
+!
+!            !---------------------------------------------------------------------------------
 !            write(get_fileId(),*) "-> Creating Standard Gaussian Random field";
 !
 !            t1 = MPI_Wtime();
@@ -563,7 +626,7 @@ program main_RandomField
 !            if(RDF%rang == 0) write(*,*) "Generation Time = ", all_t2 - all_t1
 !
 !
-!            write(get_fileId(),*) "-> Writing XMF and hdf5 files";
+            write(get_fileId(),*) "-> Writing XMF and hdf5 files";
             call write_Mono_XMF_h5(RDF%xPoints, RDF%randField, "gauss_", RDF%rang, single_path, &
                                                 MPI_COMM_WORLD, ["proc_"], [RDF%rang], 0)
 

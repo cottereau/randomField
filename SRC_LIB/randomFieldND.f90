@@ -8,6 +8,7 @@ module randomFieldND
     use mpi
     use write_Log_File
     use type_RF
+    use type_MESH
 
     implicit none
     !use blas
@@ -27,7 +28,7 @@ contains
     subroutine create_RF_Unstruct_noInit (xPoints, corrL, corrMod, Nmc,   &
                                           randField, method, seedStart,   &
                                           margiFirst, fieldAvg, fieldVar, &
-                                          comm, rang, nb_procs, calculate)
+                                          comm, rang, nb_procs, calculate, MSH)
         !INPUT
         double precision, dimension(1:, 1:), intent(in), target :: xPoints;
         double precision, dimension(1:)    , intent(in) :: corrL;
@@ -40,6 +41,7 @@ contains
         double precision                   , intent(in) :: fieldVar;
         integer                            , intent(in) :: comm, rang, nb_procs
         logical, dimension(1:), optional   , intent(in) :: calculate
+        type(MESH), intent(in) :: MSH
 
         !OUTPUT
         double precision, dimension(:, :), intent(out), target :: randField;
@@ -64,7 +66,7 @@ contains
         RDF%fieldVar   = fieldVar
         if(present(calculate)) RDF%calculate  = calculate
 
-        call create_RF_Unstruct_Init(RDF)
+        call create_RF_Unstruct_Init(RDF, MSH)
 
     end subroutine create_RF_Unstruct_noInit
 
@@ -72,23 +74,34 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine create_RF_Unstruct_Init (RDF)
+    subroutine create_RF_Unstruct_Init (RDF, MSH)
         !INPUT OUTPUT
         type(RF), intent(inout) :: RDF
+        type(MESH), intent(in) :: MSH
         !LOCAL
         logical, dimension(:), allocatable :: effectCalc;
 
-        write(*,*) "Inside create_RF_Unstruct_Init"
+        if(RDF%rang == 0) write(*,*) "Inside create_RF_Unstruct_Init"
 
         !Discovering Global Extremes
-        call get_Global_Extremes_Mesh(RDF%xPoints, RDF%xMinGlob, RDF%xMaxGlob)
+        RDF%xMinGlob = MSH%xMinGlob
+        RDF%xMaxGlob = MSH%xMaxGlob
+        RDF%xMinBound = MSH%xMinBound
+        RDF%xMaxBound = MSH%xMaxBound
+
+        !call get_Global_Extremes_Mesh(RDF%xPoints, RDF%xMinGlob, RDF%xMaxGlob)
 
         !Defining random seed
-        call calculate_random_seed(RDF%seed, RDF%seedStart)
-        call init_random_seed(RDF%seed)
+        !call calculate_random_seed(RDF%seed, RDF%seedStart)
+        !call init_random_seed(RDF%seed)
 
         !Generating standard Gaussian Field
-        call gen_Std_Gauss(RDF)
+        call gen_Std_Gauss(RDF, MSH)
+
+        if(MSH%rang == 0) then
+            !call show_MESH(MSH)
+            !call show_RF(RDF)
+        end if
 
     end subroutine create_RF_Unstruct_Init
 
@@ -96,22 +109,25 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine gen_Std_Gauss (RDF)
+    subroutine gen_Std_Gauss (RDF, MSH)
         implicit none
 
         !INPUT OUTPUT
         type(RF), intent(inout) :: RDF
+        type(MESH), intent(in) :: MSH
 
         !LOCAL VARIABLES
         integer :: i;
 
-        write(*,*) "Inside gen_Std_Gauss"
+        if(RDF%rang == 0) write(*,*) "Inside gen_Std_Gauss"
 
         !Normalization
         do i = 1, RDF%nDim
             RDF%xPoints(i,:) = RDF%xPoints(i,:)/RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
             RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)/RDF%corrL(i)
+            RDF%xMinBound(i) = RDF%xMinBound(i)/RDF%corrL(i)
+            RDF%xMaxBound(i) = RDF%xMaxBound(i)/RDF%corrL(i)
         end do
 
         !call show_RF(RDF, "After Normalization")
@@ -126,11 +142,18 @@ contains
                 call gen_Std_Gauss_Randomization(RDF)
         end select
 
+        !Communicating borders to neighbours
+        if(RDF%independent) then
+            call extremes_to_neighbours(RDF, MSH)
+        end if
+
         !Reverting Normalization
         do i = 1, RDF%nDim
             RDF%xPoints(i,:) = RDF%xPoints(i,:)*RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)*RDF%corrL(i)
             RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)*RDF%corrL(i)
+            RDF%xMinBound(i) = RDF%xMinBound(i)*RDF%corrL(i)
+            RDF%xMaxBound(i) = RDF%xMaxBound(i)*RDF%corrL(i)
         end do
 
         !call show_RF(RDF, "After Revert Normalization")
@@ -199,22 +222,22 @@ contains
         integer :: n
         logical :: randomK
 
-        write(*,*) "Inside Shinozuka"
+        if(RDF%rang == 0) write(*,*) "Inside Shinozuka"
 
         randomK = .false.
         if(present(randomK_in)) randomK = randomK_in
 
-        write(*,*) "Defining kPoints"
+        !write(*,*) "Defining kPoints"
         call set_kPoints(RDF, kDelta)
         call set_SkVec(RDF)
 
-        write(*,*) "Calculating Samples"
+        !write(*,*) "Calculating Samples"
         allocate(phiK (RDF%kNTotal));
         allocate(k_dot_x_plus_phi(RDF%xNTotal, RDF%kNTotal))
 
         !Generating random field samples
         if(.not. randomK) then
-            write(*,*) "Shinozuka, k discrete"
+            if(RDF%rang == 0) write(*,*) "Shinozuka, k discrete"
             RDF%randField(:,:) = 0.0d0;
             ampMult = 2.0d0*sqrt(product(kDelta)/((2.0d0*PI)**(dble(RDF%nDim))))
 
@@ -227,27 +250,27 @@ contains
                 call DGEMM_simple(cos(k_dot_x_plus_phi), reshape(source = ampMult * sqrt(RDF%SkVec), shape = [size(RDF%SkVec),1]) , RDF%randField(:,n:n), "N", "N")
             end do
 
-            call show_RF(RDF, "Shinozuka Discrete After Generation")
+            !call show_RF(RDF, "Shinozuka Discrete After Generation")
             !call dispCarvalhol(RDF%randField, "RDF%randField")
         else
-            write(*,*) "Shinozuka, k random"
-            call show_RF(RDF, "Shinozuka Random Before Generation")
+            if(RDF%rang == 0) write(*,*) "Shinozuka, k random"
+            !call show_RF(RDF, "Shinozuka Random Before Generation")
             RDF%randField(:,:) = 0.0d0;
             ampMult = 2.0d0*sqrt(1/(RDF%kNTotal*(2.0d0*PI)**(dble(RDF%nDim))))
 
             do n = 1, RDF%Nmc
                 if(.not. RDF%calculate(n)) cycle
-                write(*,*) "Before filling phiK"
+                !write(*,*) "Before filling phiK"
                 call random_number(phiK(:))
-                write(*,*) "Before PhiK Replication"
+                !write(*,*) "Before PhiK Replication"
                 k_dot_x_plus_phi(:,:) = transpose(spread( source=2.0D0*pi*phiK , dim =2 , ncopies = RDF%xNTotal)) !2pi*phiK replicated xNTotal times
-                write(*,*) "Before First DGEMM"
+                !write(*,*) "Before First DGEMM"
                 call DGEMM_simple(RDF%xPoints, RDF%kPoints, k_dot_x_plus_phi, "T", "N") !x*k + 2pi*phiK
-                write(*,*) "Before Second DGEMM"
+                !write(*,*) "Before Second DGEMM"
                 call DGEMM_simple(cos(k_dot_x_plus_phi), reshape(source = ampMult * sqrt(RDF%SkVec), shape = [size(RDF%SkVec),1]) , RDF%randField(:,n:n), "N", "N")
             end do
 
-            call show_RF(RDF, "Shinozuka Random After Generation")
+            !call show_RF(RDF, "Shinozuka Random After Generation")
         end if
 
         if(allocated(dgemm_mult))       deallocate(dgemm_mult)
@@ -271,7 +294,7 @@ contains
         !LOCAL
         logical :: randomK;
 
-        write(*,*) "Inside Randomization"
+        if(RDF%rang == 0) write(*,*) "Inside Randomization"
 
         randomK = .true.
 
@@ -411,6 +434,615 @@ contains
         if(allocated(rVec))         deallocate(rVec);
 
     end subroutine gen_Std_Gauss_Isotropic
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine extremes_to_neighbours (RDF, MSH)
+        implicit none
+
+        !INPUT OUTPUT
+        type(RF), intent(inout) :: RDF
+
+        !INPUT
+        type(MESH), intent(in) :: MSH
+
+        !LOCAL
+        integer :: i, direction, neighPos
+        integer :: code;
+        integer :: minPos, maxPos,totalSize
+        integer :: testrank = 1, testrank2 = 3
+        double precision, dimension(:,:), allocatable :: tempRandField
+        !integer, dimension(:), allocatable :: request
+        integer, dimension(:)  , allocatable :: request
+        integer, dimension(:,:), allocatable :: status
+        integer :: requestSize, countReq
+        integer :: tag
+        logical :: sndRcv
+
+        !VAR TEST
+        integer, dimension(3) :: testVector, testVector3
+        integer, dimension(4) :: testReq
+        integer, dimension(:), allocatable :: testVector2
+        integer, dimension(:,:), allocatable :: statuts
+        integer :: testTag, testRcv, dir
+        integer, dimension(:), allocatable :: statut
+        !END VAR TEST
+
+!        !TEST IDRIS
+!        allocate(statut(MPI_STATUS_SIZE ))
+!        allocate(testVector2(8))
+!        allocate(statuts(MPI_STATUS_SIZE, 4))
+!        testTag = 3
+!
+!        if(RDF%rang == testrank) then
+!            testVector = [(i,i=1,size(testVector))]
+!            testVector2 = 2
+!            testVector3 = 3
+!            countReq = 4
+!
+!            !do i = 1, size(MSH%neigh)
+!            !    testTag = findTag(MSH, i, send = .true.)
+!            !    write(*,*) "Tag in sender dir ", i," = ",  testTag
+!            !end do
+!
+!            dir = 1
+!            testTag = findTag(MSH, dir, send = .true.)
+!            write(*,*) "I am 4 i send tag : ", testTag, " to ", MSH%neigh(dir)
+!            call MPI_ISEND (testVector, size(testVector), MPI_INTEGER, &
+!                            MSH%neigh(dir), testTag, RDF%comm, testReq(1), code)
+!            write(*,*) "SEND code = ", code
+!            write(*,*) "SEND wait ", testTag
+!
+!            dir = 2
+!            testTag = findTag(MSH, dir, send = .true.)
+!            write(*,*) "I am 4 i send tag : ", testTag, " to ", MSH%neigh(dir)
+!            call MPI_ISEND (testVector, size(testVector), MPI_INTEGER, &
+!                            MSH%neigh(dir), testTag, RDF%comm, testReq(2), code)
+!            write(*,*) "SEND code = ", code
+!            write(*,*) "SEND wait ", testTag
+!
+!            dir = 3
+!            testTag = findTag(MSH, dir, send = .true.)
+!            write(*,*) "I am 4 i send tag : ", testTag, " to ", MSH%neigh(dir)
+!            call MPI_ISEND (testVector, size(testVector), MPI_INTEGER, &
+!                            MSH%neigh(dir), testTag, RDF%comm, testReq(3), code)
+!            write(*,*) "SEND code = ", code
+!            write(*,*) "SEND wait ", testTag
+!
+!            dir = 4
+!            testTag = findTag(MSH, dir, send = .true.)
+!            write(*,*) "I am 4 i send tag : ", testTag, " to ", MSH%neigh(dir)
+!            call MPI_ISEND (testVector, size(testVector), MPI_INTEGER, &
+!                            MSH%neigh(dir), testTag, RDF%comm, testReq(4), code)
+!            write(*,*) "SEND code = ", code
+!            write(*,*) "SEND wait ", testTag
+!
+!            call MPI_WAITALL (countReq, testReq(1:countReq), statuts(:,1:countReq), code)
+!
+!            testTag = findTag(MSH, 1, send = .true.)
+!            call MPI_ISEND (testVector2, size(testVector2), MPI_INTEGER, &
+!                            testrank + 1, testTag+1, RDF%comm, testReq(2), code)
+!            write(*,*) "SEND code = ", code
+!            write(*,*) "SEND wait ", testTag
+!
+!            testTag = tag = findTag(MSH, 2, send = .true.)
+!            call MPI_ISEND (testVector2, size(testVector2), MPI_INTEGER, &
+!                            testrank + 2, testTag, RDF%comm, testReq(3), code)
+!            write(*,*) "SEND code = ", code
+!            write(*,*) "SEND wait ", testTag
+!
+!            testTag = tag = findTag(MSH, 2, send = .true.)
+!            call MPI_ISEND (testVector3, size(testVector3), MPI_INTEGER, &
+!                            testrank + 2, testTag+1, RDF%comm, testReq(4), code)
+!            write(*,*) "SEND code = ", code
+!            write(*,*) "SEND wait ", testTag
+!            call MPI_WAITALL (size(testReq), testReq(:), statuts(:,:), code)
+!            !deallocate(statuts)
+!        end if
+
+!        if(RDF%rang == 1) then
+
+!            !do i = 1, size(MSH%neigh)
+!            !    testTag = findTag(MSH, i, send = .false.)
+!            !    write(*,*) "Tag in recv 1 dir ", i," = ",  testTag
+!            !end do
+!            dir = 4
+!            testTag = findTag(MSH, dir, send = .false.)
+!            countReq = 1
+!
+!            write(*,*) "I am 1 i want tag : ", testTag, " from ", MSH%neigh(dir)
+!
+!            call MPI_IRECV (testVector, size(testVector), MPI_INTEGER, &
+!                            testrank, testTag, RDF%comm, testReq(1), code)
+!            write(*,*) "RECEIVE code = ", code
+!            write(*,*) "RECEIVE wait ", testTag
+!            call MPI_WAITALL (countReq, testReq(1:countReq), statuts(:,1:countReq), code)
+!            write(*,*) "I am 1 and received : ", testVector
+!        end if
+!
+!        if(RDF%rang == 7) then
+!            !do i = 1, size(MSH%neigh)
+!            !    testTag = findTag(MSH, i, send = .false.)
+!            !    write(*,*) "Tag in recv 7 dir ", i," = ",  testTag
+!            !end do
+!            dir = 3
+!            testTag = findTag(MSH, dir, send = .false.)
+!            countReq = 1
+!
+!            write(*,*) "I am 7 i want tag : ", testTag, " from ", MSH%neigh(dir)
+!
+!            call MPI_IRECV (testVector, size(testVector), MPI_INTEGER, &
+!                            testrank, testTag, RDF%comm, testReq(1), code)
+!            write(*,*) "RECEIVE code = ", code
+!            write(*,*) "RECEIVE wait ", testTag
+!            call MPI_WAITALL (countReq, testReq(1:countReq), statuts(:,1:countReq), code)
+!            write(*,*) "I am 7 and received : ", testVector
+!        end if
+!
+!        if(RDF%rang == 3) then
+!            dir = 2
+!            testTag = findTag(MSH, dir, send = .false.)
+!            countReq = 1
+!
+!            write(*,*) "I am 3 i want tag : ", testTag, " from ", MSH%neigh(dir)
+!
+!            call MPI_IRECV (testVector, size(testVector), MPI_INTEGER, &
+!                            testrank, testTag, RDF%comm, testReq(1), code)
+!            write(*,*) "RECEIVE code = ", code
+!            write(*,*) "RECEIVE wait ", testTag
+!            call MPI_WAITALL (countReq, testReq(1:countReq), statuts(:,1:countReq), code)
+!            write(*,*) "I am 7 and received : ", testVector
+!        end if
+!
+!        if(RDF%rang == 5) then
+!            dir = 1
+!            testTag = findTag(MSH, dir, send = .false.)
+!            countReq = 1
+!
+!            write(*,*) "I am 5 i want tag : ", testTag, " from ", MSH%neigh(dir)
+!
+!            call MPI_IRECV (testVector, size(testVector), MPI_INTEGER, &
+!                            testrank, testTag, RDF%comm, testReq(1), code)
+!            write(*,*) "RECEIVE code = ", code
+!            write(*,*) "RECEIVE wait ", testTag
+!            call MPI_WAITALL (countReq, testReq(1:countReq), statuts(:,1:countReq), code)
+!            write(*,*) "I am 7 and received : ", testVector
+!        end if
+!        deallocate(statut)
+!        deallocate(testVector2)
+!        deallocate(statuts)
+!        !END TEST IDRIS
+!
+!--------------------------------------------------------------------------------------
+!        if(RDF%nDim == 1) then
+!            requestSize = 2* (2*1)
+!        else if(RDF%nDim == 2) then
+!            requestSize = 2* (4*1 +  4*3)
+!        else if(RDF%nDim == 3) then
+!            requestSize = 2* (8*1 + 12*3 + 6*9)
+!        else
+!            stop("No requestSize for this dimension")
+!        end if
+!
+!
+!        countReq = 0
+!        tag = 0
+!        testVector = [(i,i=1,size(testVector))]
+!
+!        allocate(request(requestSize))
+!        allocate(status(MPI_STATUS_SIZE, size(request)))
+!
+!
+!        !Allocation
+!        minPos = minval(pack(MSH%indexNeigh(1,:), MSH%neigh(:) >= 0))
+!        maxPos = maxval(pack(MSH%indexNeigh(2,:), MSH%neigh(:) >= 0))
+!        allocate(tempRandField(minPos:maxPos, RDF%Nmc)) !Obs: first index doesn't start in "1"
+!        tempRandField = 0
+!        !if(RDF%rang == testrank) write(*,*) " size(tempRandField,1) = ", size(tempRandField,1)
+!
+!        if(MSH%rang == testrank) call dispCarvalhol(MSH%neighShift, "MSH%neighShift")
+!        if(MSH%rang == testrank) call dispCarvalhol(MSH%neigh, "MSH%neigh")
+!
+!        do neighPos = 1, size(MSH%neigh)
+!
+!            if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
+!
+!            if(MSH%rang == testrank) then
+!                write(*,*) " "
+!                write(*,*) "For proc = ", MSH%neigh(neighPos), "--------------------"
+!            end if
+!
+!            !sndRcvMask(:) = false
+!
+!            !if(RDF%rang == testrank) write(*,*) "------------------------"
+!            !if(RDF%rang == testrank) write(*,*) "neighPos = ", neighPos
+!            !if(RDF%rang == testrank) write(*,*) "MSH%neighShift(:, neighPos) = ", MSH%neighShift(:, neighPos)
+!
+!            do direction = 1, size(MSH%neigh) !Choosing which borders should be sent to this neighbour
+!
+!                if(MSH%neigh(direction) < 0) cycle !Check if this direction exists (for the borders)
+!
+!                minPos = MSH%indexNeigh(1,direction)
+!                maxPos = MSH%indexNeigh(2,direction)
+!                totalSize = (maxPos - minPos + 1)*RDF%Nmc
+!                sndRcv = .true.
+!
+!
+!                do i = 1, MSH%nDim
+!                    if(       (MSH%neighShift(i, neighPos) /= 0) &
+!                        .and. (MSH%neighShift(i, neighPos) /= MSH%neighShift(i, direction))) then
+!                        sndRcv = .false.
+!                        exit
+!                    end if
+!                end do
+!
+!                !if(RDF%rang == testrank) write(*,*) " "
+!                !if(RDF%rang == testrank) write(*,*) "sndRcv = ", sndRcv
+!                if(sndRcv) then
+!                    !if(RDF%rang == testrank) write(*,*) "direction = ", direction
+!                    !if(RDF%rang == testrank) write(*,*) "MSH%neighShift(:, direction) = ", MSH%neighShift(:, direction)
+!                end if
+!
+!                !write(*,*) "Communicating ovelaping areas"
+!
+!                if(sndRcv) then
+!                    if(MSH%rang == testrank) then
+!                        !call dispCarvalhol(MSH%neighShift, "MSH%neighShift")
+!                        !do i = 1, size(MSH%neigh)
+!                            write(*,*) " "
+!                            write(*,*) "Dir = ", direction
+!                            !write(*,*) "for proc = ", MSH%neigh(neighPos)
+!                            tag = findTag(MSH, direction, send = .true.)
+!                            write(*,*) "SEND tag = ", tag
+!                            tag = findTag(MSH, direction, send = .false.)
+!                            write(*,*) "RECEIVE tag = ", tag
+!                        !end do
+!                    end if
+!                    if(MSH%rang > 3 .and. MSH%rang < 6) then
+!                    countReq = countReq + 1
+!                    tag = findTag(MSH, direction, send = .true.)
+!                    !write(*,*) "I am ", numb2String(MSH%rang), "and I send tag : ", tag, " to ", MSH%neigh(neighPos)
+!                    write(*,*) trim(numb2String(MSH%rang))//" to "//trim(numb2String(MSH%neigh(neighPos)))//" : tag "//trim(numb2String(tag))                  !call MPI_ISEND (RDF%randField(minPos:maxPos,:), totalSize, MPI_DOUBLE_PRECISION,
+!                    request(countReq) = countReq
+!                                    !MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                    !call MPI_ISEND (testVector, size(testVector), MPI_INTEGER, &
+!                    !                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                    !if(RDF%rang == testrank) write(*,*) "SEND code = ", code
+!
+!                    countReq = countReq + 1
+!                    tag = findTag(MSH, direction, send = .false.)
+!                    write(*,*) "                    "//trim(numb2String(MSH%rang))//" FROM "//trim(numb2String(MSH%neigh(neighPos)))//" : tag "//trim(numb2String(tag))
+!                    request(countReq) = countReq
+!                    !call MPI_IRECV (tempRandField(minPos:maxPos,:), totalSize, MPI_DOUBLE_PRECISION, &
+!                    !                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                    !call MPI_IRECV (testVector, size(testVector), MPI_INTEGER, &
+!                    !                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                    !if(RDF%rang == testrank) write(*,*) "RECEIVE code = ", code
+!                    end if
+!                end if
+!
+!            end do
+!        end do
+!
+!        !if(RDF%rang == testrank) write(*,*) "request = ", request
+!
+!        !if(RDF%rang == testrank) write(*,*) "countReq = ", countReq
+!
+!        if(MSH%rang > 3 .and. MSH%rang < 6) then
+!        !if(RDF%rang == testrank)
+!        write(*,*) "Waiting All rank = ", MSH%rang
+!        call dispCarvalhol(request, "request")
+!        !call MPI_WAITALL (countReq, request(1:countReq), status(:,1:countReq), code)
+!        end if
+!
+!        deallocate(tempRandField)
+!        deallocate(request)
+!        deallocate(status)
+
+        if(RDF%nDim == 1) then
+            requestSize = 2* (2*1)
+        else if(RDF%nDim == 2) then
+            requestSize = 2* (4*1 +  4*3)
+        else if(RDF%nDim == 3) then
+            requestSize = 2* (8*1 + 12*3 + 6*9)
+        else
+            stop("No requestSize for this dimension")
+        end if
+
+
+        countReq = 0
+        tag = 0
+        testVector = [(i,i=1,size(testVector))]
+
+
+        !Allocation
+        allocate(request(requestSize))
+        allocate(status(MPI_STATUS_SIZE, size(request)))
+
+        !Allocating Temp Random Field
+        minPos = minval(pack(MSH%indexNeigh(1,:), MSH%neigh(:) >= 0))
+        maxPos = maxval(pack(MSH%indexNeigh(2,:), MSH%neigh(:) >= 0))
+        allocate(tempRandField(minPos:maxPos, RDF%Nmc)) !Obs: first index doesn't start in "1"
+        tempRandField = 0
+        !if(RDF%rang == testrank) write(*,*) " size(tempRandField,1) = ", size(tempRandField,1)
+
+!        if(MSH%rang == testrank) call dispCarvalhol(MSH%neighShift, "MSH%neighShift")
+!        if(MSH%rang == testrank) call dispCarvalhol(MSH%neigh, "MSH%neigh")
+
+        countReq = 0
+
+        !if(MSH%rang == testrank) then
+        if(.true.) then
+            !call show_MESH(MSH)
+            !write(*,*) "FROM Proc rank = ", MSH%rang
+
+            do neighPos = 1, size(MSH%neigh)
+
+                if(MSH%neigh(neighPos) < 0) then
+                    write(*,*) ""
+                    !write(*,*) "Neighbour ", neighPos, " doesn't exist"
+                    cycle !Check if this neighbour exists
+                end if
+
+                if (MSH%rang == testrank2 .or. MSH%rang == testrank) then
+                    write(*,*) ""
+                    write(*,*) "Neighbour ", neighPos, " exist and is"
+                    write(*,*) "        Proc rank = ", MSH%neigh(neighPos)
+                end if
+
+                do direction = 1, size(MSH%neigh)
+
+                    if(MSH%neigh(direction) < 0) then
+                        !write(*,*) "Direction ", direction, " doesn't exist"
+                        cycle !Check if this direction exists
+                    end if
+
+                    minPos = MSH%indexNeigh(1,direction)
+                    maxPos = MSH%indexNeigh(2,direction)
+                    totalSize = (maxPos - minPos + 1)*RDF%Nmc
+
+                    sndRcv = .true.
+
+                    do i = 1, MSH%nDim
+                        if(       (MSH%neighShift(i, neighPos) /= 0) &
+                            .and. (MSH%neighShift(i, neighPos) /= MSH%neighShift(i, direction))) then
+                            sndRcv = .false.
+                            exit
+                        end if
+                    end do
+
+                    if (sndRcv) then
+
+
+                        countReq = countReq + 1
+                        tag = findTag(MSH, neighPos, direction, send = .true.)
+                        if (MSH%rang == testrank2 .or. MSH%rang == testrank) then
+                            write(*,*) " RANG = ", MSH%rang
+                            write(*,*) " direction = ", direction
+                            write(*,*) " totalsize = ", totalSize
+                            write(*,*) " size(tempRandField(minPos:maxPos,:)) = ", size(tempRandField(minPos:maxPos,:))
+                            write(*,*) " Tag send in dir ", direction," = ",  tag
+                            write(*,*) "    TO  rang ", MSH%neigh(neighPos)
+                        end if
+!                        call MPI_ISEND (testVector, size(testVector), MPI_INTEGER, &
+!                                        MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                        call MPI_ISEND (RDF%randField(minPos:maxPos,:), totalSize, MPI_DOUBLE_PRECISION, &
+!                                        MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+                        call MPI_ISEND (RDF%randField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
+                                        MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+
+                        countReq = countReq + 1
+                        tag = findTag(MSH, neighPos, direction, send = .false.)
+                        if (MSH%rang == testrank2 .or. MSH%rang == testrank) then
+                            write(*,*) "Tag rcv in dir ", direction," = ",  tag
+                            write(*,*) "    FROM  rang ", MSH%neigh(neighPos)
+                        end if
+
+!                        call MPI_IRECV (testVector3, size(testVector3), MPI_INTEGER, &
+!                                        MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                        call MPI_IRECV (tempRandField(minPos:maxPos,:), totalSize, MPI_DOUBLE_PRECISION, &
+!                                        MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+                        call MPI_IRECV (tempRandField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
+                                        MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+
+                        !write(*,*) ""
+                    end if
+                end do
+            end do
+
+            !write(*,*) "WAITING"
+            call MPI_WAITALL (countReq, request(1:countReq), status(:,1:countReq), code)
+            if(MSH%rang == testrank) write(*,*) "tempRandField = ", tempRandField
+        end if
+
+        deallocate(tempRandField)
+        deallocate(request)
+        deallocate(status)
+
+!        do neighPos = 1, size(MSH%neigh)
+!
+!            if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
+!
+!            do direction = 1, size(MSH%neigh)
+!
+!                if(MSH%neigh(direction) < 0) cycle !Check if this direction exists
+!
+!                countReq = countReq + 1
+                !tag = findTag(MSH, neighPos, direction, send = .true.)
+                !write(*,*) trim(numb2String(MSH%rang))//" to "//trim(numb2String(MSH%neigh(neighPos)))//" : tag "//trim(numb2String(tag))
+!                call MPI_ISEND (testVector, size(testVector), MPI_INTEGER, &
+!                                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+
+
+!                countReq = countReq + 1
+                !tag = findTag(MSH, neighPos, direction, send = .false.)
+                !write(*,*) "                    "//trim(numb2String(MSH%rang))//" FROM "//trim(numb2String(MSH%neigh(neighPos)))//" : tag "//trim(numb2String(tag))
+!                call MPI_IRECV (testVector3, size(testVector3), MPI_INTEGER, &
+!                                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!
+!            end do
+!
+!
+!
+!        end do
+
+        !write(*,*) "WAITING"
+        !call MPI_WAITALL (countReq, request(1:countReq), status(:,1:countReq), code)
+
+        !write(*,*) "testVector3 = ", testVector3
+
+
+
+!            if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
+!
+!            if(MSH%rang == testrank) then
+!                write(*,*) " "
+!                write(*,*) "For proc = ", MSH%neigh(neighPos), "--------------------"
+!            end if
+!
+!            !sndRcvMask(:) = false
+!
+!            !if(RDF%rang == testrank) write(*,*) "------------------------"
+!            !if(RDF%rang == testrank) write(*,*) "neighPos = ", neighPos
+!            !if(RDF%rang == testrank) write(*,*) "MSH%neighShift(:, neighPos) = ", MSH%neighShift(:, neighPos)
+!
+!            do direction = 1, size(MSH%neigh) !Choosing which borders should be sent to this neighbour
+!
+!                if(MSH%neigh(direction) < 0) cycle !Check if this direction exists (for the borders)
+!
+!                minPos = MSH%indexNeigh(1,direction)
+!                maxPos = MSH%indexNeigh(2,direction)
+!                totalSize = (maxPos - minPos + 1)*RDF%Nmc
+!                sndRcv = .true.
+!
+!
+!                do i = 1, MSH%nDim
+!                    if(       (MSH%neighShift(i, neighPos) /= 0) &
+!                        .and. (MSH%neighShift(i, neighPos) /= MSH%neighShift(i, direction))) then
+!                        sndRcv = .false.
+!                        exit
+!                    end if
+!                end do
+!
+!                !if(RDF%rang == testrank) write(*,*) " "
+!                !if(RDF%rang == testrank) write(*,*) "sndRcv = ", sndRcv
+!                if(sndRcv) then
+!                    !if(RDF%rang == testrank) write(*,*) "direction = ", direction
+!                    !if(RDF%rang == testrank) write(*,*) "MSH%neighShift(:, direction) = ", MSH%neighShift(:, direction)
+!                end if
+!
+!                !write(*,*) "Communicating ovelaping areas"
+!
+!                if(sndRcv) then
+!                    if(MSH%rang == testrank) then
+!                        !call dispCarvalhol(MSH%neighShift, "MSH%neighShift")
+!                        !do i = 1, size(MSH%neigh)
+!                            write(*,*) " "
+!                            write(*,*) "Dir = ", direction
+!                            !write(*,*) "for proc = ", MSH%neigh(neighPos)
+!                            tag = findTag(MSH, direction, send = .true.)
+!                            write(*,*) "SEND tag = ", tag
+!                            tag = findTag(MSH, direction, send = .false.)
+!                            write(*,*) "RECEIVE tag = ", tag
+!                        !end do
+!                    end if
+!                    if(MSH%rang > 3 .and. MSH%rang < 6) then
+!                    countReq = countReq + 1
+!                    tag = findTag(MSH, direction, send = .true.)
+!                    !write(*,*) "I am ", numb2String(MSH%rang), "and I send tag : ", tag, " to ", MSH%neigh(neighPos)
+!                    write(*,*) trim(numb2String(MSH%rang))//" to "//trim(numb2String(MSH%neigh(neighPos)))//" : tag "//trim(numb2String(tag))
+!                    request(countReq) = countReq
+!call MPI_ISEND (RDF%randField(minPos:maxPos,:), totalSize, MPI_DOUBLE_PRECISION,
+!                                    !MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                    !call MPI_ISEND (testVector, size(testVector), MPI_INTEGER, &
+!                    !                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                    !if(RDF%rang == testrank) write(*,*) "SEND code = ", code
+!
+!                    countReq = countReq + 1
+!                    tag = findTag(MSH, direction, send = .false.)
+!                    write(*,*) "                    "//trim(numb2String(MSH%rang))//" FROM "//trim(numb2String(MSH%neigh(neighPos)))//" : tag "//trim(numb2String(tag))
+!                    request(countReq) = countReq
+!                    !call MPI_IRECV (tempRandField(minPos:maxPos,:), totalSize, MPI_DOUBLE_PRECISION, &
+!                    !                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                    !call MPI_IRECV (testVector, size(testVector), MPI_INTEGER, &
+!                    !                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+!                    !if(RDF%rang == testrank) write(*,*) "RECEIVE code = ", code
+!                    end if
+!                end if
+!
+!            end do
+!        end do
+!
+!        !if(RDF%rang == testrank) write(*,*) "request = ", request
+!
+!        !if(RDF%rang == testrank) write(*,*) "countReq = ", countReq
+!
+!        if(MSH%rang > 3 .and. MSH%rang < 6) then
+!        !if(RDF%rang == testrank)
+!        write(*,*) "Waiting All rank = ", MSH%rang
+!        call dispCarvalhol(request, "request")
+!        !call MPI_WAITALL (countReq, request(1:countReq), status(:,1:countReq), code)
+!        end if
+!
+!        deallocate(tempRandField)
+!        deallocate(request)
+!        deallocate(status)
+
+    end subroutine extremes_to_neighbours
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    function findTag(MSH, neighPos, direction, send) result(tag)
+
+        implicit none
+        !INPUT
+        type(MESH), intent(in) :: MSH
+        integer, intent(in) :: neighPos, direction
+        logical, intent(in) :: send
+        integer :: sinal
+
+        !OUTPUT
+        integer :: tag
+
+        !LOCAL
+        double precision :: i
+        integer :: testrank = 0
+
+
+
+        if(MSH%neigh(neighPos) < 0 .or. MSH%neigh(direction) < 0) then
+            if(MSH%rang == testrank) then
+                !write(*,*) "MSH%neigh(neighPos) = ", MSH%neigh(neighPos)
+                !write(*,*) "MSH%neigh(direction) = ", MSH%neigh(direction)
+                write(*,*) "Inside findTag , Invalid Neighbour"
+            end if
+            tag = -1
+        else
+            !if(MSH%rang == testrank) write(*,*) "Valid Direction"
+            tag = 0
+            !if(MSH%rang == testrank) write(*,*) " MSH%neighShift (:, direction) = ", MSH%neighShift (:, direction)
+
+            if(send) then
+                do i = 1, MSH%nDim
+                    tag = tag + MSH%neighShift(i, direction)*3**(MSH%nDim - i)
+                end do
+            else
+                do i = 1, MSH%nDim
+                    sinal = 1
+                    if(MSH%neighShift(i, neighPos) /= 0) sinal = -1
+                    tag = tag + sinal*MSH%neighShift(i, direction)*3**(MSH%nDim - i)
+                end do
+            end if
+
+            tag = tag + (3**(MSH%nDim)-1)/2
+
+        end if
+
+    end function findTag
 
 end module randomFieldND
 !! Local Variables:

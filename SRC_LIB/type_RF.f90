@@ -1,6 +1,7 @@
 module type_RF
 
     use mpi
+    use charFunctions
 
     implicit none
 
@@ -20,6 +21,7 @@ module type_RF
         integer            :: method = -1!1 for Isotropic, 2 for Shinozuka, 3 for Randomization
         integer            :: Nmc = -1
         logical :: init = .false.
+        logical :: independent
             !nDim dependent
         double precision, dimension(:)   , allocatable :: corrL, kMax;
         double precision, dimension(:, :), allocatable :: kPoints;
@@ -28,6 +30,7 @@ module type_RF
         double precision, dimension(:, :), allocatable :: randField_Local
         integer, dimension(:), allocatable :: seed
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
+        double precision, dimension(:), allocatable :: xMaxBound, xMinBound;
         double precision, pointer :: xPoints(:,:)
         double precision, pointer :: randField(:,:)
         logical, dimension(:), allocatable :: calculate
@@ -54,6 +57,8 @@ module type_RF
             allocate(RF_a%xMinGlob(nDim))
             allocate(RF_a%xMaxGlob(nDim))
             allocate(RF_a%calculate(Nmc))
+            allocate(RF_a%xMaxBound(nDim))
+            allocate(RF_a%xMinBound(nDim))
             call random_seed(size = n)
             allocate(RF_a%seed(n))
             RF_a%corrL = -1
@@ -61,6 +66,8 @@ module type_RF
             RF_a%seed  = -1
             RF_a%xMinGlob = -1
             RF_a%xMaxGlob = -1
+            RF_a%xMinBound = -1
+            RF_a%xMaxBound = -1
             RF_a%calculate(:) = .true.
             RF_a%init  = .true.
 
@@ -92,6 +99,7 @@ module type_RF
                 write(*,*) "|"
                 write(*,*) "|  Generation---"
                 write(*,*) "|  |nDim       = ", RF_a%nDim
+                write(*,*) "|  |independent= ", RF_a%independent
                 write(*,*) "|  |corrMod    = ", RF_a%corrMod
                 write(*,*) "|  |margiFirst = ", RF_a%margiFirst
                 write(*,*) "|  |method     = ", RF_a%method
@@ -107,6 +115,8 @@ module type_RF
                 write(*,*) "|  |xPOINTS"
                 write(*,"(A,("//dblFmt//"))") " |  |  |xMinGlob   = ", RF_a%xMinGlob
                 write(*,"(A,("//dblFmt//"))") " |  |  |xMaxGlob   = ", RF_a%xMaxGlob
+                write(*,"(A,("//dblFmt//"))") " |  |  |xMinBound  = ", RF_a%xMinBound
+                write(*,"(A,("//dblFmt//"))") " |  |  |xMaxBound  = ", RF_a%xMaxBound
                 write(*,*) "|  |  |xNTotal                    = ", RF_a%xNTotal
                 write(*,*) "|  |  |associated(xPoints)        = ", associated(RF_a%xPoints)
                 if(associated(RF_a%xPoints)) &
@@ -198,6 +208,8 @@ module type_RF
             if(allocated(RF_a%xMinGlob))  deallocate(RF_a%xMinGlob)
             if(allocated(RF_a%xMaxGlob))  deallocate(RF_a%xMaxGlob)
             if(allocated(RF_a%calculate)) deallocate(RF_a%calculate)
+            if(allocated(RF_a%xMaxBound))   deallocate(RF_a%xMaxBound)
+            if(allocated(RF_a%xMinBound))   deallocate(RF_a%xMinBound)
             if(associated(RF_a%xPoints))  nullify (RF_a%xPoints)
             if(associated(RF_a%randField))  nullify (RF_a%randField)
             RF_a%init = .false.
