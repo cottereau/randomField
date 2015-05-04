@@ -12,5 +12,7 @@ module constants_RF
 	                      SHINOZUKA = 2, &
 	                      RANDOMIZATION = 3
 
+	integer :: TESTRANK = 0 !ONLY FOR TESTS
+
 
 end module constants_RF

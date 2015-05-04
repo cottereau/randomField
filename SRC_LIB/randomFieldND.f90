@@ -41,7 +41,7 @@ contains
         double precision                   , intent(in) :: fieldVar;
         integer                            , intent(in) :: comm, rang, nb_procs
         logical, dimension(1:), optional   , intent(in) :: calculate
-        type(MESH), intent(in) :: MSH
+        type(MESH), intent(inout) :: MSH
 
         !OUTPUT
         double precision, dimension(:, :), intent(out), target :: randField;
@@ -77,7 +77,7 @@ contains
     subroutine create_RF_Unstruct_Init (RDF, MSH)
         !INPUT OUTPUT
         type(RF), intent(inout) :: RDF
-        type(MESH), intent(in) :: MSH
+        type(MESH), intent(inout) :: MSH
         !LOCAL
         logical, dimension(:), allocatable :: effectCalc;
 
@@ -114,7 +114,7 @@ contains
 
         !INPUT OUTPUT
         type(RF), intent(inout) :: RDF
-        type(MESH), intent(in) :: MSH
+        type(MESH), intent(inout) :: MSH
 
         !LOCAL VARIABLES
         integer :: i;
@@ -128,6 +128,10 @@ contains
             RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)/RDF%corrL(i)
             RDF%xMinBound(i) = RDF%xMinBound(i)/RDF%corrL(i)
             RDF%xMaxBound(i) = RDF%xMaxBound(i)/RDF%corrL(i)
+            RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
+            RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)/RDF%corrL(i)
+            MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)/RDF%corrL(i)
+            MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)/RDF%corrL(i)
         end do
 
         !call show_RF(RDF, "After Normalization")
@@ -155,6 +159,8 @@ contains
             RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)*RDF%corrL(i)
             RDF%xMinBound(i) = RDF%xMinBound(i)*RDF%corrL(i)
             RDF%xMaxBound(i) = RDF%xMaxBound(i)*RDF%corrL(i)
+            MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)*RDF%corrL(i)
+            MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
         end do
 
         !call show_RF(RDF, "After Revert Normalization")
@@ -453,7 +459,6 @@ contains
         integer :: i, direction, neighPos
         integer :: code;
         integer :: minPos, maxPos,totalSize
-        integer :: testrank = 1, testrank2 = 3
         double precision, dimension(:,:), allocatable :: tempRandField
         !integer, dimension(:), allocatable :: request
         integer, dimension(:)  , allocatable :: request
@@ -498,11 +503,11 @@ contains
 
                 if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
 
-                if (MSH%rang == testrank2 .or. MSH%rang == testrank) then
-                    write(*,*) ""
-                    write(*,*) "Neighbour ", neighPos, " exist and is"
-                    write(*,*) "        Proc rank = ", MSH%neigh(neighPos)
-                end if
+!                if (MSH%rang == TESTRANK) then
+!                    write(*,*) ""
+!                    write(*,*) "Neighbour ", neighPos, " exist and is"
+!                    write(*,*) "        Proc rank = ", MSH%neigh(neighPos)
+!                end if
 
                 do direction = 1, size(MSH%neigh)
 
@@ -527,24 +532,24 @@ contains
                         if(stage == 1) then
                             countReq = countReq + 1
                             tag = findTag(MSH, neighPos, direction, send = .true.)
-                            if (MSH%rang == testrank2 .or. MSH%rang == testrank) then
-                                write(*,*) " RANG = ", MSH%rang
-                                write(*,*) " direction = ", direction
-                                write(*,*) " totalsize = ", totalSize
-                                write(*,*) " size(tempRandField(minPos:maxPos,:)) = ", size(tempRandField(minPos:maxPos,:))
-                                write(*,*) " Tag send in dir ", direction," = ",  tag
-                                write(*,*) "    TO  rang ", MSH%neigh(neighPos)
-                            end if
+!                            if (MSH%rang == TESTRANK) then
+!                                write(*,*) " RANG = ", MSH%rang
+!                                write(*,*) " direction = ", direction
+!                                write(*,*) " totalsize = ", totalSize
+!                                write(*,*) " size(tempRandField(minPos:maxPos,:)) = ", size(tempRandField(minPos:maxPos,:))
+!                                write(*,*) " Tag send in dir ", direction," = ",  tag
+!                                write(*,*) "    TO  rang ", MSH%neigh(neighPos)
+!                            end if
                             call MPI_ISEND (RDF%randField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
                                             MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
 
                         else if(stage == 2) then
                             countReq = countReq + 1
                             tag = findTag(MSH, neighPos, direction, send = .false.)
-                            if (MSH%rang == testrank2 .or. MSH%rang == testrank) then
-                                write(*,*) "Tag rcv in dir ", direction," = ",  tag
-                                write(*,*) "    FROM  rang ", MSH%neigh(neighPos)
-                            end if
+!                            if (MSH%rang == TESTRANK) then
+!                                write(*,*) "Tag rcv in dir ", direction," = ",  tag
+!                                write(*,*) "    FROM  rang ", MSH%neigh(neighPos)
+!                            end if
 
 !                            call MPI_IRECV (tempRandField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
 !                                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
@@ -559,7 +564,7 @@ contains
 
         !write(*,*) "WAITING"
         !call MPI_WAITALL (countReq, request(1:countReq), status(:,1:countReq), code)
-        if(MSH%rang == testrank) write(*,*) "RDF%randField(:,1) = ", RDF%randField(:,1)
+        !if(MSH%rang == TESTRANK) write(*,*) "RDF%randField(:,1) = ", RDF%randField(:,1)
 
         deallocate(tempRandField)
         !deallocate(tempSumRF)
@@ -583,60 +588,97 @@ contains
 
         !LOCAL
         integer :: i, j, n
-        double precision, dimension(:), allocatable :: origin
-        double precision, dimension(:,:), allocatable :: normFactor
-        logical, dimension(:,:), allocatable :: xPointsMask
-        integer :: minPos, maxPos, neighPos
+        double precision, dimension(:, :), allocatable :: originList
+        double precision, dimension(:), allocatable :: normFactor, power
+        double precision, dimension(:), allocatable :: originCorner
+        integer :: minPos, maxPos, neighPos, minPosGlob, maxPosGlob
+        integer, dimension(:), allocatable :: tempXNStep, shift
+        integer :: nVertex
 
-        allocate(origin(MSH%nDim))
-        minPos = minval(pack(MSH%indexNeigh(1,:), MSH%neigh(:) >= 0))
-        maxPos = maxval(pack(MSH%indexNeigh(2,:), MSH%neigh(:) >= 0))
-        !allocate(normFactor(minPos:maxPos, 2)) !Obs: first index doesn't start in "1"
+
+        allocate(originList(MSH%nDim, 2**MSH%nDim))
+        allocate(originCorner(MSH%nDim))
+        allocate(tempXNStep(MSH%nDim))
+        allocate(shift(MSH%nDim))
+
+        tempXNStep = 2
+        minPosGlob = minval(pack(MSH%indexNeigh(1,:), MSH%neigh(:) >= 0))
+        maxPosGlob = maxval(pack(MSH%indexNeigh(2,:), MSH%neigh(:) >= 0))
+        allocate(normFactor(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
+        allocate(power(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
 
         normFactor = 0
 
         do neighPos = 1, size(MSH%neigh)
             if(MSH%neigh(neighPos) < 0) cycle
 
-            !Finding origin
-            origin = MSH%xMinNeigh(:, neighPos)
-            do i = 1, MSH%nDim
-                if(MSH%neighShift(i, neighPos) == -1) then
-                    origin(i) = MSH%xMaxNeigh(i, neighPos)
-                end if
-            end do
-
+            nVertex = 2**(sum((MSH%neighShift(:, neighPos))**2))
             !Positions in temp Vector
             minPos = MSH%indexNeigh(1,neighPos)
             maxPos = MSH%indexNeigh(2,neighPos)
 
-            !Shape Function multiplication
+            !Finding all vertex
+            do i = 1, 2**MSH%nDim
+                call get_Permutation(i, MSH%xMaxNeigh(:,neighPos), tempXNStep, originList(:, i), &
+                                     MSH%xMinNeigh(:,neighPos), snapExtremes = .true.);
+            end do
+
+            !Finding origin
+            originCorner = MSH%xMinNeigh(:, neighPos)
+            do i = 1, MSH%nDim
+                if(MSH%neighShift(i, neighPos) == -1) then
+                    originCorner(i) = MSH%xMaxNeigh(i, neighPos)
+
+                end if
+            end do
+
+            if(MSH%rang == TESTRANK) then
+                write(*,*) "neighPos = ", neighPos
+                write(*,*) "origin = ", originCorner
+                !write(*,*) "all vertex = ", originList
+                call dispCarvalhol(originList, " originList ")
+            end if
+
+            !Normalization values
+            normFactor(minPos:maxPos) = 0
+            do j = 1, size(originList, 2)
+                power(minPos:maxPos) = 0
+                do i = 1, MSH%nDim
+                    if(MSH%neighShift(i, neighPos) == 0) cycle
+
+                    power(minPos:maxPos) = (RDF%xPoints(i, minPos:maxPos) - originList(i, j))**2 &
+                                           + power(minPos:maxPos)
+                end do
+
+                normFactor(minPos:maxPos) = exp(-(power(minPos:maxPos))) + normFactor(minPos:maxPos)
+            end do
+
+            !Shape Function multiplication (Obs: redefinition of power, should come after Normalization values calculation)
+            power(minPos:maxPos) = 0
             do i = 1, MSH%nDim
                 if(MSH%neighShift(i, neighPos) == 0) cycle
 
-                RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) &
-                                                  * (- exp((RDF%xPoints(i, minPos:maxPos) - origin(i))**2))
+                power(minPos:maxPos) = (RDF%xPoints(i, minPos:maxPos) - originCorner(i))**2 &
+                                           + power(minPos:maxPos)
             end do
-
-            !Nomalization
-!            do i = 1, MSH%nDim
-!                do j = 1, MSH%nDim
-!
-!                normFactor(minPos:maxPos, 1) = (- exp((RDF%xPoints(i, minPos:maxPos) - minPos(i))**2))) + &
-!                                            (- exp((RDF%xPoints(i, minPos:maxPos) - maxPos(i))**2)))
-!                normFactor(minPos:maxPos, 2) = normFactor(minPos:maxPos) /
-!                    end do
-!                end do
-!            end do
-
-
-
-
 
         end do
 
-        deallocate(origin)
-        !deallocate(normFactor)
+        if(MSH%rang == TESTRANK) then
+            !write(*,*) "shape(normFactor) = ", shape(normFactor)
+            !call dispCarvalhol(normFactor, "normFactor")
+            !write(*,*) "shape(power) = ", shape(power)
+            !call dispCarvalhol(power, "power")
+        end if
+
+        RDF%randField(minPosGlob:maxPosGlob,1) = (RDF%randField(minPosGlob:maxPosGlob,1) * exp(-power(:)))/normFactor(:)
+
+        deallocate(originList)
+        deallocate(tempXNStep)
+        deallocate(originCorner)
+        deallocate(normFactor)
+        deallocate(power)
+        deallocate(shift)
 
     end subroutine modify_RF_interface
 
@@ -658,16 +700,14 @@ contains
 
         !LOCAL
         double precision :: i
-        integer :: testrank = 0
-
 
 
         if(MSH%neigh(neighPos) < 0 .or. MSH%neigh(direction) < 0) then
-            if(MSH%rang == testrank) then
+            !if(MSH%rang == TESTRANK) then
                 !write(*,*) "MSH%neigh(neighPos) = ", MSH%neigh(neighPos)
                 !write(*,*) "MSH%neigh(direction) = ", MSH%neigh(direction)
                 write(*,*) "Inside findTag , Invalid Neighbour"
-            end if
+            !end if
             tag = -1
         else
             !if(MSH%rang == testrank) write(*,*) "Valid Direction"
