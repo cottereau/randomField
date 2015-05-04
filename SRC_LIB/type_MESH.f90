@@ -27,7 +27,7 @@ module type_MESH
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:,:), allocatable :: xMaxNeigh, xMinNeigh; !Rounded Values of the overlapping area
         integer         , dimension(:,:), allocatable :: indexNeigh, neighShift
-        double precision :: overlap = 0.5; !Absolute value (should change to percentual of corrL)
+        double precision :: overlap = 2.0; !Absolute value (should change to percentual of corrL)
         logical :: init = .false.
 
     end type MESH

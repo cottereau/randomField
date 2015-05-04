@@ -593,7 +593,7 @@ contains
         double precision, dimension(:), allocatable :: originCorner
         integer :: minPos, maxPos, neighPos, minPosGlob, maxPosGlob
         integer, dimension(:), allocatable :: tempXNStep, shift
-        integer :: nVertex
+        integer :: nNeigh, zeroVal
 
 
         allocate(originList(MSH%nDim, 2**MSH%nDim))
@@ -612,7 +612,7 @@ contains
         do neighPos = 1, size(MSH%neigh)
             if(MSH%neigh(neighPos) < 0) cycle
 
-            nVertex = 2**(sum((MSH%neighShift(:, neighPos))**2))
+            nNeigh = 2**(sum((MSH%neighShift(:, neighPos))**2))
             !Positions in temp Vector
             minPos = MSH%indexNeigh(1,neighPos)
             maxPos = MSH%indexNeigh(2,neighPos)
@@ -633,13 +633,15 @@ contains
             end do
 
             if(MSH%rang == TESTRANK) then
+                write(*,*) "----------------------------------"
                 write(*,*) "neighPos = ", neighPos
                 write(*,*) "origin = ", originCorner
-                !write(*,*) "all vertex = ", originList
+                write(*,*) "nNeigh = ", nNeigh
                 call dispCarvalhol(originList, " originList ")
             end if
 
             !Normalization values
+            zeroVal = MSH%nDim - (sum((MSH%neighShift(:, neighPos))**2))
             normFactor(minPos:maxPos) = 0
             do j = 1, size(originList, 2)
                 power(minPos:maxPos) = 0
@@ -652,6 +654,8 @@ contains
 
                 normFactor(minPos:maxPos) = exp(-(power(minPos:maxPos))) + normFactor(minPos:maxPos)
             end do
+
+            normFactor(minPos:maxPos) = normFactor(minPos:maxPos)/(2 ** zeroVal)
 
             !Shape Function multiplication (Obs: redefinition of power, should come after Normalization values calculation)
             power(minPos:maxPos) = 0
