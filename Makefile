@@ -9,15 +9,20 @@
 
 #### PATH TO HDF5 AND MPI LIBRARY AND INCLUDES - to be modified by user (to be completed)
 
-#module load intel-compiler/14.0.0
-#module load intel-mkl/11.1.0
-#module load intel-mpi/4.0.0.028
+#module load intel-compiler/15.0.1
+#module load intel-mkl/11.2.1
+#module load intel-mpi/5.0.2
 #module load hdf5/1.8.12
+
+#LIBHDF5 = -L/opt/san/bibliotheques/hdf5/1.8.12/lib/ -lhdf5 -lhdf5_hl -lhdf5_fortran
+#INCLUDEHDF5 = -I/opt/san/bibliotheques/hdf5/1.8.12/include
+#LIBMPI = -L/opt/san/intel/impi/4.0.0.028/lib64/ -lmpi -lmpi_dbg -lmpi_mt -lmpigf -lmpi_ilp64 
+#INCLUDEMPI = -I/opt/san/intel/impi/4.0.0.028/include64 
 
 LIBHDF5 = -L/opt/san/bibliotheques/hdf5/1.8.12/lib/ -lhdf5 -lhdf5_hl -lhdf5_fortran
 INCLUDEHDF5 = -I/opt/san/bibliotheques/hdf5/1.8.12/include
-LIBMPI = -L/opt/san/intel/impi/4.0.0.028/lib64/ -lmpi -lmpi_dbg -lmpi_mt -lmpigf -lmpi_ilp64 
-INCLUDEMPI = -I/opt/san/intel/impi/4.0.0.028/include64 
+LIBMPI = -L/opt/san/intel15/impi/5.0.2.044/lib64/ -lmpi -lmpi_dbg -lmpi_mt -lmpigf -lmpi_ilp64 
+INCLUDEMPI = -I/opt/san/intel15/impi/5.0.2.044/include64
 
 EXEC = randomField.exe
 #FC   = ifort

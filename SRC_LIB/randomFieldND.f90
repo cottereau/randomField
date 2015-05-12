@@ -122,6 +122,7 @@ contains
         if(RDF%rang == 0) write(*,*) "Inside gen_Std_Gauss"
 
         !Normalization
+        write(get_fileId(),*) "Normalizing"
         do i = 1, RDF%nDim
             RDF%xPoints(i,:) = RDF%xPoints(i,:)/RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
@@ -136,6 +137,9 @@ contains
 
         !call show_RF(RDF, "After Normalization")
 
+!        if(RDF%rang == TESTRANK) call show_MESH(MSH, "MESH inside gen_Std_Gauss")
+!        if(RDF%rang == TESTRANK) call show_RF(RDF, "RF inside gen_Std_Gauss")
+
         !Generating Standard Gaussian Field
         select case (RDF%method)
             case(SHINOZUKA)
@@ -146,13 +150,17 @@ contains
                 call gen_Std_Gauss_Randomization(RDF)
         end select
 
+
         !Communicating borders to neighbours
         if(RDF%independent) then
+            write(get_fileId(),*) "Modifying interface"
             call modify_RF_interface(RDF, MSH)
+            write(get_fileId(),*) "Communicating borders to neighbours"
             call extremes_to_neighbours(RDF, MSH)
         end if
 
         !Reverting Normalization
+        write(get_fileId(),*) "Reverting Normalization"
         do i = 1, RDF%nDim
             RDF%xPoints(i,:) = RDF%xPoints(i,:)*RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)*RDF%corrL(i)
@@ -221,12 +229,14 @@ contains
         logical, intent(in), optional ::randomK_in
 
         !LOCAL
-        double precision, dimension(:)   , allocatable :: phiK;
+        double precision, dimension(:, :), allocatable :: phiK, kVec;
         double precision, dimension(:, :), allocatable :: kDelta;
         double precision, dimension(:)   , allocatable :: dgemm_mult;
-        double precision, dimension(:,:) , allocatable :: k_dot_x_plus_phi;
+        !double precision, dimension(:,:) , allocatable :: k_dot_x_plus_phi;
+        double precision, dimension(:,:) , allocatable :: k_x_phi, kSign;
         double precision :: ampMult
-        integer :: n
+        integer :: testIndex = 65
+        integer :: n, i, j, m
         logical :: randomK
 
         if(RDF%rang == 0) write(*,*) "Inside Shinozuka"
@@ -239,43 +249,126 @@ contains
         call set_SkVec(RDF)
 
         !write(*,*) "Calculating Samples"
-        allocate(phiK (RDF%kNTotal));
-        allocate(k_dot_x_plus_phi(RDF%xNTotal, RDF%kNTotal))
+        allocate(k_x_phi (RDF%xNTotal, 1))
+        allocate(kSign (2**(RDF%nDim-1), RDF%nDim));
+        allocate(kVec(RDF%nDim, 1))
+        !allocate(k_dot_x_plus_phi(RDF%xNTotal, RDF%kNTotal))
 
         !Generating random field samples
+
+        call set_kSign(kSign) !Set the sign permutations for kVec
+
+        allocate(phiK (RDF%kNTotal, size(kSign,1)));
+
+        call show_RF(RDF, "RF inside Shino", unit_in = get_fileId())
+
         if(.not. randomK) then
-            if(RDF%rang == 0) write(*,*) "Shinozuka, k discrete"
+            write(get_fileId(),*) "Shinozuka, k discrete"
             RDF%randField(:,:) = 0.0d0;
             ampMult = 2.0d0*sqrt(product(kDelta)/((2.0d0*PI)**(dble(RDF%nDim))))
 
-            do n = 1, RDF%Nmc
-                if(.not. RDF%calculate(n)) cycle
-                call random_number(phiK(:))
-                k_dot_x_plus_phi(:,:) = transpose(spread( source=2.0D0*pi*phiK , dim =2 , ncopies = RDF%xNTotal)) !2pi*phiK replicated xNTotal times
+!PROBLEM
+!            do n = 1, RDF%Nmc
+!                if(.not. RDF%calculate(n)) cycle
+!                call random_number(phiK(:))
+!
+!                k_dot_x_plus_phi(:,:) = transpose(spread( source=2.0D0*pi*phiK , dim =2 , ncopies = RDF%xNTotal)) !2pi*phiK replicated xNTotal times
+!
+!                call DGEMM_simple(RDF%xPoints, RDF%kPoints, k_dot_x_plus_phi, "T", "N") !x*k + 2pi*phiK
+!                call DGEMM_simple(cos(k_dot_x_plus_phi), reshape(source = ampMult * sqrt(RDF%SkVec), shape = [size(RDF%SkVec),1]) , RDF%randField(:,n:n), "N", "N")
+!            end do
+!END PROBLEM
 
-                call DGEMM_simple(RDF%xPoints, RDF%kPoints, k_dot_x_plus_phi, "T", "N") !x*k + 2pi*phiK
-                call DGEMM_simple(cos(k_dot_x_plus_phi), reshape(source = ampMult * sqrt(RDF%SkVec), shape = [size(RDF%SkVec),1]) , RDF%randField(:,n:n), "N", "N")
-            end do
+!TEST 1
+            !if(RDF%rang == TESTRANK) write(*,*) "RDF%kNTotal = ", RDF%kNTotal
+            !if(RDF%rang == TESTRANK) call dispCarvalhol(kSign, "kSign")
+            !if(RDF%rang == TESTRANK) write(*,*) "ampMult = ", ampMult
+            !if(RDF%rang == TESTRANK) write(*,*) "shape(k_x_phi) = ", shape(k_x_phi)
+            !if(RDF%rang == TESTRANK) write(*,*) "shape(phiK(1, 1)) = ", shape(phiK(1, 1))
+            !if(RDF%rang == TESTRANK) call dispCarvalhol(RDF%SkVec(:testIndex), "RDF%SkVec(1:testIndex)", "E15.5")
+            !if(RDF%rang == TESTRANK) call dispCarvalhol(RDF%kPoints(:,:testIndex), "RDF%kPoints(:,1:testIndex)", "E15.5")
+            !if(RDF%rang == TESTRANK) call dispCarvalhol(RDF%xPoints(:,:testIndex), "RDF%xPoints(:,1:testIndex)", "E15.5")
+
+            do n = 1, RDF%Nmc
+
+                write(get_fileId(),*) "n ", n
+
+                if(.not. RDF%calculate(n)) cycle
+                call random_number(phiK(:,:))
+                phiK(:,:) = 2.0D0*pi*phiK(:,:)
+
+                !Loop on k sign
+                do m = 1, size(kSign,1)
+
+                    write(get_fileId(),*) "--m = ", m
+
+                    !Changing kPoints Sign
+                    do i = 1, RDF%nDim
+                        if(kSign(m, i) == -1) RDF%kPoints(i,:) = -RDF%kPoints(i,:)
+                    end do
+
+                    !Loop on k
+                    do j = 1, RDF%kNTotal
+
+                        !write(get_fileId(),*) "----j = ", j
+
+                        call DGEMM_simple(RDF%xPoints, RDF%kPoints(:,j:j), k_x_phi(:,:), "T", "N") !x*k
+                        !k_x_phi(:,:) = matmul(transpose(RDF%xPoints), RDF%kPoints(:,j:j))
+
+                        RDF%randField(:,n) = sqrt(RDF%SkVec(j)) * &
+                                             cos(k_x_phi(:,1) + phiK(j, m)) &
+                                             + RDF%randField(:,n)
+
+                        !if(RDF%rang == TESTRANK .and. j <= 4 .and. m==1) then
+                            !write(*,*) "m = ", m
+                            !write(*,*) "j = ", j
+                            !if(RDF%rang == TESTRANK) call dispCarvalhol(RDF%kPoints(:,1:testIndex), "AFTER RDF%kPoints(:,10:20)")
+                            !if(RDF%rang == TESTRANK) call dispCarvalhol(RDF%xPoints(:,1:testIndex), "AFTER RDF%xPoints(:,10:20)")
+                            !call dispCarvalhol(k_x_phi(1:testIndex,:), "k_x_phi(1:20, :)", "F25.5")
+                            !call dispCarvalhol(k_x_phi(1:testIndex,:), "k_x_phi(1:testIndex,:)", "E15.5")
+                        !end if
+
+
+                    end do !END Loop on k
+
+                    write(get_fileId(),*) "--m OUT= ", m
+
+                    !Reverting kPoints Sign
+                    do i = 1, RDF%nDim
+                        if(kSign(m, i) == -1) RDF%kPoints(i,:) = -RDF%kPoints(i,:)
+                    end do
+
+                end do !END Loop on k sign
+
+            end do !END Loop on Nmc
+
+            write(get_fileId(),*) "Nmc OUT"
+
+            RDF%randField(:,:) = ampMult * RDF%randField(:,:);
+
+            !if(RDF%rang == TESTRANK) call dispCarvalhol(RDF%randField(1:testIndex,:), "AFTER RDF%randField(:,:)")
+
+!END TEST 1
 
             !call show_RF(RDF, "Shinozuka Discrete After Generation")
             !call dispCarvalhol(RDF%randField, "RDF%randField")
         else
-            if(RDF%rang == 0) write(*,*) "Shinozuka, k random"
-            !call show_RF(RDF, "Shinozuka Random Before Generation")
-            RDF%randField(:,:) = 0.0d0;
-            ampMult = 2.0d0*sqrt(1/(RDF%kNTotal*(2.0d0*PI)**(dble(RDF%nDim))))
-
-            do n = 1, RDF%Nmc
-                if(.not. RDF%calculate(n)) cycle
-                !write(*,*) "Before filling phiK"
-                call random_number(phiK(:))
-                !write(*,*) "Before PhiK Replication"
-                k_dot_x_plus_phi(:,:) = transpose(spread( source=2.0D0*pi*phiK , dim =2 , ncopies = RDF%xNTotal)) !2pi*phiK replicated xNTotal times
-                !write(*,*) "Before First DGEMM"
-                call DGEMM_simple(RDF%xPoints, RDF%kPoints, k_dot_x_plus_phi, "T", "N") !x*k + 2pi*phiK
-                !write(*,*) "Before Second DGEMM"
-                call DGEMM_simple(cos(k_dot_x_plus_phi), reshape(source = ampMult * sqrt(RDF%SkVec), shape = [size(RDF%SkVec),1]) , RDF%randField(:,n:n), "N", "N")
-            end do
+!            if(RDF%rang == 0) write(*,*) "Shinozuka, k random"
+!            !call show_RF(RDF, "Shinozuka Random Before Generation")
+!            RDF%randField(:,:) = 0.0d0;
+!            ampMult = 2.0d0*sqrt(1/(RDF%kNTotal*(2.0d0*PI)**(dble(RDF%nDim))))
+!
+!            do n = 1, RDF%Nmc
+!                if(.not. RDF%calculate(n)) cycle
+!                !write(*,*) "Before filling phiK"
+!                call random_number(phiK(:))
+!                !write(*,*) "Before PhiK Replication"
+!                k_dot_x_plus_phi(:,:) = transpose(spread( source=2.0D0*pi*phiK , dim =2 , ncopies = RDF%xNTotal)) !2pi*phiK replicated xNTotal times
+!                !write(*,*) "Before First DGEMM"
+!                call DGEMM_simple(RDF%xPoints, RDF%kPoints, k_dot_x_plus_phi, "T", "N") !x*k + 2pi*phiK
+!                !write(*,*) "Before Second DGEMM"
+!                call DGEMM_simple(cos(k_dot_x_plus_phi), reshape(source = ampMult * sqrt(RDF%SkVec), shape = [size(RDF%SkVec),1]) , RDF%randField(:,n:n), "N", "N")
+!            end do
 
             !call show_RF(RDF, "Shinozuka Random After Generation")
         end if
@@ -283,7 +376,9 @@ contains
         if(allocated(dgemm_mult))       deallocate(dgemm_mult)
         if(allocated(phiK))             deallocate(phiK);
         if(allocated(kDelta))           deallocate(kDelta);
-        if(allocated(k_dot_x_plus_phi)) deallocate(k_dot_x_plus_phi)
+        if(allocated(k_x_phi))          deallocate(k_x_phi)
+        if(allocated(kSign))            deallocate(kSign)
+        !if(allocated(k_dot_x_plus_phi)) deallocate(k_dot_x_plus_phi)
 
     end subroutine gen_Std_Gauss_Shinozuka
 
@@ -464,8 +559,13 @@ contains
         integer, dimension(:)  , allocatable :: request
         integer, dimension(:,:), allocatable :: status
         integer :: requestSize, countReq, stage
-        integer :: tag
-        logical :: sndRcv
+        integer :: tag, sumCoords
+        logical :: sndRcv, isEven
+
+        isEven = .false.
+        if(mod(sum(MSH%coords),2) == 0) isEven = .true.
+
+        write(get_fileId(),*) "rang = ", MSH%rang, "isEven = ", isEven
 
 
         if(RDF%nDim == 1) then
@@ -529,30 +629,37 @@ contains
 
                     if (sndRcv) then
 
+!                        if(isEven) then
+!                            tag = findTag(MSH, neighPos, direction, send = .true.)
+!
+!                        else
+!                            tag = findTag(MSH, neighPos, direction, send = .false.)
+!                        end if
+
                         if(stage == 1) then
                             countReq = countReq + 1
                             tag = findTag(MSH, neighPos, direction, send = .true.)
-!                            if (MSH%rang == TESTRANK) then
-!                                write(*,*) " RANG = ", MSH%rang
-!                                write(*,*) " direction = ", direction
-!                                write(*,*) " totalsize = ", totalSize
-!                                write(*,*) " size(tempRandField(minPos:maxPos,:)) = ", size(tempRandField(minPos:maxPos,:))
-!                                write(*,*) " Tag send in dir ", direction," = ",  tag
-!                                write(*,*) "    TO  rang ", MSH%neigh(neighPos)
-!                            end if
+                            !if (MSH%rang == TESTRANK) then
+                            !    write(*,*) " RANG = ", MSH%rang
+                            !    write(*,*) " direction = ", direction
+                            !    write(*,*) " totalsize = ", totalSize
+                            !    write(*,*) " size(tempRandField(minPos:maxPos,:)) = ", size(tempRandField(minPos:maxPos,:))
+                            !    write(*,*) " Tag send in dir ", direction," = ",  tag
+                            !    write(*,*) "    TO  rang ", MSH%neigh(neighPos)
+                            !end if
                             call MPI_ISEND (RDF%randField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
                                             MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
 
                         else if(stage == 2) then
                             countReq = countReq + 1
                             tag = findTag(MSH, neighPos, direction, send = .false.)
-!                            if (MSH%rang == TESTRANK) then
-!                                write(*,*) "Tag rcv in dir ", direction," = ",  tag
-!                                write(*,*) "    FROM  rang ", MSH%neigh(neighPos)
-!                            end if
+                            !if (MSH%rang == TESTRANK) then
+                            !    write(*,*) "Tag rcv in dir ", direction," = ",  tag
+                            !    write(*,*) "    FROM  rang ", MSH%neigh(neighPos)
+                            !end if
 
-!                            call MPI_IRECV (tempRandField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
-!                                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+                            !call MPI_IRECV (tempRandField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
+                            !    MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
                             call MPI_RECV (tempRandField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
                                            MSH%neigh(neighPos), tag, RDF%comm, status(:,countReq), code)
                             RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + tempRandField(minPos:maxPos,1)
@@ -573,6 +680,7 @@ contains
 
 
     end subroutine extremes_to_neighbours
+
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -652,7 +760,7 @@ contains
                                            + power(minPos:maxPos)
                 end do
 
-                normFactor(minPos:maxPos) = exp(-(power(minPos:maxPos))) + normFactor(minPos:maxPos)
+                normFactor(minPos:maxPos) = sqrt(exp(-(power(minPos:maxPos)))) + normFactor(minPos:maxPos)
             end do
 
             normFactor(minPos:maxPos) = normFactor(minPos:maxPos)/(2 ** zeroVal)
@@ -675,7 +783,7 @@ contains
             !call dispCarvalhol(power, "power")
         end if
 
-        RDF%randField(minPosGlob:maxPosGlob,1) = (RDF%randField(minPosGlob:maxPosGlob,1) * exp(-power(:)))/normFactor(:)
+        RDF%randField(minPosGlob:maxPosGlob,1) = (RDF%randField(minPosGlob:maxPosGlob,1) * sqrt(exp(-power(:))))/normFactor(:)
 
         deallocate(originList)
         deallocate(tempXNStep)

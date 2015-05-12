@@ -27,7 +27,7 @@ module type_MESH
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:,:), allocatable :: xMaxNeigh, xMinNeigh; !Rounded Values of the overlapping area
         integer         , dimension(:,:), allocatable :: indexNeigh, neighShift
-        double precision :: overlap = 2.0; !Absolute value (should change to percentual of corrL)
+        double precision :: overlap !Size of the overlap (in corrL)
         logical :: init = .false.
 
     end type MESH
@@ -77,6 +77,7 @@ module type_MESH
             MESH_a%xMaxNeigh(:,:) = 0
             MESH_a%xMinNeigh(:,:) = 0
             MESH_a%indexNeigh(:,:) = -1
+            MESH_a%overlap = 0.0D0
             MESH_a%neigh(:) = -2 !-1 is already the default when the proc is in the topology border
             MESH_a%neighShift(:,:) = 0
 
@@ -88,11 +89,18 @@ module type_MESH
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine show_MESH(MESH_a, name, fmt)
+        subroutine show_MESH(MESH_a, name, fmt, unit_in)
+            !INPUT
             type(MESH), intent(in) :: MESH_a
             character(len=*), intent(in), optional :: name
             character(len = 20), intent(in), optional :: fmt
+            integer, intent(in), optional :: unit_in
+            !LOCAL
             character(len = 20) :: dblFmt, matDblFmt, intFmt, matIntFmt
+            integer :: unit
+
+            unit = 6 !Screen
+            if(present(unit_in)) unit = unit_in
 
             dblFmt = "T20,F15.5"
             intFmt = "T20,I15"
@@ -100,53 +108,97 @@ module type_MESH
             matIntFmt = string_vec_join(["T20,",trim(numb2String(MESH_a%nDim)),"I15"])
             if(present(fmt)) dblFmt = fmt
 
-            write(*,*) "MESH------------------------------------------------------------"
-            if(present(name)) write(*,*) "|  ", name
+            write(unit,*) "MESH------------------------------------------------------------"
+            if(present(name)) write(unit,*) "|  ", name
 
             if(MESH_a%init) then
-                write(*,*) "|  init     = ", MESH_a%init
-                write(*,*) "|"
-                write(*,*) "|  MPI---"
-                write(*,*) "|  |rang     = ", MESH_a%rang
-                write(*,*) "|  |comm     = ", MESH_a%comm
-                write(*,*) "|  |nb_procs = ", MESH_a%nb_procs
-                write(*,*) "|  |topComm  = ", MESH_a%topComm
-                write(*,*) "|"
-                write(*,*) "|  Input---"
-                write(*,*) "|  |nDim     = ", MESH_a%nDim
-                write(*,*) "|  |independent = ", MESH_a%independent
-                write(*,*) "|  |meshType = ", MESH_a%meshType
-                write(*,*) "|  |meshMod  = ", MESH_a%meshMod
-                write(*,"(A,("//dblFmt//"))") " |  |xMinGlob = ", MESH_a%xMinGlob
-                write(*,"(A,("//dblFmt//"))") " |  |xMaxGlob = ", MESH_a%xMaxGlob
-                write(*,"(A,("//dblFmt//"))") " |  |xStep    = ", MESH_a%xStep
-                write(*,"(A,F15.5)")" |  |overLap  = ", MESH_a%overLap
-                write(*,*) "|"
-                write(*,*) "|  |Process--"
-                write(*,*) "|  |NStep      = ", MESH_a%xNStep
-                write(*,"(A,("//dblFmt//"))") " |  |xMin       = ", MESH_a%xMin
-                write(*,"(A,("//dblFmt//"))") " |  |xMax       = ", MESH_a%xMax
-                write(*,*) "|  |xNTotal    = ", MESH_a%xNTotal
-                write(*,*) "|  |procPerDim = ", MESH_a%procPerDim
-                write(*,*) "|  |coords     = ", MESH_a%coords
-                !write(*,*) "|  |neigh(1:2nDim)      = ", MESH_a%neigh(1:2*MESH_a%nDim)
-                write(*,"(A,("//dblFmt//"))") " |  |xMinLoc    = ", MESH_a%xMinLoc
-                write(*,"(A,("//dblFmt//"))") " |  |xMaxLoc    = ", MESH_a%xMaxLoc
-                write(*,"(A,("//matDblFmt//"))") " |  |xMinNeigh  = ", MESH_a%xMinNeigh
-                write(*,"(A,("//matDblFmt//"))") " |  |xMaxNeigh  = ", MESH_a%xMaxNeigh
-                write(*,"(A,("//dblFmt//"))") " |  |xMinBound  = ", MESH_a%xMinBound
-                write(*,"(A,("//dblFmt//"))") " |  |xMaxBound  = ", MESH_a%xMaxBound
-                write(*,"(A,("//intFmt//"))") " |  |neigh      = ", MESH_a%neigh
-                write(*,"(A,("//matIntFmt//"))") " |  |neighShift = ", MESH_a%neighShift(:,:)
+                write(unit,*) "|  init     = ", MESH_a%init
+                write(unit,*) "|"
+                write(unit,*) "|  MPI---"
+                write(unit,*) "|  |rang     = ", MESH_a%rang
+                write(unit,*) "|  |comm     = ", MESH_a%comm
+                write(unit,*) "|  |nb_procs = ", MESH_a%nb_procs
+                write(unit,*) "|  |topComm  = ", MESH_a%topComm
+                write(unit,*) "|"
+                write(unit,*) "|  Input---"
+                write(unit,*) "|  |nDim     = ", MESH_a%nDim
+                write(unit,*) "|  |independent = ", MESH_a%independent
+                write(unit,*) "|  |meshType = ", MESH_a%meshType
+                write(unit,*) "|  |meshMod  = ", MESH_a%meshMod
+                write(unit,"(A,("//dblFmt//"))") " |  |xMinGlob = ", MESH_a%xMinGlob
+                write(unit,"(A,("//dblFmt//"))") " |  |xMaxGlob = ", MESH_a%xMaxGlob
+                write(unit,"(A,("//dblFmt//"))") " |  |xStep    = ", MESH_a%xStep
+                write(unit,"(A,F15.5)")" |  |overLap  = ", MESH_a%overLap
+                write(unit,*) "|"
+                write(unit,*) "|  |Process--"
+                write(unit,*) "|  |xNStep     = ", MESH_a%xNStep
+                write(unit,"(A,("//dblFmt//"))") " |  |xMin       = ", MESH_a%xMin
+                write(unit,"(A,("//dblFmt//"))") " |  |xMax       = ", MESH_a%xMax
+                write(unit,*) "|  |xNTotal    = ", MESH_a%xNTotal
+                write(unit,*) "|  |procPerDim = ", MESH_a%procPerDim
+                write(unit,*) "|  |coords     = ", MESH_a%coords
+                write(unit,"(A,("//dblFmt//"))") " |  |xMinLoc    = ", MESH_a%xMinLoc
+                write(unit,"(A,("//dblFmt//"))") " |  |xMaxLoc    = ", MESH_a%xMaxLoc
+                write(unit,"(A,("//dblFmt//"))") " |  |xMinBound  = ", MESH_a%xMinBound
+                write(unit,"(A,("//dblFmt//"))") " |  |xMaxBound  = ", MESH_a%xMaxBound
+                call show_MESHneigh(MESH_a, onlyExisting = .true., unit_in = unit)
 
             else
-                write(*,*) "|  init     = ", MESH_a%init
-                write(*,*) "|  MESH has not been initialized----"
+                write(unit,*) "|  init     = ", MESH_a%init
+                write(unit,*) "|  MESH has not been initialized----"
             end if
-            write(*,*) "|---------------------------------------------------------------"
-            write(*,*) ""
+            write(unit,*) "|---------------------------------------------------------------"
+            write(unit,*) ""
 
         end subroutine show_MESH
+
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        subroutine show_MESHneigh(MESH_a, name, onlyExisting, unit_in)
+            implicit none
+            !INPUT
+            type(MESH), intent(in) :: MESH_a
+            character(len=*), intent(in), optional :: name
+            logical, intent(in) :: onlyExisting
+            integer, intent(in), optional :: unit_in
+            !LOCAL
+            character(len = 3) :: nDim, space
+            character(len = 50) :: fmtNum, fmtChar, fmtDble
+            integer :: i
+            integer :: unit
+
+
+            unit = 6 !Screen
+            if(present(unit_in)) unit = unit_in
+
+            nDim = trim(numb2String(MESH_a%nDim))
+            space = trim(numb2String(MESH_a%nDim*6 + 1))
+
+            if(present(name)) write(unit,*) "|  ", name
+
+            fmtNum = "(I10, A1, "//nDim//"I6, A1, "//nDim//"F6.2, A1, "//nDim//"F6.2)"
+            fmtDble = "(I10, A1, "//nDim//"F6.2, A1, "//nDim//"F6.2, "//nDim//"F6.2, A1, "//nDim//"F6.2)"
+            fmtChar = "(A10, A"//space//", A"//space//", A"//space//")"
+
+            if(MESH_a%init) then
+
+                write(unit,fmtChar) "Neighbour", "|Shift                 ", "|xMin                    ", "|xMax                  "
+
+                do i = 1, size(MESH_a%neigh)
+                    if(onlyExisting .and. MESH_a%neigh(i)<0) cycle
+                    write(unit,fmtNum) MESH_a%neigh(i), "|", MESH_a%neighShift(:,i), "|", MESH_a%xMinNeigh(:,i), "|", MESH_a%xMaxNeigh(:,i)
+                end do
+
+            else
+                write(unit,*) "|  init     = ", MESH_a%init
+                write(unit,*) "|  MESH has not been initialized----"
+            end if
+
+            write(unit,*) ""
+
+        end subroutine show_MESHneigh
 
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------

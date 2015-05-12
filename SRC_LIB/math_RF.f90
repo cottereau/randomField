@@ -85,7 +85,7 @@ contains
         transA = "N"
         transB = "N"
         alpha  = 1.0D0
-        beta   = 1.0D0
+        beta   = 0.0D0
         M   = size(A,1)
         N   = size(B,2)
         K   = size(A,2)
