@@ -553,6 +553,8 @@ contains
             if(RDF%method == ISOTROPIC) write(fileId,*) "ISOTROPIC"
             if(RDF%method == SHINOZUKA) write(fileId,*) "SHINOZUKA"
             if(RDF%method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
+            write(fileId,*) "--independent-----------------------"
+            write(fileId,*) RDF%independent
             write(fileId,*) "--Seed-----------------------"
             write(fileId,fmt = "(I20)") RDF%seed
             if(present(timeVec)) then

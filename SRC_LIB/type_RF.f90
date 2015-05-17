@@ -28,8 +28,10 @@ module type_RF
         double precision, dimension(:)   , allocatable :: SkVec;
         double precision, dimension(:, :), allocatable :: xPoints_Local
         double precision, dimension(:, :), allocatable :: randField_Local
-        integer, dimension(:), allocatable :: seed
+        integer, dimension(:)  , allocatable :: seed
+        integer, dimension(:,:), allocatable :: neighSeed
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
+        double precision, dimension(:,:), allocatable :: neighRange;
         double precision, dimension(:), allocatable :: xMaxBound, xMinBound;
         double precision, pointer :: xPoints(:,:)
         double precision, pointer :: randField(:,:)
@@ -61,6 +63,8 @@ module type_RF
             allocate(RF_a%xMinBound(nDim))
             call random_seed(size = n)
             allocate(RF_a%seed(n))
+            allocate(RF_a%neighSeed(n,(3**nDim)-1))
+            allocate(RF_a%neighRange(nDim,(3**nDim)-1))
             RF_a%corrL = -1
             RF_a%kMax  = -1
             RF_a%seed  = -1
@@ -70,6 +74,7 @@ module type_RF
             RF_a%xMaxBound = -1
             RF_a%calculate(:) = .true.
             RF_a%init  = .true.
+            RF_a%neighSeed(:,:) = -1
 
         end subroutine init_RF
 
@@ -172,9 +177,17 @@ module type_RF
             type(RF)   :: RDF
             double precision, dimension(:,:), allocatable, target :: randField
 
-            allocate(randField(RDF%xNTotal, RDF%Nmc))
+            if(allocated(randField)) then
+                if(.not.(size(randField,1) == RDF%xNTotal .and. size(randField,1) == RDF%Nmc)) then
+                    nullify(RDF%randField)
+                    deallocate(randField)
+                end if
+            end if
 
-            RDF%randField => randField
+            if(.not.allocated(randField)) then
+                allocate(randField(RDF%xNTotal, RDF%Nmc))
+                RDF%randField => randField
+            end if
 
         end subroutine allocate_randField
 
@@ -208,10 +221,12 @@ module type_RF
             if(allocated(RF_a%xMinGlob))  deallocate(RF_a%xMinGlob)
             if(allocated(RF_a%xMaxGlob))  deallocate(RF_a%xMaxGlob)
             if(allocated(RF_a%calculate)) deallocate(RF_a%calculate)
-            if(allocated(RF_a%xMaxBound))   deallocate(RF_a%xMaxBound)
-            if(allocated(RF_a%xMinBound))   deallocate(RF_a%xMinBound)
-            if(associated(RF_a%xPoints))  nullify (RF_a%xPoints)
-            if(associated(RF_a%randField))  nullify (RF_a%randField)
+            if(allocated(RF_a%xMaxBound)) deallocate(RF_a%xMaxBound)
+            if(allocated(RF_a%xMinBound)) deallocate(RF_a%xMinBound)
+            if(allocated(RF_a%neighSeed)) deallocate(RF_a%neighSeed)
+            if(allocated(RF_a%neighRange)) deallocate(RF_a%neighRange)
+            if(associated(RF_a%xPoints))   nullify(RF_a%xPoints)
+            if(associated(RF_a%randField)) nullify(RF_a%randField)
             RF_a%init = .false.
 
         end subroutine finalize_RF

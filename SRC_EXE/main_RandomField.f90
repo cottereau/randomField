@@ -61,7 +61,7 @@ program main_RandomField
     type(MESH) :: MSH
     type(TEST) :: TST
 
-    logical :: sameFolder =.true.
+    logical :: sameFolder =.false.
 
     !RDF%independent = independent
     !MSH%independent = independent
@@ -588,15 +588,28 @@ program main_RandomField
             call MPI_ALLREDUCE (RDF%xNTotal, all_xNTotal,1,MPI_INTEGER, &
                                 MPI_SUM,comm,code)
 
+            t1 = MPI_Wtime();
+            call MPI_ALLREDUCE (t1, all_t1, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
+            if(RDF%rang == 0) write(*,*) "Time Zero = ", all_t1
+
             write(get_fileId(),*) "Generating Random Field"
             call create_RF_Unstruct_Init (RDF, MSH)
             call show_RF(RDF, "RDF", unit_in = get_fileId())
 
-            write(get_fileId(),*) "-> Writing XMF and hdf5 files";
-            call write_Mono_XMF_h5(RDF%xPoints, RDF%randField, "trans_", RDF%rang, single_path, &
-                                                MPI_COMM_WORLD, ["_proc_"], [RDF%rang], 0)
+            t2 = MPI_Wtime();
+            call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
+            if(RDF%rang == 0) write(*,*) "Generation Time = ", all_t2 - all_t1
 
+!            write(get_fileId(),*) "-> Writing XMF and hdf5 files";
+!            call write_Mono_XMF_h5(RDF%xPoints, RDF%randField, "trans_", RDF%rang, single_path, &
+!                                                MPI_COMM_WORLD, ["_proc_"], [RDF%rang], 0)
 
+            t3 = MPI_Wtime();
+            call MPI_ALLREDUCE (t3, all_t3, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
+            if(RDF%rang == 0) write(*,*) "Writing Files Time = ", all_t3 - all_t2
+
+            call write_generation_spec(MSH, RDF, single_path, "singleGen", &
+                                       [all_t1,all_t2,all_t3])
 
 
 

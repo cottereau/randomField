@@ -62,6 +62,8 @@ contains
         double precision :: periodMult = 1.1D0 !"range" multiplier
         double precision :: rAdjust    = 1.0D0 !"rNStep minimum" multiplier
 
+        if(allocated(RDF%kPoints)) deallocate(RDF%kPoints)
+
         call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
 
         allocate(kDelta (RDF%nDim,1))
@@ -69,6 +71,7 @@ contains
             kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxBound - RDF%xMinBound)) !Delta max in between two wave numbers to avoid periodicity
         else
             kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
+            !kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxBound - RDF%xMinBound))
         end if
 
         select case (RDF%method)
@@ -125,6 +128,7 @@ contains
         !INPUT OUTPUT
         type(RF) :: RDF
 
+        if(allocated(RDF%SkVec)) deallocate(RDF%SkVec)
         allocate(RDF%SkVec(RDF%kNTotal))
 
         select case(RDF%corrMod)

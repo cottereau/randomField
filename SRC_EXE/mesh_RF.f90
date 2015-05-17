@@ -127,6 +127,8 @@ contains
         MSH%xNStep = find_xNStep(xBottom, xTop, MSH%xStep)
         MSH%xNTotal = product(MSH%xNStep)
         RDF%xNTotal = MSH%xNTotal
+        RDF%xMaxBound = xTop
+        RDF%xMinBound = xBottom
 
         allocate(xPoints(MSH%nDim, MSH%xNTotal))
 

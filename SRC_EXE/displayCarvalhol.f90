@@ -333,7 +333,7 @@ contains
         write(doubleFmt, fmt="(I3, A)") div, tempFmt;
 
         write(unit,*) ""
-        if(present(title)) write(*,*) "/////// ", title, " ///////";
+        if(present(title)) write(unit,*) "/////// ", title, " ///////";
 
         tol = 1E-10;
 
@@ -417,7 +417,7 @@ contains
             write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
             write(unit,*)
             do j= lbound(matrix2D,1), ubound(matrix2D,1)
-                write(*,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
+                write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
             enddo
         enddo
 
