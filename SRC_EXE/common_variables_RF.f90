@@ -8,6 +8,7 @@ module common_variables_RF
 	character(len=20) , parameter :: xStep_folder_name = "xStep"
 	character(len=20) , parameter :: Nmc_folder_name = "Nmc"
 	character(len=20) , parameter :: corrL_folder_name = "corrL"
+	character(len=200) :: single_path
 
 
 end module common_variables_RF

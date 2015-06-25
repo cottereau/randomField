@@ -53,20 +53,39 @@ contains
 
         !Internal Points
         counterXPoints = 0;
+        write(get_fileId(),*) "BEFORE tempXNStep"
         tempXNStep = find_xNStep(MSH%xMinLoc, MSH%xMaxLoc, MSH%xStep)
+        write(get_fileId(),*) "AFTER tempXNStep"
         do i = 1, product(tempXNStep)
             call get_Permutation(i, MSH%xMaxLoc, tempXNStep, xPoints(:,i), MSH%xMinLoc, snapExtremes = .true.);
         end do
 
         counterXPoints = counterXPoints + product(tempXNStep);
 
+        write(get_fileId(),*) "AFTER Internal Points"
+
+        call show_MESH(MSH, "MSH", unit_in = get_fileId())
+
         !Border Points
         do j = 1, size(MSH%xMaxNeigh, 2)
             if(MSH%neigh(j)<0) cycle
+!            write(get_fileId(),*) "Dir = ", j
+!            write(get_fileId(),*) "Neigh Rang = ", MSH%neigh(j)
             tempXNStep = find_xNStep(MSH%xMinNeigh(:,j), MSH%xMaxNeigh(:,j), MSH%xStep)
+!            write(get_fileId(),*) "tempXNStep = ", tempXNStep
+!            write(get_fileId(),*) "product(tempXNStep) = ", product(tempXNStep)
+!            write(get_fileId(),*) "counterXPoints = ", counterXPoints
+!            write(get_fileId(),*) "tempXNStep = ", tempXNStep
+!            write(get_fileId(),*) "MSH%xMaxNeigh(:,j) = ", MSH%xMaxNeigh(:,j)
+!            write(get_fileId(),*) "MSH%xMinNeigh(:,j) = ", MSH%xMinNeigh(:,j)
+
             do i = 1, product(tempXNStep)
-                call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), snapExtremes = .true.);
+                 !write(get_fileId(),*) "i = ", i
+                 call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), snapExtremes = .true.);
             end do
+
+            write(get_fileId(),*) "AFTER Border"
+
             MSH%indexNeigh(1, j) = counterXPoints + 1
             counterXPoints = counterXPoints + product(tempXNStep);
             MSH%indexNeigh(2,j) = counterXPoints
@@ -376,9 +395,10 @@ contains
         MSH%xMinLoc = MSH%xMin
         MSH%xMaxLoc = MSH%xMax
 
-        write(get_fileId(),*) "MSH%xMin = ", MSH%xMin
-        write(get_fileId(),*) "MSH%xMax = ", MSH%xMax
-
+        write(get_fileId(),*) " MSH%xMin = ", MSH%xMin
+        write(get_fileId(),*) " MSH%xMax = ", MSH%xMax
+        write(get_fileId(),*) " MSH%xMinLoc = ", MSH%xMinLoc
+        write(get_fileId(),*) " MSH%xMaxLoc = ", MSH%xMaxLoc
         deallocate(procDelta)
 
     end subroutine set_Local_Extremes_From_Coords
@@ -592,7 +612,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine redefine_Global_Inputs (MSH, RDF, pointsPerCorrL)
+    subroutine redefine_Global_Extremes (MSH, RDF, pointsPerCorrL)
 
         implicit none
 
@@ -607,10 +627,9 @@ contains
 
         MSH%xStep = RDF%corrL / dble(pointsPerCorrL);
 
-        write(get_fileId(),*) "BEFORE:"
-        write(get_fileId(),*) "MSH%xMinGlob = ", MSH%xMinGlob
-        write(get_fileId(),*) "MSH%xMaxGlob = ", MSH%xMaxGlob
-        write(get_fileId(),*) "MSH%overlap  = ", MSH%overlap
+        write(get_fileId(),*) " BEFORE:"
+        write(get_fileId(),*) " MSH%xMinGlob = ", MSH%xMinGlob
+        write(get_fileId(),*) " MSH%xMaxGlob = ", MSH%xMaxGlob
 
         !Redefining global extremes
         do i = 1, MSH%nDim
@@ -620,16 +639,59 @@ contains
                               intDivisor(MSH%xMaxGlob(i), MSH%xStep(i)*dble(MSH%procPerDim(i)), up = .true.)
         end do
 
+        write(get_fileId(),*) " AFTER:"
+        write(get_fileId(),*) " MSH%xMinGlob = ", MSH%xMinGlob
+        write(get_fileId(),*) " MSH%xMaxGlob = ", MSH%xMaxGlob
+
+    end subroutine redefine_Global_Extremes
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine redefine_Overlap (MSH, RDF)
+
+        implicit none
+
+        !INPUT AND OUTPUT
+        type(MESH) :: MSH
+        type(RF)   :: RDF
+
+        !LOCAL
+        integer :: i
+
+        write(get_fileId(),*) " BEFORE:"
+        write(get_fileId(),*) " MSH%overlap  = ", MSH%overlap
+
+
+        do i = 1, MSH%nDim
+            if(MSH%overlap > ((MSH%xMax(i) - MSH%xMin(i))/RDF%corrL(i)) - 4*MSH%xStep(i)) then
+
+                write(get_fileId(),*)"WARNING overlap exceeded local dimensions (consider changing the overlap size)"
+                write(get_fileId(),*)"  Dim = ", i
+                write(get_fileId(),*)"  OLD overlap value = ", MSH%overlap
+                MSH%overlap = ((MSH%xMax(i) - MSH%xMin(i))/RDF%corrL(i)) - 4*MSH%xStep(i)
+                write(get_fileId(),*)"  NEW overlap value = ", MSH%overlap
+
+            end if
+        end do
 
         !Redefining overlap
         MSH%overlap = 2*MSH%xStep(1) * intDivisor(MSH%overlap, MSH%xStep(1)*2, up = .true.)
 
-        write(get_fileId(),*) "AFTER:"
-        write(get_fileId(),*) "MSH%xMinGlob = ", MSH%xMinGlob
-        write(get_fileId(),*) "MSH%xMaxGlob = ", MSH%xMaxGlob
-        write(get_fileId(),*) "MSH%overlap  = ", MSH%overlap
+        if(MSH%overlap < 0.0D0) then
+            write(get_fileId(),*)"WARNING overlap is not adapted to this problem, overlap too big or mesh too coarse (try an non-overlapping approach)"
+            MSH%overlap = 0.0D0
+        end if
 
-    end subroutine redefine_Global_Inputs
+!        do i = 1, MSH%nDim
+!            if(MSH%overlap(i) > (MSH%xMaxGlob(i) - MSH%xMinGlob(i))) MSH%overlap(i) = (MSH%xMaxGlob(i) - MSH%xMinGlob(i))
+!        end do
+
+        write(get_fileId(),*) " AFTER:"
+        write(get_fileId(),*) " MSH%overlap  = ", MSH%overlap
+
+    end subroutine redefine_Overlap
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -676,18 +738,21 @@ contains
         !LOCAL VARIABLES
         integer :: i, d
         integer :: code, neighPos;
-        !integer, dimension(:), allocatable :: shift
         integer :: testrank = 4
+        double precision, parameter :: notPresent = -1.0D0
+        double precision, dimension(:), allocatable :: tempExtreme
 
-        !allocate(shift(MSH%nDim))
+        allocate(tempExtreme(MSH%nDim))
+
+        call show_MESH(MSH, "   REDEFINE EXTREMES INPUT MESH", unit_in = get_fileId())
+
+        !Redefining Overlap
+        !write(get_fileId(),*)"  OLD overlap value = ", MSH%overlap
+        !write(get_fileId(),*)"  (MSH%xMax(:) - MSH%xMin(:))/corrL(:) = ", (MSH%xMax(:) - MSH%xMin(:))/corrL(:)
 
 
+        !write(get_fileId(),*)"  NEW overlap value = ", MSH%overlap
 
-        !call MPI_CART_COORDS (MSH%topComm, neigh, MSH%nDim, shift, code)
-
-        !if(MSH%rang == testrank) write(*,*) "Inside redefine_extremes"
-
-        !if(MSH%rang == testrank) call show_MESH(MSH, "BEFORE")
 
         !Redimensioning the internal part
         do neighPos = 1, 2*MSH%nDim
@@ -696,7 +761,8 @@ contains
 
             !call MPI_CART_COORDS (MSH%topComm, MSH%neigh(neighPos), MSH%nDim, shift, code)
 
-            !shift = shift - MSH%coords
+            !write(get_fileId(),*) "neighPos = ", neighPos
+            !write(get_fileId(),*) "MSH%neighShift(:,neighPos) = ", MSH%neighShift(:,neighPos)
 
             do i = 1, MSH%nDim
                 if(MSH%neighShift(i,neighPos) < 0) then
@@ -722,15 +788,30 @@ contains
                 end if
 
             end do
+
+            !write(get_fileId(),*) "MSH%xMinLoc = ", MSH%xMinLoc
+            !write(get_fileId(),*) "MSH%xMaxLoc = ", MSH%xMaxLoc
+
         end do
+
+!        !tempExtreme = MSH%xMinLoc
+!        do i = 1, MSH%nDim
+!            if(MSH%xMinLoc(i) > MSH%xMaxLoc(i)) then
+!                write(get_fileId(),*)"WARNING xMin/xMaxLoc were put to the center (non-overlapping area doesn't exist)"
+!                MSH%xMinLoc(i) = (MSH%xMin(i) + MSH%xMax(i))/2
+!                MSH%xMaxLoc(i) = MSH%xMinLoc(i)
+!            end if
+!        end do
+
+        !write(get_fileId(),*) "AFTER Internal Redefining Extremes"
+        !write(get_fileId(),*) "MSH%xMinLoc = ", MSH%xMinLoc
+        !write(get_fileId(),*) "MSH%xMaxLoc = ", MSH%xMaxLoc
+        !write(get_fileId(),*) "MSH%xMin = ", MSH%xMin
+        !write(get_fileId(),*) "MSH%xMax = ", MSH%xMax
 
         !Dimensioning overlapping area
         do neighPos = 1, size(MSH%neigh)
             if(MSH%neigh(neighPos) < 0) cycle
-
-!            call MPI_CART_COORDS (MSH%topComm, MSH%neigh(neighPos), MSH%nDim, shift, code)
-!
-!            shift = shift - MSH%coords
 
             do i = 1, MSH%nDim
                 if(MSH%neighShift(i,neighPos) > 0) then
@@ -742,6 +823,7 @@ contains
                 else
                     MSH%xMaxNeigh(i,neighPos) = MSH%xMaxLoc(i)
                     MSH%xMinNeigh(i,neighPos) = MSH%xMinLoc(i)
+
                 end if
 
                 !Checking if the points are in the range
@@ -759,13 +841,18 @@ contains
                     write(get_fileId(),*)"MSH%xMaxGlob(i)    = ", MSH%xMaxGlob(i)
                     MSH%xMaxNeigh(i,neighPos) = MSH%xMaxGlob(i)
                 end if
+!                if(MSH%xMinNeigh(i,neighPos) >= MSH%xMaxNeigh(i,neighPos)) then
+!                    write(get_fileId(),*)"WARNING xMin/xMaxNeigh were put to -1.0 (non-overlapping area doesn't exist)"
+!                    MSH%xMinNeigh(i,neighPos) = notPresent
+!                    MSH%xMaxNeigh(i,neighPos) = notPresent
+!                end if
 
             end do
         end do
 
-        !if(MSH%rang == testrank) call show_MESH(MSH, "AFTER")
+        call show_MESH(MSH, "   REDEFINE EXTREMES OUTPUT MESH", unit_in = get_fileId())
 
-        !deallocate(shift)
+        deallocate(tempExtreme)
 
     end subroutine redefine_extremes
 
@@ -838,6 +925,7 @@ contains
 
         !OUTPUT
         integer, dimension(:), allocatable :: xNStep
+        integer :: i
 
         allocate(xNStep(size(xStep)))
 
@@ -848,6 +936,10 @@ contains
 !        write(*,*) " 1 + nint((xMax-xMin)/(xStep)) = ", 1 + nint((xMax-xMin)/(xStep))
 
         xNStep = 1 + nint((xMax-xMin)/(xStep));
+
+        do i = 1, size(xStep)
+            if(xNStep(i) < 1) stop "ERROR!!! Inside find_xNStep, xMin is greater than xMax"
+        end do
 
     end function find_xNStep
 

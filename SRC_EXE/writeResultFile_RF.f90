@@ -555,6 +555,8 @@ contains
             if(RDF%method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
             write(fileId,*) "--independent-----------------------"
             write(fileId,*) RDF%independent
+            write(fileId,*) "--overlap-----------------------"
+            write(fileId,*) MSH%overlap
             write(fileId,*) "--Seed-----------------------"
             write(fileId,fmt = "(I20)") RDF%seed
             if(present(timeVec)) then

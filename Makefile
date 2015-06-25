@@ -24,7 +24,9 @@ INCLUDEHDF5 = -I/opt/san/bibliotheques/hdf5/1.8.12/include
 LIBMPI = -L/opt/san/intel15/impi/5.0.2.044/lib64/ -lmpi -lmpi_dbg -lmpi_mt -lmpigf -lmpi_ilp64 
 INCLUDEMPI = -I/opt/san/intel15/impi/5.0.2.044/include64
 
-EXEC = randomField.exe
+EXEC  = randomField.exe
+#EXEC  = statistics.exe
+#EXEC2 = statistics.exe
 #FC   = ifort
 FC   = mpiifort
 FFLAGS = -O2
@@ -40,6 +42,7 @@ SRCS = $(wildcard *.f90 *.f)
 
 OBJS += ./displayCarvalhol.o \
 ./main_RandomField.o \
+./main_Statistics.o \
 ./test_func_RF.o \
 ./math_RF.o \
 ./constants_RF.o \
@@ -79,6 +82,11 @@ main_RandomField.o   : displayCarvalhol.o statistics_RF.o charFunctions.o \
 					   test_func_RF.o constants_RF.o mesh_RF.o \
 					   write_Log_File.o common_variables_RF.o \
 					   systemUt_RF.o type_RF.o type_MESH.o type_TEST.o dger.o
+main_Statistics.o    : displayCarvalhol.o statistics_RF.o charFunctions.o \
+					   randomFieldND.o  writeResultFile_RF.o readFile_RF.o \
+					   test_func_RF.o constants_RF.o mesh_RF.o \
+					   write_Log_File.o common_variables_RF.o \
+					   systemUt_RF.o type_RF.o type_MESH.o type_TEST.o dger.o					   
 test_func_RF.o       : displayCarvalhol.o statistics_RF.o randomFieldND.o \
 					   writeResultFile_RF.o readFile_RF.o mesh_RF.o mesh_RF.o\
 					   write_Log_File.o common_variables_RF.o \
@@ -86,8 +94,8 @@ test_func_RF.o       : displayCarvalhol.o statistics_RF.o randomFieldND.o \
 writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o write_Log_File.o constants_RF.o \
 					   type_RF.o type_MESH.o type_TEST.o
 randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o \
-			           constants_RF.o mesh_RF.o write_Log_File.o \
-			           type_RF.o type_MESH.o dgemm.o ranlib.o
+			           constants_RF.o mesh_RF.o write_Log_File.o writeResultFile_RF.o\
+			           common_variables_RF.o type_RF.o type_MESH.o dgemm.o ranlib.o
 statistics_RF.o      : displayCarvalhol.o math_RF.o write_Log_File.o
 spectra_RF.o         : displayCarvalhol.o math_RF.o write_Log_File.o constants_RF.o ranlib.o \
 					   type_RF.o
@@ -106,6 +114,7 @@ cumnor.o             : spmpar.o
 stvaln.o             : devlpl.o
 dinvnr.o             : stvaln.o cumnor.o
 cdfnor.o             : dinvnr.o spmpar.o cumnor.o
+
 
 # Making all the ".o" from the ".f90"
 %.o: ../randomField/SRC_EXE/%.f90
@@ -154,7 +163,7 @@ randomField: $(OBJS)
 	@echo 'Invoking: Fortran Linker'
 	$(FC) -o $(EXEC) $(FFLAGS) $(OBJS) $(INCLUDE) $(LIBS)
 	@echo 'Finished building target: $@'
-	@echo ' '
+	@echo ' '	
 
 # Other Targets
 clean:
