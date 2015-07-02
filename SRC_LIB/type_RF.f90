@@ -15,6 +15,7 @@ module type_RF
             !nDim independent
         integer :: nDim = -1!, xNTotal = -1, kNTotal = -1;
         integer(kind=8) :: xNTotal = -1, kNTotal = -1;
+        integer, dimension(:)  , allocatable :: seed
         integer :: seedStart = -1
         character (len=15) :: corrMod = "Not", margiFirst = "Not";
         double precision   :: fieldAvg = -1, fieldVar = -1;
@@ -23,12 +24,13 @@ module type_RF
         logical :: init = .false.
         logical :: independent
             !nDim dependent
-        double precision, dimension(:)   , allocatable :: corrL, kMax;
+        double precision, dimension(:)   , allocatable :: corrL, kMax, kDelta;
         double precision, dimension(:, :), allocatable :: kPoints;
+        double precision, dimension(:, :, :), allocatable :: Sk3D;
         double precision, dimension(:)   , allocatable :: SkVec;
         double precision, dimension(:, :), allocatable :: xPoints_Local
         double precision, dimension(:, :), allocatable :: randField_Local
-        integer, dimension(:)  , allocatable :: seed
+        integer, dimension(:)  , allocatable :: kNStep, xNStep
         integer, dimension(:,:), allocatable :: neighSeed
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:,:), allocatable :: neighRange;
@@ -56,6 +58,9 @@ module type_RF
             RF_a%nb_procs = nb_procs
             allocate(RF_a%corrL(nDim))
             allocate(RF_a%kMax(nDim))
+            allocate(RF_a%kNStep(nDim))
+            allocate(RF_a%xNStep(nDim))
+            allocate(RF_a%kDelta(nDim))
             allocate(RF_a%xMinGlob(nDim))
             allocate(RF_a%xMaxGlob(nDim))
             allocate(RF_a%calculate(Nmc))
@@ -65,13 +70,16 @@ module type_RF
             allocate(RF_a%seed(n))
             allocate(RF_a%neighSeed(n,(3**nDim)-1))
             allocate(RF_a%neighRange(nDim,(3**nDim)-1))
-            RF_a%corrL = -1
-            RF_a%kMax  = -1
-            RF_a%seed  = -1
+            RF_a%corrL  = -1
+            RF_a%kMax   = -1
+            RF_a%kDelta = -1
+            RF_a%seed   = -1
             RF_a%xMinGlob = -1
             RF_a%xMaxGlob = -1
             RF_a%xMinBound = -1
             RF_a%xMaxBound = -1
+            RF_a%kNStep = -1
+            RF_a%xNStep = -1
             RF_a%calculate(:) = .true.
             RF_a%init  = .true.
             RF_a%neighSeed(:,:) = -1
@@ -129,6 +137,7 @@ module type_RF
                 write(unit,"(A,("//dblFmt//"))") " |  |  |xMinBound  = ", RF_a%xMinBound
                 write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxBound  = ", RF_a%xMaxBound
                 write(unit,*) "|  |  |xNTotal                    = ", RF_a%xNTotal
+                write(unit,*) "|  |  |xNStep                     = ", RF_a%xNStep
                 write(unit,*) "|  |  |associated(xPoints)        = ", associated(RF_a%xPoints)
                 if(associated(RF_a%xPoints)) &
                 write(unit,*) "|  |  |shape(xPoints)             = ", shape(RF_a%xPoints)
@@ -139,6 +148,7 @@ module type_RF
                 write(unit,*) "|  |kPOINTS"
                 write(unit,"(A,("//dblFmt//"))") " |  |  |kMax       = ", RF_a%kMax
                 write(unit,*) "|  |  |kNTotal                    = ", RF_a%kNTotal
+                write(unit,*) "|  |  |kNStep                     = ", RF_a%kNStep
                 write(unit,*) "|  |  |allocated(kPoints)         = ", allocated(RF_a%kPoints)
                 if(allocated(RF_a%kPoints)) &
                 write(unit,*) "|  |  |shape(kPoints)             = ", shape(RF_a%kPoints)
@@ -225,6 +235,10 @@ module type_RF
             if(allocated(RF_a%xMinBound)) deallocate(RF_a%xMinBound)
             if(allocated(RF_a%neighSeed)) deallocate(RF_a%neighSeed)
             if(allocated(RF_a%neighRange)) deallocate(RF_a%neighRange)
+            if(allocated(RF_a%Sk3D))       deallocate(RF_a%Sk3D)
+            if(allocated(RF_a%kNStep))     deallocate(RF_a%kNStep)
+            if(allocated(RF_a%xNStep))     deallocate(RF_a%xNStep)
+            if(allocated(RF_a%kDelta))     deallocate(RF_a%kDelta)
             if(associated(RF_a%xPoints))   nullify(RF_a%xPoints)
             if(associated(RF_a%randField)) nullify(RF_a%randField)
             RF_a%init = .false.

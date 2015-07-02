@@ -20,17 +20,17 @@ program main_RandomField
     implicit none
 
     !INPUTS
-    integer                                        :: nDim, Nmc;
-    character (len=30), parameter                  :: mesh_input = "mesh_input"
-    character (len=30), parameter                  :: gen_input  = "gen_input"
-    character (len=30), parameter                  :: test_input = "test_input"
+    integer                       :: nDim, Nmc;
+    character (len=30), parameter :: mesh_input = "mesh_input"
+    character (len=30), parameter :: gen_input  = "gen_input"
+    character (len=30), parameter :: test_input = "test_input"
     logical :: step_variate, nmc_variate, corrL_variate
     logical :: step_speedUp, nmc_speedUp, corrL_fix_pointsPerCorrL
     integer :: step_nIter, nmc_nIter, corrL_nIter
     integer :: nmc_initial, corrL_pointsPerCorrL
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeFiles = .true.
-    logical :: sameFolder =.true.
+    logical :: sameFolder = .true.
 
     double precision, dimension(:), allocatable :: step_mult, step_add, step_initial
     double precision, dimension(:), allocatable :: corrL_mult, corrL_add, corrL_initial

@@ -10,7 +10,8 @@ module constants_RF
 	double precision, parameter :: MAX_DOUBLE = 2.0D+307
 	integer, parameter :: ISOTROPIC = 1, &
 	                      SHINOZUKA = 2, &
-	                      RANDOMIZATION = 3
+	                      RANDOMIZATION = 3, &
+	                      FFT = 4
 
 	integer :: TESTRANK = 0 !ONLY FOR TESTS
 

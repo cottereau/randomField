@@ -67,6 +67,36 @@ contains
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+
+    subroutine find_Permutation(pos, nStep, posVec)
+
+        implicit none
+
+        !INPUT
+        integer, intent(in)                 :: pos;
+        integer, dimension(1:), intent(in)  :: nStep;
+        !OUTPUT
+        integer, dimension(1:), intent(out) :: posVec;
+        !LOCAL VARIABLES
+        integer :: i, j;
+        integer :: seedStep, nDim;
+        double precision :: contrib
+
+        nDim = size(nStep);
+        contrib = 0.0d0
+
+
+        do j = 1, nDim
+            seedStep = product(nStep(j+1:));
+            if (j == nDim) seedStep = 1;
+            i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
+            posVec(j) = i;
+        end do
+
+    end subroutine find_Permutation
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine DGEMM_simple(A, B, C, transA_in, transB_in, alpha_in, beta_in)

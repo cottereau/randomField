@@ -85,42 +85,6 @@ contains
         !LOCAL
         logical, dimension(:), allocatable :: effectCalc;
 
-        !TESTE
-        integer N
-        parameter(N=4)
-        integer*8 plan
-        double complex, dimension(N) :: in, out
-        integer :: i
-
-        do i = 1,N,1
-            in(i) = dcmplx(float(i),float(i+1))
-            write(*,*) '    in(',i,') = ',in(i)
-        enddo
-
-        call dfftw_plan_dft_1d ( plan, N, in, out, FFTW_FORWARD, FFTW_ESTIMATE )
-
-        call dfftw_execute ( plan )
-
-        write(*,*) 'Output array:'
-        do i = 1,N,1
-            write(*,*) '    out(',i,') = ',out(i)
-        enddo
-
-        call dfftw_destroy_plan ( plan )
-
-        call dfftw_plan_dft_1d ( plan, N, out, in, FFTW_FORWARD, FFTW_ESTIMATE )
-
-        call dfftw_execute ( plan )
-
-        write(*,*) 'Output array after inverse FFT:'
-        do i = 1,N,1
-            write(*,*) '    ',N,' * in(',i,') = ',in(i)
-        enddo
-
-        call dfftw_destroy_plan ( plan )
-
-        !END TESTE
-
 
         if(RDF%rang == 0) write(*,*) "Inside create_RF_Unstruct_Init"
 
@@ -129,6 +93,9 @@ contains
         RDF%xMaxGlob  = MSH%xMaxGlob
         RDF%xMinBound = MSH%xMinBound
         RDF%xMaxBound = MSH%xMaxBound
+
+        !Getting Mesh Information
+        RDF%xNStep = MSH%xNStep
 
         !call get_Global_Extremes_Mesh(RDF%xPoints, RDF%xMinGlob, RDF%xMaxGlob)
 
@@ -190,16 +157,16 @@ contains
                 call gen_Std_Gauss_Isotropic(RDF)
             case(RANDOMIZATION)
                 call gen_Std_Gauss_Randomization(RDF)
+            case(FFT)
+                call gen_Std_Gauss_FFT(RDF)
         end select
 
-
-        !Communicating borders to neighbours
-        write(get_fileId(),*) ""
-        write(get_fileId(),*) "GENERATING BORDER RANDOM FIELDS"
-        write(get_fileId(),*) "-------------------------------"
-        write(get_fileId(),*) ""
-
         if(RDF%independent) then
+            !Communicating borders to neighbours
+            write(get_fileId(),*) ""
+            write(get_fileId(),*) "GENERATING BORDER RANDOM FIELDS"
+            write(get_fileId(),*) "-------------------------------"
+            write(get_fileId(),*) ""
             write(get_fileId(),*) "Discovering neighbours seed"
             call get_neighbours_info(RDF, MSH)
             write(get_fileId(),*) "Calculating tmpRDF"
@@ -277,7 +244,6 @@ contains
 
         !LOCAL
         double precision, dimension(:, :), allocatable :: phiK, kVec;
-        double precision, dimension(:, :), allocatable :: kDelta;
         double precision, dimension(:)   , allocatable :: dgemm_mult;
         double precision, dimension(:,:) , allocatable :: k_x_phi, kSign;
         double precision :: ampMult
@@ -291,16 +257,15 @@ contains
         if(present(randomK_in)) randomK = randomK_in
         call init_random_seed(RDF%seed)
 
-        !write(*,*) "Defining kPoints"
-        call set_kPoints(RDF, kDelta)
+        write(get_fileId(),*) "Defining kPoints and SkVec"
+        call set_kPoints(RDF)
         call set_SkVec(RDF)
 
-        !write(*,*) "Calculating Samples"
+        write(get_fileId(),*) "Calculating Fields"
         allocate(k_x_phi (RDF%xNTotal, 1))
         allocate(kSign (2**(RDF%nDim-1), RDF%nDim));
         allocate(kVec(RDF%nDim, 1))
 
-        !Generating random field samples
         call set_kSign(kSign) !Set the sign permutations for kVec
 
         allocate(phiK (RDF%kNTotal, size(kSign,1)));
@@ -308,12 +273,11 @@ contains
         if(.not. randomK) then
             write(get_fileId(),*) "Shinozuka, k discrete"
             RDF%randField(:,:) = 0.0d0;
-            ampMult = 2.0d0*sqrt(product(kDelta)/((2.0d0*PI)**(dble(RDF%nDim))))
+            ampMult = 2.0d0*sqrt(product(RDF%kDelta)/((2.0d0*PI)**(dble(RDF%nDim))))
             do n = 1, RDF%Nmc
 
-                !write(get_fileId(),*) "n ", n
-
                 if(.not. RDF%calculate(n)) cycle
+
                 call random_number(phiK(:,:))
                 phiK(:,:) = 2.0D0*pi*phiK(:,:)
 
@@ -323,8 +287,6 @@ contains
                 !Loop on k sign
                 do m = 1, size(kSign,1)
 
-                    !write(get_fileId(),*) "--m = ", m
-
                     !Changing kPoints Sign
                     do i = 1, RDF%nDim
                         if(kSign(m, i) == -1) RDF%kPoints(i,:) = -RDF%kPoints(i,:)
@@ -333,28 +295,13 @@ contains
                     !Loop on k
                     do j = 1, RDF%kNTotal
 
-                        !write(get_fileId(),*) "----j = ", j
-
                         call DGEMM_simple(RDF%xPoints, RDF%kPoints(:,j:j), k_x_phi(:,:), "T", "N") !x*k
-                        !k_x_phi(:,:) = matmul(transpose(RDF%xPoints), RDF%kPoints(:,j:j))
 
                         RDF%randField(:,n) = sqrt(RDF%SkVec(j)) * &
                                              cos(k_x_phi(:,1) + phiK(j, m)) &
                                              + RDF%randField(:,n)
 
-                        !if(RDF%rang == TESTRANK .and. j <= 4 .and. m==1) then
-                            !write(*,*) "m = ", m
-                            !write(*,*) "j = ", j
-                            !if(RDF%rang == TESTRANK) call dispCarvalhol(RDF%kPoints(:,1:testIndex), "AFTER RDF%kPoints(:,10:20)")
-                            !if(RDF%rang == TESTRANK) call dispCarvalhol(RDF%xPoints(:,1:testIndex), "AFTER RDF%xPoints(:,10:20)")
-                            !call dispCarvalhol(k_x_phi(1:testIndex,:), "k_x_phi(1:20, :)", "F25.5")
-                            !call dispCarvalhol(k_x_phi(1:testIndex,:), "k_x_phi(1:testIndex,:)", "E15.5")
-                        !end if
-
-
                     end do !END Loop on k
-
-                    write(get_fileId(),*) "--m OUT= ", m
 
                     !Reverting kPoints Sign
                     do i = 1, RDF%nDim
@@ -365,14 +312,10 @@ contains
 
             end do !END Loop on Nmc
 
-            write(get_fileId(),*) "Nmc OUT"
-
             RDF%randField(:,:) = ampMult * RDF%randField(:,:);
 
-            !call show_RF(RDF, "Shinozuka Discrete After Generation")
-            !call dispCarvalhol(RDF%randField, "RDF%randField")
         else
-!            if(RDF%rang == 0) write(*,*) "Shinozuka, k random"
+            if(RDF%rang == 0) write(*,*) "Shinozuka, k random"
 !            !call show_RF(RDF, "Shinozuka Random Before Generation")
 !            RDF%randField(:,:) = 0.0d0;
 !            ampMult = 2.0d0*sqrt(1/(RDF%kNTotal*(2.0d0*PI)**(dble(RDF%nDim))))
@@ -394,10 +337,8 @@ contains
 
         if(allocated(dgemm_mult))       deallocate(dgemm_mult)
         if(allocated(phiK))             deallocate(phiK);
-        if(allocated(kDelta))           deallocate(kDelta);
         if(allocated(k_x_phi))          deallocate(k_x_phi)
         if(allocated(kSign))            deallocate(kSign)
-        !if(allocated(k_dot_x_plus_phi)) deallocate(k_dot_x_plus_phi)
 
     end subroutine gen_Std_Gauss_Shinozuka
 
@@ -415,13 +356,177 @@ contains
         !LOCAL
         logical :: randomK;
 
-        if(RDF%rang == 0) write(*,*) "Inside Randomization"
+        write(get_fileId(),*) "Inside Randomization"
 
         randomK = .true.
 
         call gen_Std_Gauss_Shinozuka(RDF, randomK)
 
     end subroutine gen_Std_Gauss_Randomization
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine gen_Std_Gauss_FFT(RDF)
+
+        implicit none
+
+        !INPUT OUTPUT
+        type(RF), intent(inout) :: RDF
+
+        !LOCAL
+        double precision, dimension(:,:,:), allocatable :: gammak, phik
+        double complex, dimension(:,:,:), allocatable :: Dk, Dk_base
+        double precision, dimension(:,:,:), allocatable :: realOut
+        integer, dimension(3)  :: DkStart
+        integer, dimension(3) :: posVec, kS, kE, kSc, kEc;
+        integer :: pos, i
+        integer*8 plan
+        double complex, dimension(14) :: testV1, testV2
+
+
+
+!        !TESTE
+!        integer N
+!        parameter(N=4)
+!        integer*8 plan
+!        double complex, dimension(N) :: in, out
+!        integer :: i
+!
+!        do i = 1,N,1
+!            in(i) = dcmplx(float(i),float(i+1))
+!            write(*,*) '    in(',i,') = ',in(i)
+!        enddo
+!
+!        call dfftw_plan_dft_1d ( plan, N, in, out, FFTW_FORWARD, FFTW_ESTIMATE )
+!
+!        call dfftw_execute ( plan )
+!
+!        write(*,*) 'Output array:'
+!        do i = 1,N,1
+!            write(*,*) '    out(',i,') = ',out(i)
+!        enddo
+!
+!        call dfftw_destroy_plan ( plan )
+!
+!        call dfftw_plan_dft_1d ( plan, N, out, in, FFTW_FORWARD, FFTW_ESTIMATE )
+!
+!        call dfftw_execute ( plan )
+!
+!        write(*,*) 'Output array after inverse FFT:'
+!        do i = 1,N,1
+!            write(*,*) '    ',N,' * in(',i,') = ',in(i)
+!        enddo
+!
+!        call dfftw_destroy_plan ( plan )
+!        !END TESTE
+
+        write(*,*) "Inside FFT"
+        write(get_fileId(),*) "Inside FFT"
+
+        call init_random_seed(RDF%seed)
+
+        write(get_fileId(),*) "Defining kPoints and SkVec"
+        call set_kPoints(RDF)
+        call dispCarvalhol(RDF%kMax, "RDF%kMax")
+        call dispCarvalhol(RDF%kNStep, "RDF%kNStep")
+        call dispCarvalhol(RDF%kDelta, "RDF%kDelta")
+
+        call set_SkVec(RDF)
+
+        allocate(gammak (RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
+        allocate(phik   (RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
+        allocate(Dk_base(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
+        allocate(realOut(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
+        allocate(Dk     (2*RDF%kNStep(1)-2, 2*RDF%kNStep(2)-2, 2*RDF%kNStep(3)-2))
+
+        call random_number(gammak(:,:,:))
+        call random_number(phik(:,:,:))
+
+        Dk_base = gammak*sqrt(RDF%Sk3D)*exp(dcmplx(0.0D0,1.0D0)*2*pi*phik);
+
+        !Symmetrization
+        kS  = 2
+        kE  = RDF%kNStep-1
+        kSc = RDF%kNStep + 1;
+        kEc = 2*RDF%kNStep -2;
+        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)) =       Dk_base(:             , :             , :             ) ![ 1, 1, 1]
+
+        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = conjg(Dk_base(kE(1):kS(1):-1, :             , :             )) ![-1, 1, 1]
+        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = conjg(Dk_base(:             , kE(2):kS(2):-1, :             )) ![ 1,-1, 1]
+        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = conjg(Dk_base(:             , :             , kE(3):kS(3):-1)) ![ 1, 1,-1]
+
+        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = conjg(Dk_base(kE(1):kS(1):-1, kE(2):kS(2):-1, :             )) ![-1,-1, 1]
+        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = conjg(Dk_base(:             , kE(2):kS(2):-1, kE(3):kS(3):-1)) ![ 1,-1,-1]
+        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = conjg(Dk_base(kE(1):kS(1):-1, :             , kE(3):kS(3):-1)) ![-1, 1,-1]
+
+        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = conjg(Dk_base(kE(1):kS(1):-1, kE(2):kS(2):-1, kE(3):kS(3):-1)) ![-1,-1,-1]
+
+        testV1(1:8)  = Dk_base(1:8,1,1)
+        testV1(9:14) = conjg(Dk_base(7:2:-1,1,1))
+
+!        write(*,*) "BEFORE FFT testV1 = ", testV1
+!
+!        call dfftw_plan_dft_1d(plan, 14, &
+!                               testV1, testV1, FFTW_BACKWARD, FFTW_ESTIMATE)
+!        call dfftw_execute(plan)
+!        call dfftw_destroy_plan(plan)!
+!
+!        write(*,*) "AFTER FFT testV1 = ", testV1
+
+
+!        write(*,*) " shape(Dk_base) = ", shape(Dk_base)
+!        write(*,*) " shape(Dk) = ", shape(Dk)
+!        write(*,*) " kS  = ", kS
+!        write(*,*) " kE  = ", kE
+!        write(*,*) " kSc = ", kSc
+!        write(*,*) " kEc = ", kEc
+!        write(*,*) " Corners 1st quadrant"
+!        write(*,*) " Dk(1,1,1) = ", Dk(2, 2, 2)
+!        write(*,*) " Dk() = ", Dk(kEc(1), 2, 2)
+!        write(*,*) " Dk() = ", Dk(2, kEc(2), 2)
+!        write(*,*) " Dk() = ", Dk(2, 2, kEc(3))
+!        write(*,*) " Dk() = ", Dk(kEc(1), kEc(2), 2)
+!        write(*,*) " Dk() = ", Dk(2, kEc(2), kEc(3))
+!        write(*,*) " Dk() = ", Dk(kEc(1), 2, kEc(3))
+!        write(*,*) " Dk(N,N,N) = ", Dk(kEc(1), kEc(2), kEc(3))
+
+        !write(*,*) "Dk 111    = ", Dk(1:5, 1:5, 1:5)
+        !write(*,*) "Dk -1-1-1 = ",Dk(kSc(1)-5:kSc(1)  , kSc(2)-5:kSc(2)  , kSc(3)-5:kSc(3)  )
+
+!        write(*,*) "BEFORE Dk(1:10,1:10,1)", Dk(1:10,1:10,1)
+!
+!        call dfftw_plan_dft_3d(plan, RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3), &
+!                               Dk_base, Dk_base, FFTW_BACKWARD, FFTW_ESTIMATE)
+        call dfftw_plan_dft_3d(plan, kEc(1), kEc(2), kEc(3), &
+                               Dk, Dk, FFTW_BACKWARD, FFTW_ESTIMATE)
+!        call fftw_plan_dft_c2r_3d(plan, kEc(1), kEc(2), kEc(3), &
+!                                  Dk, realOut, FFTW_ESTIMATE)
+        call dfftw_execute(plan)
+        call dfftw_destroy_plan(plan)
+
+        realOut(:,:,:) = real(Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)))
+
+        !write(*,*) "AFTER Dk(1:10,1:10,1)", Dk(1:10,1:10,1)
+        write(*,*) "AFTER realOut(1:10,1:10,1)", realOut(1:10,1:10,1)
+
+        !Mapping generated field back to coordinates
+        DkStart = [1, 1, 1]
+
+        do pos = 1, RDF%xNTotal
+            call find_Permutation(pos, RDF%kNStep, posVec)
+            !write(*,*) "pos = ", pos, "posVec = ", posVec
+            RDF%randField(pos,1) = realOut(posVec(1), posVec(2), posVec(3))
+        end do
+
+        deallocate(gammak)
+        deallocate(phik)
+        deallocate(Dk)
+        deallocate(Dk_base)
+        deallocate(realOut)
+
+    end subroutine gen_Std_Gauss_FFT
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

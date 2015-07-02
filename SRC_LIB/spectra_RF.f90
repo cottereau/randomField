@@ -48,15 +48,13 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_kPoints(RDF, kDelta);
+    subroutine set_kPoints(RDF);
         implicit none
 
         !INPUT OUTPUT
         type(RF) :: RDF
-        double precision, dimension(:,:), allocatable, intent(out) :: kDelta
 
         !LOCAL
-        integer         , dimension(:)  , allocatable :: kNStep
         integer :: i
         double precision :: kAdjust    = 1.0D0 !"kNStep minimum" multiplier
         double precision :: periodMult = 1.1D0 !"range" multiplier
@@ -66,11 +64,10 @@ contains
 
         call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
 
-        allocate(kDelta (RDF%nDim,1))
         if(RDF%independent) then
-            kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxBound - RDF%xMinBound)) !Delta max in between two wave numbers to avoid periodicity
+            RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxBound - RDF%xMinBound)) !Delta max in between two wave numbers to avoid periodicity
         else
-            kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
+            RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
             !kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxBound - RDF%xMinBound))
         end if
 
@@ -78,25 +75,23 @@ contains
             case(ISOTROPIC)
 
             case(SHINOZUKA)
-                allocate(kNStep (RDF%nDim))
-                kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/kDelta(:,1))); !Number of points in k
-                kDelta(:,1) = (RDF%kMax)/(kNStep-1); !Redefining kDelta after ceiling and adjust
-                RDF%kNTotal = product(kNStep);
+                RDF%kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:))); !Number of points in k
+                RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1); !Redefining kDelta after ceiling and adjust
+                RDF%kNTotal = product(RDF%kNStep);
 
-                write(get_fileId(),*) "kNStep = ", kNStep
+                write(get_fileId(),*) "RDF%kNStep = ", RDF%kNStep
                 write(get_fileId(),*) "RDF%kNTotal = ", RDF%kNTotal
 
                 allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
 
                 do i = 1, RDF%kNTotal
-                    call get_Permutation(i, RDF%kMax, kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
+                    call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
                 end do
 
             case(RANDOMIZATION)
-                allocate(kNStep (RDF%nDim))
-                kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/kDelta(:,1))); !Number of points in k
-                kDelta(:,1) = (RDF%kMax)/(kNStep-1); !Redefining kDelta after ceiling and adjust
-                RDF%kNTotal = product(kNStep);
+                RDF%kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:))); !Number of points in k
+                RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1); !Redefining kDelta after ceiling and adjust
+                RDF%kNTotal = product(RDF%kNStep);
 
                 allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
                 call random_number(RDF%kPoints(:,:))
@@ -104,16 +99,12 @@ contains
                     RDF%kPoints(i,:) = RDF%kPoints(i,:) * RDF%kMax(i)
                 end do
 
-!                deallocate(kDelta)
-!                allocate(kDelta(RDF%nDim, RDF%kNTotal))
-!
-!                call set_DeltaMatrix(RDF%kPoints(:,:), kDelta(:,:))
-!                call dispCarvalhol(transpose(RDF%kPoints), "transpose(RDF%kPoints)")
-!                call dispCarvalhol(transpose(kDelta), "transpose(kDelta)")
+            case(FFT)
+                RDF%kNStep(:) = 2*RDF%xNStep(:); !Number of points in k
+                RDF%kNTotal   = product(RDF%kNStep);
+                RDF%kMax(:)   = dble(RDF%kNStep(:) - 1) * RDF%kDelta(:)
 
         end select
-
-        if(allocated(kNStep)) deallocate(kNStep)
 
     end subroutine set_kPoints
 
@@ -125,15 +116,57 @@ contains
         implicit none
 
         !OBS: corrL is supposed = 1. The complete formula is RDF%SkVec = product(corrL) * exp(-dot_product(kVector**2, corrL_effec**2)/(4.0d0*pi))
+
         !INPUT OUTPUT
         type(RF) :: RDF
 
+        !LOCAL
+        integer :: i, j, k
+        logical :: cycleX, cycleY, cycleZ
+
+
         if(allocated(RDF%SkVec)) deallocate(RDF%SkVec)
-        allocate(RDF%SkVec(RDF%kNTotal))
+        if(RDF%method /= FFT ) allocate(RDF%SkVec(RDF%kNTotal))
 
         select case(RDF%corrMod)
+
             case("gaussian")
-                RDF%SkVec = exp(-sum(RDF%kPoints**(2.0D0), 1)/(4.0d0*pi))
+                select case (RDF%method)
+                    case(FFT)
+                        if(RDF%nDim == 3 ) then
+
+                            allocate(RDF%Sk3D(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
+                            RDF%Sk3D(:,:,:) = 0.0D0;
+
+                            do k = 1, RDF%kNStep(3)
+                                do j = 1, RDF%kNStep(2)
+                                    do i = 1, RDF%kNStep(1)
+
+                                        RDF%Sk3D(i,j,k) = exp(                                  &
+                                            -(((i-1)*RDF%kDelta(1))**(2.0D0)  &
+                                            + ((j-1)*RDF%kDelta(2))**(2.0D0)  &
+                                            + ((k-1)*RDF%kDelta(3))**(2.0D0)) &
+                                            /(4.0d0*pi))
+
+                                        !TODO: Optimize to cycle when reaching Sk3D < TOLERANCE)
+
+!                                        if(i==1) write(*,*) "RDF%Sk3D(i,j,k) = ",  RDF%Sk3D(i,j,k);
+!                                        if(i==1) write(*,*) "sum k**2 = ",  ((i-1)*RDF%kDelta(1))**(2.0D0)  &
+!                                                                          + ((j-1)*RDF%kDelta(2))**(2.0D0)  &
+!                                                                          + ((k-1)*RDF%kDelta(3))**(2.0D0)
+                                    end do
+
+                                end do
+                            end do
+                        else
+                            write(*,*) "ERROR!, FFT only is implemented in 3D)"
+                            stop
+                        end if
+
+                    case default
+                        RDF%SkVec = exp(-sum(RDF%kPoints**(2.0D0), 1)/(4.0d0*pi))
+
+                end select
         end select
 
     end subroutine set_SkVec
