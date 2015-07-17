@@ -151,10 +151,10 @@ contains
         write(get_fileId(),*) ""
 
         select case (RDF%method)
-            case(SHINOZUKA)
-                call gen_Std_Gauss_Shinozuka(RDF)
             case(ISOTROPIC)
                 call gen_Std_Gauss_Isotropic(RDF)
+            case(SHINOZUKA)
+                call gen_Std_Gauss_Shinozuka(RDF)
             case(RANDOMIZATION)
                 call gen_Std_Gauss_Randomization(RDF)
             case(FFT)
@@ -270,52 +270,58 @@ contains
 
         allocate(phiK (RDF%kNTotal, size(kSign,1)));
 
-        if(.not. randomK) then
-            write(get_fileId(),*) "Shinozuka, k discrete"
-            RDF%randField(:,:) = 0.0d0;
-            ampMult = 2.0d0*sqrt(product(RDF%kDelta)/((2.0d0*PI)**(dble(RDF%nDim))))
-            do n = 1, RDF%Nmc
-
-                if(.not. RDF%calculate(n)) cycle
-
-                call random_number(phiK(:,:))
-                phiK(:,:) = 2.0D0*pi*phiK(:,:)
-
-                write(get_fileId(),*) "First PhiK = ", phiK(1,1)
-                write(get_fileId(),*) "Last PhiK  = ", phiK(size(phiK,1), size(phiK,2))
-
-                !Loop on k sign
-                do m = 1, size(kSign,1)
-
-                    !Changing kPoints Sign
-                    do i = 1, RDF%nDim
-                        if(kSign(m, i) == -1) RDF%kPoints(i,:) = -RDF%kPoints(i,:)
-                    end do
-
-                    !Loop on k
-                    do j = 1, RDF%kNTotal
-
-                        call DGEMM_simple(RDF%xPoints, RDF%kPoints(:,j:j), k_x_phi(:,:), "T", "N") !x*k
-
-                        RDF%randField(:,n) = sqrt(RDF%SkVec(j)) * &
-                                             cos(k_x_phi(:,1) + phiK(j, m)) &
-                                             + RDF%randField(:,n)
-
-                    end do !END Loop on k
-
-                    !Reverting kPoints Sign
-                    do i = 1, RDF%nDim
-                        if(kSign(m, i) == -1) RDF%kPoints(i,:) = -RDF%kPoints(i,:)
-                    end do
-
-                end do !END Loop on k sign
-
-            end do !END Loop on Nmc
-
-            RDF%randField(:,:) = ampMult * RDF%randField(:,:);
-
+        if(randomK) then
+            write(get_fileId(),*) "Shinozuka, k random"
+            ampMult = 2.0d0*sqrt(1/(RDF%kNTotal*(2.0d0*PI)**(dble(RDF%nDim))))
         else
-            if(RDF%rang == 0) write(*,*) "Shinozuka, k random"
+            write(get_fileId(),*) "Shinozuka, k discrete"
+            ampMult = 2.0d0*sqrt(product(RDF%kDelta)/((2.0d0*PI)**(dble(RDF%nDim))))
+        end if
+
+        RDF%randField(:,:) = 0.0d0;
+
+        do n = 1, RDF%Nmc
+
+            if(.not. RDF%calculate(n)) cycle
+
+            call random_number(phiK(:,:))
+            phiK(:,:) = 2.0D0*pi*phiK(:,:)
+
+            write(get_fileId(),*) "First PhiK = ", phiK(1,1)
+            write(get_fileId(),*) "Last PhiK  = ", phiK(size(phiK,1), size(phiK,2))
+
+            !Loop on k sign
+            do m = 1, size(kSign,1)
+
+                !Changing kPoints Sign
+                do i = 1, RDF%nDim
+                    if(kSign(m, i) == -1) RDF%kPoints(i,:) = -RDF%kPoints(i,:)
+                end do
+
+                !Loop on k
+                do j = 1, RDF%kNTotal
+
+                    call DGEMM_simple(RDF%xPoints, RDF%kPoints(:,j:j), k_x_phi(:,:), "T", "N") !x*k
+
+                    RDF%randField(:,n) = sqrt(RDF%SkVec(j)) * &
+                                         cos(k_x_phi(:,1) + phiK(j, m)) &
+                                         + RDF%randField(:,n)
+
+                end do !END Loop on k
+
+                !Reverting kPoints Sign
+                do i = 1, RDF%nDim
+                    if(kSign(m, i) == -1) RDF%kPoints(i,:) = -RDF%kPoints(i,:)
+                end do
+
+            end do !END Loop on k sign
+
+        end do !END Loop on Nmc
+
+        RDF%randField(:,:) = ampMult * RDF%randField(:,:);
+
+!        else
+!            if(RDF%rang == 0) write(*,*) "Shinozuka, k random"
 !            !call show_RF(RDF, "Shinozuka Random Before Generation")
 !            RDF%randField(:,:) = 0.0d0;
 !            ampMult = 2.0d0*sqrt(1/(RDF%kNTotal*(2.0d0*PI)**(dble(RDF%nDim))))
@@ -333,7 +339,7 @@ contains
 !            end do
 
             !call show_RF(RDF, "Shinozuka Random After Generation")
-        end if
+!        end if
 
         if(allocated(dgemm_mult))       deallocate(dgemm_mult)
         if(allocated(phiK))             deallocate(phiK);
@@ -364,6 +370,139 @@ contains
 
     end subroutine gen_Std_Gauss_Randomization
 
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+
+    subroutine gen_Std_Gauss_Isotropic(RDF)
+
+        implicit none
+
+        !INPUT OUTPUT
+        type(RF), intent(inout) :: RDF
+
+        !LOCAL
+        double precision, dimension(:)  , allocatable :: gammaN, phiN, thetaN, psiN;
+        double precision, dimension(:)  , allocatable :: rVec;
+        logical         , dimension(:)  , allocatable :: effectCalc;
+        double precision :: rMax, Sk
+        double precision, dimension(1) :: rMaxVec
+        integer          :: i, j, k, m;
+        integer          :: rNTotal;
+        double precision :: step, rDelta, rAdjust = 5.0, periodMul = 1.1;
+        double precision, dimension(:), allocatable :: dgemm_mult;
+
+        !Allocating
+        allocate(rVec (RDF%nDim));
+        allocate(dgemm_mult(RDF%xNTotal))
+
+        !r Definition
+        call set_kMaxND(RDF%corrMod, rMaxVec)
+        rMax = rMaxVec(1)
+        rDelta  = 2d0*pi/(periodMul*sqrt(sum((RDF%xMaxGlob - RDF%xMinGlob)**2))) !Delta min in between two wave numbers to avoid periodicity
+        rNTotal = rAdjust*(ceiling(rMax/rDelta) + 1);
+
+        !Generating random field samples
+        step      = rMax/dble(rNTotal)
+        RDF%randField(:,:) = 0.0D0;
+
+        call init_random_seed(RDF%seed)
+
+        if (RDF%nDim == 2) then
+            allocate(psiN   (rNTotal));
+            allocate(thetaN (rNTotal));
+            allocate(gammaN (rNTotal));
+            do k = 1, RDF%Nmc
+                if(RDF%calculate(k)) then
+                    call random_number(psiN(:))
+                    call random_number(thetaN(:))
+                    call random_number(gammaN(:))
+                    psiN   = 2d0*pi*psiN
+                    thetaN = 2d0*pi*psiN
+                    gammaN = 2d0*pi*gammaN
+
+                    do j = 1, rNTotal
+                        rVec           = [cos(thetaN(j)) * (j-1)*step, &
+                                          sin(thetaN(j)) * (j-1)*step]
+                        Sk             = get_SpectrumND([(j-1)*step], RDF%corrMod); !Obs, here Sk is a scalar
+                        call DGEMM ( "T", "N", RDF%xNTotal, 1, RDF%nDim, &
+                            1.0d0, RDF%xPoints, RDF%nDim, rVec, RDF%nDim, 0.0d0, dgemm_mult, RDF%xNTotal)
+
+                        RDF%randField(:,k) = sqrt(Sk*(j-1)*(dble(step**2))) * gammaN(j) &
+                                            * cos(                           &
+                                            dgemm_mult                &
+                                            + psiN(j)                 &
+                                            )                          &
+                                            + RDF%randField(:,k)
+                    end do
+                else
+                    RDF%randField(:,k) = 0.0
+                end if
+            end do
+
+        else if (RDF%nDim == 3) then
+            !write(*,*) "nDim = 3 !!!"
+            !write(*,*) "k = ",k;
+            allocate(psiN   (rNTotal));
+            allocate(thetaN (rNTotal));
+            allocate(phiN   (rNTotal));
+            allocate(gammaN (rNTotal));
+            do k = 1, RDF%Nmc
+                if(RDF%calculate(k)) then
+                    !write(*,*) "k = ",k;
+                    !write(*,*) "rNTotal = ",rNTotal;
+                    call random_number(phiN(:))
+                    call random_number(thetaN(:))
+                    call random_number(gammaN(:))
+                    call random_number(psiN(:))
+
+                    psiN   = 2*pi*psiN
+                    thetaN = 2*pi*psiN
+                    phiN   = pi*phiN
+                    gammaN = sqrt(12.0)*(gammaN -0.5d0)
+
+                    do j = 1, rNTotal
+                        !write(*,*) "j = ", j
+                        rVec           = [cos(thetaN(j))*sin(phiN(j)) * (j-1)*step, &
+                                          sin(thetaN(j))*sin(phiN(j)) * (j-1)*step, &
+                                          cos(phiN(j))                * (j-1)*step]
+                        Sk             = get_SpectrumND([(j-1)*step], RDF%corrMod);
+                        call DGEMM ( "T", "N", RDF%xNTotal, 1, RDF%nDim, &
+                                    1.0d0, RDF%xPoints, RDF%nDim, rVec, RDF%nDim, 0.0d0, dgemm_mult, RDF%xNTotal)
+                        RDF%randField(:,k) = sqrt(Sk*sin(phiN(j))*step*((j-1)*step)**2) * gammaN(j) &
+                                              * cos(                                             &
+                                              dgemm_mult                                   &
+                                              + psiN(j)                                    &
+                                              )                                            &
+                                              + RDF%randField(:,k)
+                    end do
+                else
+                    RDF%randField(:,k) = 0.0
+                end if
+            end do
+
+        else
+            write(*,*) "ERROR The number of dimensions is not accepted in this method (Isotropic)";
+            write(*,*) "RDF%nDim = ", RDF%nDim;
+            stop
+        end if
+
+        !if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
+
+        RDF%randField(:,:) = sqrt((1.0d0)/((2.0d0*pi)**(RDF%nDim)))&
+                             * RDF%randField(:,:)
+
+        if(allocated(dgemm_mult))   deallocate(dgemm_mult)
+        if(allocated(phiN))         deallocate(phiN);
+        if(allocated(psiN))         deallocate(psiN);
+        if(allocated(thetaN))       deallocate(thetaN);
+        if(allocated(gammaN))       deallocate(gammaN);
+        if(allocated(rVec))         deallocate(rVec);
+
+    end subroutine gen_Std_Gauss_Isotropic
+
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -382,89 +521,138 @@ contains
         integer, dimension(3)  :: DkStart
         integer, dimension(3) :: posVec, kS, kE, kSc, kEc;
         integer :: pos, i
-        integer*8 plan
-        double complex, dimension(14) :: testV1, testV2
+        integer*8 plan, planTest2
+        double complex,   dimension(2000) :: testV1, testV2
 
+!        !START TEST
+!        testV1(:) = 0.0D0
+!        testV2(:) = 0.0D0
+!        !write(*,*) "size(testV1(686:1314)) = ", size(testV1(686:1314))
+!        !write(*,*) "size([(sin(dble(i)/1000), i =0, 628)]) = ", size([(sin(dble(i)/1000), i =0, 628)])
+!        testV1(686:1314) = [(sin(dble(i)/100), i =0, 628)]
+!
+!
+!        open (unit = 98 , file = "beforeFFT", action = 'write')
+!        open (unit = 99 , file = "afterFFT", action = 'write')
+!        open (unit = 100 , file = "afteriFFT", action = 'write')
+!
+!        write(*,*) "BEFORE FFT testV1"
+!        write(98,"(2F15.5)") testV1
+!
+!
+!        call dfftw_plan_dft_1d(planTest2, 2000, &
+!                               testV1, testV2, FFTW_FORWARD, FFTW_ESTIMATE)
+!        call dfftw_execute(planTest2)
+!
+!        write(*,*) "AFTER FFT testV2"
+!        write(99,"(2F15.5)") testV2
+!
+!        call dfftw_plan_dft_1d(planTest2, 2000, &
+!                               testV2, testV1, FFTW_BACKWARD, FFTW_ESTIMATE)
+!        call dfftw_execute(planTest2)
+!        write(*,*) "AFTER iFFT testV1"
+!        write(100,"(2F15.5)") testV1
+!
+!        call dfftw_destroy_plan(planTest2)!
+!
+!        close (98)
+!        close (99)
+!        close (100)
+!        !END TEST
 
-
-!        !TESTE
-!        integer N
-!        parameter(N=4)
-!        integer*8 plan
-!        double complex, dimension(N) :: in, out
-!        integer :: i
-!
-!        do i = 1,N,1
-!            in(i) = dcmplx(float(i),float(i+1))
-!            write(*,*) '    in(',i,') = ',in(i)
-!        enddo
-!
-!        call dfftw_plan_dft_1d ( plan, N, in, out, FFTW_FORWARD, FFTW_ESTIMATE )
-!
-!        call dfftw_execute ( plan )
-!
-!        write(*,*) 'Output array:'
-!        do i = 1,N,1
-!            write(*,*) '    out(',i,') = ',out(i)
-!        enddo
-!
-!        call dfftw_destroy_plan ( plan )
-!
-!        call dfftw_plan_dft_1d ( plan, N, out, in, FFTW_FORWARD, FFTW_ESTIMATE )
-!
-!        call dfftw_execute ( plan )
-!
-!        write(*,*) 'Output array after inverse FFT:'
-!        do i = 1,N,1
-!            write(*,*) '    ',N,' * in(',i,') = ',in(i)
-!        enddo
-!
-!        call dfftw_destroy_plan ( plan )
-!        !END TESTE
+        !write(*,*) "AFTER FFT testV1 = ", testV1
 
         write(*,*) "Inside FFT"
         write(get_fileId(),*) "Inside FFT"
 
-        call init_random_seed(RDF%seed)
+!        call init_random_seed(RDF%seed)
+!
+
+!        call dispCarvalhol(RDF%kMax, "RDF%kMax")
+!        call dispCarvalhol(RDF%kNStep, "RDF%kNStep")
+!        call dispCarvalhol(RDF%kDelta, "RDF%kDelta")
 
         write(get_fileId(),*) "Defining kPoints and SkVec"
         call set_kPoints(RDF)
-        call dispCarvalhol(RDF%kMax, "RDF%kMax")
-        call dispCarvalhol(RDF%kNStep, "RDF%kNStep")
-        call dispCarvalhol(RDF%kDelta, "RDF%kDelta")
-
         call set_SkVec(RDF)
-
+!
         allocate(gammak (RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
         allocate(phik   (RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
         allocate(Dk_base(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
-        allocate(realOut(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
         allocate(Dk     (2*RDF%kNStep(1)-2, 2*RDF%kNStep(2)-2, 2*RDF%kNStep(3)-2))
-
+!        allocate(realOut(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
+!
         call random_number(gammak(:,:,:))
         call random_number(phik(:,:,:))
 
-        Dk_base = gammak*sqrt(RDF%Sk3D)*exp(dcmplx(0.0D0,1.0D0)*2*pi*phik);
+        Dk_base = gammak*sqrt(RDF%Sk3D)*exp(2*pi*phik);
 
+        write(get_fileId(),*) "Symmetrization"
         !Symmetrization
         kS  = 2
         kE  = RDF%kNStep-1
         kSc = RDF%kNStep + 1;
         kEc = 2*RDF%kNStep -2;
-        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)) =       Dk_base(:             , :             , :             ) ![ 1, 1, 1]
 
-        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = conjg(Dk_base(kE(1):kS(1):-1, :             , :             )) ![-1, 1, 1]
-        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = conjg(Dk_base(:             , kE(2):kS(2):-1, :             )) ![ 1,-1, 1]
-        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = conjg(Dk_base(:             , :             , kE(3):kS(3):-1)) ![ 1, 1,-1]
+        write(get_fileId(),*) " RDF%kNStep = ", RDF%kNStep
+        write(get_fileId(),*) " shape(Dk_base) = ", shape(Dk_base)
+        write(get_fileId(),*) " shape(Dk) = ", shape(Dk)
+        write(get_fileId(),*) " kS  = ", kS
+        write(get_fileId(),*) " kE  = ", kE
+        write(get_fileId(),*) " kSc = ", kSc
+        write(get_fileId(),*) " kEc = ", kEc
 
-        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = conjg(Dk_base(kE(1):kS(1):-1, kE(2):kS(2):-1, :             )) ![-1,-1, 1]
-        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = conjg(Dk_base(:             , kE(2):kS(2):-1, kE(3):kS(3):-1)) ![ 1,-1,-1]
-        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = conjg(Dk_base(kE(1):kS(1):-1, :             , kE(3):kS(3):-1)) ![-1, 1,-1]
+        write(get_fileId(),*) "Copy"
+        !Copy
+        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = Dk_base(:,:,:)
 
-        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = conjg(Dk_base(kE(1):kS(1):-1, kE(2):kS(2):-1, kE(3):kS(3):-1)) ![-1,-1,-1]
+        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = Dk_base(kS(1):kE(1),:,:)
+        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = Dk_base(:,kS(2):kE(2),:)
+        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = Dk_base(:,:,kS(3):kE(3))
 
-        testV1(1:8)  = Dk_base(1:8,1,1)
-        testV1(9:14) = conjg(Dk_base(7:2:-1,1,1))
+        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = Dk_base(kS(1):kE(1), kS(2):kE(2), :          ) ![-1,-1, 1]
+        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = Dk_base(:          , kS(2):kE(2), kS(3):kE(3)) ![ 1,-1,-1]
+        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = Dk_base(kS(1):kE(1), :          , kS(3):kE(3)) ![-1, 1,-1]
+
+        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = Dk_base(kS(1):kE(1), kS(2):kE(2), kS(3):kE(3)) ![-1,-1,-1]
+
+        write(get_fileId(),*) "Hermitian Conjugate"
+        !Hermitian Conjugate
+        Dk(kSc(1):kEc(1), :, :) = -conjg(Dk(kEc(1):kSc(1):-1, :, :))
+        Dk(:, kSc(2):kEc(2), :) = -conjg(Dk(:, kEc(2):kSc(2):-1, :))
+        Dk(:, :, kSc(3):kEc(3)) = -conjg(Dk(:, :, kEc(3):kSc(3):-1))
+
+        write(get_fileId(),*) "FFT Execution"
+        !FFT Execution
+        call dfftw_plan_dft_3d(plan, size(Dk,1), size(Dk,2), size(Dk,3), &
+                               Dk, Dk, FFTW_BACKWARD, FFTW_ESTIMATE)
+
+        call dfftw_execute(plan)
+        call dfftw_destroy_plan(plan)
+
+        write(get_fileId(),*) "Mapping"
+        do pos = 1, RDF%xNTotal
+             write(get_fileId(),*) "pos = ", pos
+            call find_Permutation(pos, RDF%kNStep, posVec)
+            !write(*,*) "pos = ", pos, "posVec = ", posVec
+            write(get_fileId(),*) "allocated(RDF%randField) = ", allocated(RDF%randField)
+            RDF%randField(pos,1) = real(Dk(posVec(1), posVec(2), posVec(3)))
+        end do
+
+!        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)) =       Dk_base(:             , :             , :             ) ![ 1, 1, 1]
+
+!        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = conjg(Dk_base(kE(1):kS(1):-1, :             , :             )) ![-1, 1, 1]
+!        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = conjg(Dk_base(:             , kE(2):kS(2):-1, :             )) ![ 1,-1, 1]
+!        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = conjg(Dk_base(:             , :             , kE(3):kS(3):-1)) ![ 1, 1,-1]
+!
+!        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = conjg(Dk_base(kE(1):kS(1):-1, kE(2):kS(2):-1, :             )) ![-1,-1, 1]
+!        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = conjg(Dk_base(:             , kE(2):kS(2):-1, kE(3):kS(3):-1)) ![ 1,-1,-1]
+!        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = conjg(Dk_base(kE(1):kS(1):-1, :             , kE(3):kS(3):-1)) ![-1, 1,-1]
+!
+!        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = conjg(Dk_base(kE(1):kS(1):-1, kE(2):kS(2):-1, kE(3):kS(3):-1)) ![-1,-1,-1]
+!
+!        testV1(1:8)  = Dk_base(1:8,1,1)
+!        testV1(9:14) = conjg(Dk_base(7:2:-1,1,1))
 
 !        write(*,*) "BEFORE FFT testV1 = ", testV1
 !
@@ -476,12 +664,7 @@ contains
 !        write(*,*) "AFTER FFT testV1 = ", testV1
 
 
-!        write(*,*) " shape(Dk_base) = ", shape(Dk_base)
-!        write(*,*) " shape(Dk) = ", shape(Dk)
-!        write(*,*) " kS  = ", kS
-!        write(*,*) " kE  = ", kE
-!        write(*,*) " kSc = ", kSc
-!        write(*,*) " kEc = ", kEc
+
 !        write(*,*) " Corners 1st quadrant"
 !        write(*,*) " Dk(1,1,1) = ", Dk(2, 2, 2)
 !        write(*,*) " Dk() = ", Dk(kEc(1), 2, 2)
@@ -499,167 +682,37 @@ contains
 !
 !        call dfftw_plan_dft_3d(plan, RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3), &
 !                               Dk_base, Dk_base, FFTW_BACKWARD, FFTW_ESTIMATE)
-        call dfftw_plan_dft_3d(plan, kEc(1), kEc(2), kEc(3), &
-                               Dk, Dk, FFTW_BACKWARD, FFTW_ESTIMATE)
 !        call fftw_plan_dft_c2r_3d(plan, kEc(1), kEc(2), kEc(3), &
 !                                  Dk, realOut, FFTW_ESTIMATE)
-        call dfftw_execute(plan)
-        call dfftw_destroy_plan(plan)
 
-        realOut(:,:,:) = real(Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)))
 
-        !write(*,*) "AFTER Dk(1:10,1:10,1)", Dk(1:10,1:10,1)
-        write(*,*) "AFTER realOut(1:10,1:10,1)", realOut(1:10,1:10,1)
-
-        !Mapping generated field back to coordinates
-        DkStart = [1, 1, 1]
-
-        do pos = 1, RDF%xNTotal
-            call find_Permutation(pos, RDF%kNStep, posVec)
-            !write(*,*) "pos = ", pos, "posVec = ", posVec
-            RDF%randField(pos,1) = realOut(posVec(1), posVec(2), posVec(3))
-        end do
-
+!        call dfftw_plan_dft_3d(plan, kEc(1), kEc(2), kEc(3), &
+!                               Dk, Dk, FFTW_BACKWARD, FFTW_ESTIMATE)
+!        call dfftw_execute(plan)
+!        call dfftw_destroy_plan(plan)
+!
+!        realOut(:,:,:) = real(Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)))
+!
+!        !write(*,*) "AFTER Dk(1:10,1:10,1)", Dk(1:10,1:10,1)
+!        write(*,*) "AFTER realOut(1:10,1:10,1)", realOut(1:10,1:10,1)
+!
+!        !Mapping generated field back to coordinates
+!        DkStart = [1, 1, 1]
+!
+!        do pos = 1, RDF%xNTotal
+!            call find_Permutation(pos, RDF%kNStep, posVec)
+!            !write(*,*) "pos = ", pos, "posVec = ", posVec
+!            RDF%randField(pos,1) = realOut(posVec(1), posVec(2), posVec(3))
+!        end do
+!
         deallocate(gammak)
         deallocate(phik)
         deallocate(Dk)
         deallocate(Dk_base)
-        deallocate(realOut)
+        !deallocate(realOut)
 
     end subroutine gen_Std_Gauss_FFT
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-
-    subroutine gen_Std_Gauss_Isotropic(RDF)
-
-        implicit none
-
-        !INPUT OUTPUT
-        type(RF), intent(inout) :: RDF
-
-        !LOCAL
-        double precision, dimension(:)  , allocatable :: gammaN, phiN, thetaN, psiN;
-        double precision, dimension(:)  , allocatable :: rVec;
-        logical         , dimension(:)  , allocatable :: effectCalc;
-        double precision, dimension(1)                :: rMax
-        integer          :: i, j, k, m, nDim;
-        integer          :: xNTotal, rNTotal;
-        integer          :: nb_procs, rang, code, error;
-        double precision :: Sk, deltaKprod, step, rDelta;
-        double precision, dimension(:), allocatable :: dgemm_mult;
-
-!        nDim    = size(xPointsNorm, 1);
-!        xNTotal = size(xPointsNorm, 2);
-!
-!        !Allocating
-!        allocate(rVec (nDim));
-!        allocate(dgemm_mult(xNTotal))
-!
-!        !r Definition
-!        call set_rMax(corrMod, rMax)
-!        rDelta  = 2d0*pi/(periodMult*sqrt(sum((xGlobRange)**2))) !Delta min in between two wave numbers to avoid periodicity
-!        rNTotal = rAdjust*(ceiling(rMax(1)/rDelta) + 1);
-!
-!        !Generating random field samples
-!        step      = rMax(1)/dble(rNTotal)
-!        randField(:,:) = 0;
-!        call init_random_seed(seed)
-!
-!        if (nDim == 2) then
-!            allocate(psiN   (rNTotal));
-!            allocate(thetaN (rNTotal));
-!            allocate(gammaN (rNTotal));
-!            do k = 1, Nmc
-!                if(calculate(k)) then
-!                    call random_number(psiN(:))
-!                    call random_number(thetaN(:))
-!                    call random_number(gammaN(:))
-!                    psiN   = 2d0*pi*psiN
-!                    thetaN = 2d0*pi*psiN
-!                    gammaN = 2d0*pi*gammaN
-!
-!                    do j = 1, rNTotal
-!                        rVec           = [cos(thetaN(j)) * (j-1)*step, &
-!                            sin(thetaN(j)) * (j-1)*step]
-!                        Sk             = get_SpectrumND([(j-1)*step], corrMod);
-!                        call DGEMM ( "T", "N", xNTotal, 1, nDim, &
-!                            1.0d0, xPointsNorm, nDim, rVec, nDim, 0.0d0, dgemm_mult, xNTotal)
-!
-!                        randField(:,k) = sqrt(Sk*(j-1)*(dble(step**2))) * gammaN(j) &
-!                            * cos(                           &
-!                            dgemm_mult                &
-!                            + psiN(j)                 &
-!                            )                          &
-!                            + randField(:,k)
-!                    end do
-!                else
-!                    randField(:,k) = 0.0
-!                end if
-!            end do
-!
-!        else if (nDim == 3) then
-!            !write(*,*) "nDim = 3 !!!"
-!            !write(*,*) "k = ",k;
-!            allocate(psiN   (rNTotal));
-!            allocate(thetaN (rNTotal));
-!            allocate(phiN   (rNTotal));
-!            allocate(gammaN (rNTotal));
-!            do k = 1, Nmc
-!                if(calculate(k)) then
-!                    !write(*,*) "k = ",k;
-!                    !write(*,*) "rNTotal = ",rNTotal;
-!                    call random_number(phiN(:))
-!                    call random_number(thetaN(:))
-!                    call random_number(gammaN(:))
-!                    call random_number(psiN(:))
-!
-!                    psiN   = 2*pi*psiN
-!                    thetaN = 2*pi*psiN
-!                    phiN   = pi*phiN
-!                    gammaN = sqrt(12.0)*(gammaN -0.5d0)
-!
-!                    do j = 1, rNTotal
-!                        !write(*,*) "j = ", j
-!                        rVec           = [cos(thetaN(j))*sin(phiN(j)) * (j-1)*step, &
-!                            sin(thetaN(j))*sin(phiN(j)) * (j-1)*step, &
-!                            cos(phiN(j))                * (j-1)*step]
-!                        Sk             = get_SpectrumND([(j-1)*step], corrMod);
-!                        call DGEMM ( "T", "N", xNTotal, 1, nDim, &
-!                            1.0d0, xPointsNorm, nDim, rVec, nDim, 0.0d0, dgemm_mult, xNTotal)
-!                        randField(:,k) = sqrt(Sk*sin(phiN(j))*step*((j-1)*step)**2) * gammaN(j) &
-!                            * cos(                                             &
-!                            dgemm_mult                                   &
-!                            + psiN(j)                                    &
-!                            )                                            &
-!                            + randField(:,k)
-!                    end do
-!                else
-!                    randField(:,k) = 0.0
-!                end if
-!            end do
-!
-!        else
-!            write(*,*) "ERROR The number of dimensions is not accepted in this method (Isotropic)";
-!            write(*,*) "nDim = ", nDim;
-!            stop
-!        end if
-!
-!        !if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
-!
-!        randField(:,:) = sqrt((1.0d0)/((2.0d0*pi)**(nDim)))&
-!                         * randField(:,:)
-
-        if(allocated(dgemm_mult))   deallocate(dgemm_mult)
-        if(allocated(phiN))         deallocate(phiN);
-        if(allocated(psiN))         deallocate(psiN);
-        if(allocated(thetaN))       deallocate(thetaN);
-        if(allocated(gammaN))       deallocate(gammaN);
-        if(allocated(rVec))         deallocate(rVec);
-
-    end subroutine gen_Std_Gauss_Isotropic
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

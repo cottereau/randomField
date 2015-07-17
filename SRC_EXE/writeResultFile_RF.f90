@@ -554,7 +554,11 @@ contains
             if(RDF%method == SHINOZUKA) write(fileId,*) "SHINOZUKA"
             if(RDF%method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
             write(fileId,*) "--independent-----------------------"
-            write(fileId,*) RDF%independent
+            if(MSH%overlap == -2.0D0) then
+                write(fileId,*) .true. !Exception for monoproc cases
+            else
+                write(fileId,*) RDF%independent
+            end if
             write(fileId,*) "--overlap-----------------------"
             write(fileId,*) MSH%overlap
             write(fileId,*) "--Seed-----------------------"

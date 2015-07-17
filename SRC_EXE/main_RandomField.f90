@@ -29,8 +29,8 @@ program main_RandomField
     integer :: step_nIter, nmc_nIter, corrL_nIter
     integer :: nmc_initial, corrL_pointsPerCorrL
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
-    logical :: writeFiles = .true.
-    logical :: sameFolder = .true.
+    logical :: writeFiles = .false.
+    logical :: sameFolder = .false.
 
     double precision, dimension(:), allocatable :: step_mult, step_add, step_initial
     double precision, dimension(:), allocatable :: corrL_mult, corrL_add, corrL_initial
@@ -301,9 +301,9 @@ program main_RandomField
                 write(get_fileId(),*) "RDF%independent = ", RDF%independent
                 write(get_fileId(),*) "MSH%independent = ", MSH%independent
                 write(get_fileId(),*) "MSH%overlap     = ", MSH%overlap
+                if(RDF%independent) MSH%overlap = -2.0D0
                 RDF%independent = .false.
                 MSH%independent = .false.
-                MSH%overlap = -1.0
                 write(get_fileId(),*) " "
                 write(get_fileId(),*) "--NEW values (changed)--"
                 write(get_fileId(),*) "RDF%independent = ", RDF%independent
@@ -402,6 +402,7 @@ program main_RandomField
                 !Building xPoints
                 call set_XPoints(MSH, RDF, RDF%xPoints_Local)
             end if
+
 
             call allocate_randField(RDF, RDF%randField_Local)
 
