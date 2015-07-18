@@ -624,11 +624,11 @@ contains
 
         write(get_fileId(),*) "FFT Execution"
         !FFT Execution
-        call dfftw_plan_dft_3d(plan, size(Dk,1), size(Dk,2), size(Dk,3), &
-                               Dk, Dk, FFTW_BACKWARD, FFTW_ESTIMATE)
-
-        call dfftw_execute(plan)
-        call dfftw_destroy_plan(plan)
+        !call dfftw_plan_dft_3d(plan, size(Dk,1), size(Dk,2), size(Dk,3), &
+        !                       Dk, Dk, FFTW_BACKWARD, FFTW_ESTIMATE)
+        !
+        !call dfftw_execute(plan)
+        !call dfftw_destroy_plan(plan)
 
         write(get_fileId(),*) "Mapping"
         do pos = 1, RDF%xNTotal

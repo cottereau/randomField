@@ -9,20 +9,12 @@
 
 #### PATH TO HDF5 AND MPI LIBRARY AND INCLUDES - to be modified by user (to be completed)
 
-#module load intel-compiler/15.0.1
-#module load intel-mkl/11.2.1
-#module load intel-mpi/5.0.2
-#module load hdf5/1.8.12
-
-#LIBHDF5 = -L/opt/san/bibliotheques/hdf5/1.8.12/lib/ -lhdf5 -lhdf5_hl -lhdf5_fortran
-#INCLUDEHDF5 = -I/opt/san/bibliotheques/hdf5/1.8.12/include
-#LIBMPI = -L/opt/san/intel/impi/4.0.0.028/lib64/ -lmpi -lmpi_dbg -lmpi_mt -lmpigf -lmpi_ilp64 
-#INCLUDEMPI = -I/opt/san/intel/impi/4.0.0.028/include64 
-
-LIBHDF5 = -L/opt/san/bibliotheques/hdf5/1.8.12/lib/ -lhdf5 -lhdf5_hl -lhdf5_fortran
+LIBHDF5     = -L/opt/san/bibliotheques/hdf5/1.8.12/lib/ -lhdf5 -lhdf5_hl -lhdf5_fortran
 INCLUDEHDF5 = -I/opt/san/bibliotheques/hdf5/1.8.12/include
-LIBMPI = -L/opt/san/intel15/impi/5.0.2.044/lib64/ -lmpi -lmpi_dbg -lmpi_mt -lmpigf -lmpi_ilp64 
-INCLUDEMPI = -I/opt/san/intel15/impi/5.0.2.044/include64
+LIBMPI      = -L/opt/san/intel15/impi/5.0.2.044/lib64/ -lmpi -lmpi_dbg -lmpi_mt -lmpigf -lmpi_ilp64 
+INCLUDEMPI  = -I/opt/san/intel15/impi/5.0.2.044/include64
+LIBFFTW     = #-L/opt/san/bibliotheques/fftw/3.2.2/lib -lfftw3 -lfftw3_threads
+INCLUDEFFTW = #-I/opt/san/bibliotheques/fftw/3.2.2/include
 
 EXEC  = randomField.exe
 #EXEC  = statistics.exe
@@ -42,14 +34,11 @@ SRCS = $(wildcard *.f90 *.f)
 
 OBJS += ./displayCarvalhol.o \
 ./main_RandomField.o \
-./main_Statistics.o \
-./test_func_RF.o \
 ./math_RF.o \
 ./constants_RF.o \
 ./randomFieldND.o \
 ./readFile_RF.o \
 ./spectra_RF.o \
-./statistics_RF.o \
 ./writeResultFile_RF.o \
 ./lsame.o \
 ./charFunctions.o \
@@ -61,7 +50,6 @@ OBJS += ./displayCarvalhol.o \
 ./common_variables_RF.o \
 ./type_RF.o \
 ./type_MESH.o \
-./type_TEST.o \
 ./ranlib.o \
 ./rnglib.o \
 ./dgemm.o \
@@ -73,26 +61,30 @@ OBJS += ./displayCarvalhol.o \
 ./dinvnr.o \
 ./cdfnor.o 
 
-LIBS = $(LIBHDF5) $(LIBMPI) 
-INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI)
+#./type_TEST.o \
+#./test_func_RF.o \
+#./statistics_RF.o \
+
+LIBS = $(LIBHDF5) $(LIBMPI) $(LIBFFTW)
+INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI) $(INCLUDEFFTW)
 
 #Dependencies
 main_RandomField.o   : displayCarvalhol.o statistics_RF.o charFunctions.o \
 					   randomFieldND.o  writeResultFile_RF.o readFile_RF.o \
-					   test_func_RF.o constants_RF.o mesh_RF.o \
+					   constants_RF.o mesh_RF.o \
 					   write_Log_File.o common_variables_RF.o \
-					   systemUt_RF.o type_RF.o type_MESH.o type_TEST.o dger.o
-main_Statistics.o    : displayCarvalhol.o statistics_RF.o charFunctions.o \
+					   systemUt_RF.o type_RF.o type_MESH.o dger.o
+#main_Statistics.o    : displayCarvalhol.o statistics_RF.o charFunctions.o \
 					   randomFieldND.o  writeResultFile_RF.o readFile_RF.o \
 					   test_func_RF.o constants_RF.o mesh_RF.o \
 					   write_Log_File.o common_variables_RF.o \
 					   systemUt_RF.o type_RF.o type_MESH.o type_TEST.o dger.o					   
-test_func_RF.o       : displayCarvalhol.o statistics_RF.o randomFieldND.o \
+#test_func_RF.o       : displayCarvalhol.o statistics_RF.o randomFieldND.o \
 					   writeResultFile_RF.o readFile_RF.o mesh_RF.o mesh_RF.o\
 					   write_Log_File.o common_variables_RF.o \
 					   type_RF.o type_MESH.o type_TEST.o
 writeResultFile_RF.o : displayCarvalhol.o math_RF.o statistics_RF.o write_Log_File.o constants_RF.o \
-					   type_RF.o type_MESH.o type_TEST.o
+					   type_RF.o type_MESH.o
 randomFieldND.o      : displayCarvalhol.o math_RF.o spectra_RF.o \
 			           constants_RF.o mesh_RF.o write_Log_File.o writeResultFile_RF.o\
 			           common_variables_RF.o type_RF.o type_MESH.o dgemm.o ranlib.o

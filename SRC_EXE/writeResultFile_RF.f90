@@ -1,7 +1,6 @@
 module writeResultFile_RF
 
     use displayCarvalhol
-    use statistics_RF
     use math_RF
     use hdf5
     use mpi
@@ -9,7 +8,6 @@ module writeResultFile_RF
     use write_Log_File
     use type_RF
     use type_MESH
-    use type_TEST
 
 contains
 

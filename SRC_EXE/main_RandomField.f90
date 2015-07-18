@@ -4,8 +4,6 @@ program main_RandomField
 	use constants_RF
 	use readFile_RF
 	use randomFieldND
-	use test_func_RF
-	use statistics_RF
 	use mesh_RF
 	use writeResultFile_RF
 	use displayCarvalhol
@@ -15,7 +13,6 @@ program main_RandomField
 	use common_variables_RF
 	use type_RF
 	use type_MESH
-	use type_TEST
 
     implicit none
 
@@ -60,7 +57,7 @@ program main_RandomField
 
     type(RF)   :: RDF
     type(MESH) :: MSH
-    type(TEST) :: TST
+    !type(TEST) :: TST
 
 
 
