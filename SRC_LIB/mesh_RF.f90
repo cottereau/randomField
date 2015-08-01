@@ -23,14 +23,14 @@ contains
 
         !LOCAL
         integer :: i, j, counterXPoints
-        integer         , dimension(:), allocatable :: tempXNStep
-
-        allocate(tempXNStep(MSH%nDim))
+        integer, dimension(MSH%nDim) :: tempXNStep, xMinForStep, xMaxForStep
 
         !Snaping points to the grid and discover the bounding box
         call snap_to_grid(MSH, MSH%xMinLoc, MSH%xMaxLoc)
         MSH%xMaxBound = MSH%xMaxLoc;
         MSH%xMinBound = MSH%xMinLoc;
+        xMinForStep = MSH%xMinLoc
+        xMaxForStep = MSH%xMaxLoc
 
         if(MSH%independent) then
             do i = 1, size(MSH%xMaxNeigh, 2)
@@ -41,11 +41,17 @@ contains
                 do j = 1, MSH%nDim
                     if (MSH%xMinNeigh(j,i) < MSH%xMinBound(j)) MSH%xMinBound(j) = MSH%xMinNeigh(j,i)
                     if (MSH%xMaxNeigh(j,i) > MSH%xMaxBound(j)) MSH%xMaxBound(j) = MSH%xMaxNeigh(j,i)
+
+                    if (MSH%neighShift(j,i) == 1)
+                        if (MSH%xMinNeigh(j,i) < MSH%xMinForStep(j)) MSH%xMinForStep(j) = MSH%xMinNeigh(j,i)
+                        if (MSH%xMaxNeigh(j,i) > MSH%xMaxForStep(j)) MSH%xMaxForStep(j) = MSH%xMaxNeigh(j,i)
+                    end if
+
                 end do
             end do
         end if
 
-        MSH%xNStep = find_xNStep(MSH%xMinBound, MSH%xMaxBound, MSH%xStep)
+        MSH%xNStep = find_xNStep(MSH%xMinForStep, MSH%xMaxForStep, MSH%xStep)
         MSH%xNTotal = product(MSH%xNStep)
         RDF%xNTotal = MSH%xNTotal
 
@@ -65,7 +71,14 @@ contains
         !Border Points
         if(MSH%independent) then
             do j = 1, size(MSH%xMaxNeigh, 2)
+
+                isNeeded = .true.
+                !Check if the neighbour exist
                 if(MSH%neigh(j)<0) cycle
+
+                !Take into account only positive neighbours
+                if(minval(MSH%neighShift(:,j)) == -1) cycle
+
                 tempXNStep = find_xNStep(MSH%xMinNeigh(:,j), MSH%xMaxNeigh(:,j), MSH%xStep)
                 do i = 1, product(tempXNStep)
                      call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), snapExtremes = .true.);
@@ -77,8 +90,6 @@ contains
         end if
 
         RDF%xPoints => xPoints
-
-        deallocate(tempXNStep)
 
     end subroutine set_XPoints
 

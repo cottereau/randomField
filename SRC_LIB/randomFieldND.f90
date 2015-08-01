@@ -767,10 +767,6 @@ contains
 
         end do
 
-        !call dispCarvalhol(RDF%neighSeed, "RDF%neighSeed", unit_in = get_fileId())
-        !call dispCarvalhol(RDF%neighRange, "RDF%neighRange", unit_in = get_fileId())
-
-
         deallocate(tempSeed)
 
     end subroutine get_neighbours_info
@@ -800,6 +796,7 @@ contains
         double precision :: errorTol = 0.000001, dilatation
         logical, dimension(:,:), allocatable :: first
         logical ::sndRcv
+        logical, dimension(size(MSH%neigh)) :: considerNeighbour
         type(RF) :: tmpRDF
 
         !call show_RF(tmpRDF, "tmpRDF", unit_in = get_fileId())
@@ -813,8 +810,14 @@ contains
         allocate(shift(MSH%nDim))
         allocate(first(-1:1, MSH%nDim))
 
-        minPosGlob = minval(pack(MSH%indexNeigh(1,:), MSH%neigh(:) >= 0))
-        maxPosGlob = maxval(pack(MSH%indexNeigh(2,:), MSH%neigh(:) >= 0))
+        considerNeighbour = .true.
+        do direction = 1, size(MSH%neigh)
+            if(minval(MSH%neighShift(:,direction)) == -1) considerNeighbour(direction) = .false.
+            if(MSH%neigh(direction) < 0) considerNeighbour(direction) = .false.
+        end do
+
+        minPosGlob = minval(pack(MSH%indexNeigh(1,:), considerNeighbour))
+        maxPosGlob = maxval(pack(MSH%indexNeigh(2,:), considerNeighbour))
         allocate(normFactor(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
         allocate(power(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
         allocate(powerSF(minPosGlob:maxPosGlob))
@@ -833,7 +836,7 @@ contains
 
             write(get_fileId(), *) "  DIRECTION = ", direction, "-------------------------------------"
 
-            if(MSH%neigh(direction) < 0) cycle !No Neighbours in this direction
+            if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
 
             !Positions in temp Vector
             minPos = MSH%indexNeigh(1,direction)
@@ -911,7 +914,7 @@ contains
 
         do direction = 1, size(MSH%neigh)
 
-            if(MSH%neigh(direction) < 0) cycle !Check if this direction exists
+            if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
 
             write(get_fileId(),*) "Direction = ", direction
 
@@ -933,7 +936,7 @@ contains
 
             do neighPos = 1, size(MSH%neigh)
 
-                if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
+                if(.not. considerNeighbour(neighPos)) cycle !Don't consider Neighbours in this direction
 
                 sndRcv = .true.
 
@@ -969,16 +972,8 @@ contains
 
                     write(get_fileId(),*) "After select case"
 
-                    call show_RF(tmpRDF, "tmpRDF", unit_in = get_fileId())
-
-                    call dispCarvalhol(tmpRDF%randField(1:30, :), "tmpRDF%randField(1:30, :)", unit_in = get_fileId())
-                    call dispCarvalhol(transpose(tmpRDF%xPoints(:, 1:30)), "transpose(tmpRDF%xPoints(:, 1:30))", unit_in = get_fileId())
-
                     !Finding origin for Shape Function
                     neighOrCorner = originCorner + MSH%overlap*MSH%neighShift(:, neighPos)
-
-                    write(get_fileId(),*) "Neigh rank = ", MSH%neigh(neighPos)
-                    write(get_fileId(),*) "neighOrCorner = ", neighOrCorner
 
                     !Shape Function multiplication and sum of the contribution
                     power(minPos:maxPos) = 0
