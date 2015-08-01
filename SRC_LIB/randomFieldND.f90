@@ -391,18 +391,26 @@ contains
         double precision, dimension(1) :: rMaxVec
         integer          :: i, j, k, m;
         integer          :: rNTotal;
-        double precision :: step, rDelta, rAdjust = 5.0, periodMul = 1.1;
+        double precision :: step, rDelta;
         double precision, dimension(:), allocatable :: dgemm_mult;
 
         !Allocating
         allocate(rVec (RDF%nDim));
         allocate(dgemm_mult(RDF%xNTotal))
 
+        write(get_fileId(),*) "Inside Isotropic"
+
         !r Definition
         call set_kMaxND(RDF%corrMod, rMaxVec)
+        call set_kPoints(RDF)
         rMax = rMaxVec(1)
-        rDelta  = 2d0*pi/(periodMul*sqrt(sum((RDF%xMaxGlob - RDF%xMinGlob)**2))) !Delta min in between two wave numbers to avoid periodicity
-        rNTotal = rAdjust*(ceiling(rMax/rDelta) + 1);
+        rDelta  = maxval(RDF%kDelta(:))/5.0D0 !Delta min in between two wave numbers to avoid periodicity
+        rNTotal = ceiling(rMax/rDelta) + 1;
+
+        write(get_fileId(),*) "rMax = ", rMax
+        write(get_fileId(),*) "rDelta = ", rDelta
+        write(get_fileId(),*) "rNTotal = ", rNTotal
+        write(get_fileId(),*) "RDF%calculate = ", RDF%calculate
 
         !Generating random field samples
         step      = rMax/dble(rNTotal)
@@ -852,31 +860,18 @@ contains
             first = .true.
             normFactor(minPos:maxPos) = 0
             power(minPos:maxPos) = 0
-            !counterDir = 0
             zeroVal = MSH%nDim - (sum((MSH%neighShift(:, direction))**2))
 
-!            call dispCarvalhol(originList, "originList", unit_in = get_fileId())
-!            call dispCarvalhol(originCorner, "originCorner", unit_in = get_fileId())
 
             !We sweep al vertices in this direction
             do j = 1, size(originList, 2)
 
-                !if(j==3 .or. j==4) cycle
-                !if(j/=5) cycle
-
                 power(minPos:maxPos) = 0
-
-!                write(get_fileId(), *) " "
-!                write(get_fileId(), *) "Point = ", originList(:, j)
 
                 do i = 1, MSH%nDim
 
-!                    write(get_fileId(), *) "Dim = ", i
-!
                     if(MSH%neighShift(i, direction) == 0) cycle
 
-                    !write(get_fileId(), *) "maxval of Exp = ", maxval(((RDF%xPoints(i, minPos:maxPos) - originList(i, j))/MSH%overlap)**2)
-                    !write(get_fileId(), *) "minval of Exp = ", minval(((RDF%xPoints(i, minPos:maxPos) - originList(i, j))/MSH%overlap)**2)
                     power(minPos:maxPos) = (RDF%xPoints(i, minPos:maxPos) - originList(i, j))**2 &
                                                + power(minPos:maxPos);
 
@@ -886,11 +881,6 @@ contains
                 power(minPos:maxPos) = sqrt(power(minPos:maxPos)/(MSH%overlap**2))
                 normFactor(minPos:maxPos) = sqrt((cos((PI)*(power(minPos:maxPos)))+1.0D0)/2.0D0) + normFactor(minPos:maxPos)
 
-                !power(minPos:maxPos) = dilatation*power(minPos:maxPos)/(MSH%overlap**2)
-                !normFactor(minPos:maxPos) = sqrt(exp(-(power(minPos:maxPos)))) + normFactor(minPos:maxPos)
-
-                !write(get_fileId(), *) "maxval of power = ", maxval(power)
-                !write(get_fileId(), *) "minval of power = ", minval(power)
 
             end do !Neighbours
 
@@ -908,29 +898,8 @@ contains
             where (sqrt(powerSF(minPos:maxPos)) > MSH%overlap) powerSF(minPos:maxPos) = MSH%overlap**2
             powerSF(minPos:maxPos) = sqrt(powerSF(minPos:maxPos)/(MSH%overlap**2))
 
-            !powerSF(minPos:maxPos) = dilatation*powerSF(minPos:maxPos)/(MSH%overlap**2)
-
         end do !Direction
 
-!        call write_Mono_XMF_h5(RDF%xPoints(:, minPosGlob:maxPosGlob), reshape(power, [size(power), 1]) , "power_", RDF%rang, single_path, &
-!                               MPI_COMM_WORLD, ["_proc_"], [RDF%rang], 0)
-!        call write_Mono_XMF_h5(RDF%xPoints(:, minPosGlob:maxPosGlob), reshape(powerSF, [size(power), 1]) , "powerSF_", RDF%rang, single_path, &
-!                               MPI_COMM_WORLD, ["_proc_"], [RDF%rang], 0)
-!        call write_Mono_XMF_h5(RDF%xPoints(:, minPosGlob:maxPosGlob), reshape((cos((PI)*(powerSF))+1.0D0)/2.0D0, [size(power), 1]) , &
-!                               "cos_power_", RDF%rang, single_path, &
-!                               MPI_COMM_WORLD, ["_proc_"], [RDF%rang], 0)
-!        call write_Mono_XMF_h5(RDF%xPoints(:, minPosGlob:maxPosGlob), reshape(sqrt((cos((PI)*(powerSF))+1.0D0)/2.0D0), [size(power), 1]) , &
-!                               "sqrt_cos_power_", RDF%rang, single_path, &
-!                               MPI_COMM_WORLD, ["_proc_"], [RDF%rang], 0)
-!        call write_Mono_XMF_h5(RDF%xPoints(:, minPosGlob:maxPosGlob), reshape(sqrt(exp(-(power(:)))), [size(power), 1]) , "exp_power_", RDF%rang, single_path, &
-!                               MPI_COMM_WORLD, ["_proc_"], [RDF%rang], 0)
-!        call write_Mono_XMF_h5(RDF%xPoints(:, minPosGlob:maxPosGlob), reshape(normFactor(:), [size(power), 1]) , "normFactor_", RDF%rang, single_path, &
-!                               MPI_COMM_WORLD, ["_proc_"], [RDF%rang], 0)
-
-        !write(get_fileId(), *) "maxval of power = ", maxval(power)
-        !write(get_fileId(), *) "minval of power = ", minval(power)
-
-        !RDF%randField(minPosGlob:maxPosGlob,1) = (RDF%randField(minPosGlob:maxPosGlob,1) * sqrt(exp(-(powerSF(:)))))
         RDF%randField(minPosGlob:maxPosGlob,1) = RDF%randField(minPosGlob:maxPosGlob,1) &
                                                  * sqrt((cos(PI*(powerSF))+1.0D0)/2.0D0)
 

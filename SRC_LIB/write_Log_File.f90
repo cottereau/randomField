@@ -54,7 +54,7 @@ contains
         !OUTPUT
         integer :: fileId
         !LOCAL
-        integer :: cte = 50
+        integer :: cte = 1001
 
         !write(*,*) "Inside get_fileId"
 

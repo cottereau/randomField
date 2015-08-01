@@ -13,7 +13,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_XPoints_independent(MSH, RDF, xPoints)
+    subroutine set_XPoints(MSH, RDF, xPoints)
         implicit none
 
         !INPUT AND OUTPUT
@@ -31,16 +31,19 @@ contains
         call snap_to_grid(MSH, MSH%xMinLoc, MSH%xMaxLoc)
         MSH%xMaxBound = MSH%xMaxLoc;
         MSH%xMinBound = MSH%xMinLoc;
-        do i = 1, size(MSH%xMaxNeigh, 2)
 
-            if(MSH%neigh(i)<0) cycle
+        if(MSH%independent) then
+            do i = 1, size(MSH%xMaxNeigh, 2)
 
-            call snap_to_grid(MSH, MSH%xMinNeigh(:,i), MSH%xMaxNeigh(:,i))
-            do j = 1, MSH%nDim
-                if (MSH%xMinNeigh(j,i) < MSH%xMinBound(j)) MSH%xMinBound(j) = MSH%xMinNeigh(j,i)
-                if (MSH%xMaxNeigh(j,i) > MSH%xMaxBound(j)) MSH%xMaxBound(j) = MSH%xMaxNeigh(j,i)
+                if(MSH%neigh(i)<0) cycle
+
+                call snap_to_grid(MSH, MSH%xMinNeigh(:,i), MSH%xMaxNeigh(:,i))
+                do j = 1, MSH%nDim
+                    if (MSH%xMinNeigh(j,i) < MSH%xMinBound(j)) MSH%xMinBound(j) = MSH%xMinNeigh(j,i)
+                    if (MSH%xMaxNeigh(j,i) > MSH%xMaxBound(j)) MSH%xMaxBound(j) = MSH%xMaxNeigh(j,i)
+                end do
             end do
-        end do
+        end if
 
         MSH%xNStep = find_xNStep(MSH%xMinBound, MSH%xMaxBound, MSH%xStep)
         MSH%xNTotal = product(MSH%xNStep)
@@ -48,124 +51,52 @@ contains
 
         allocate(xPoints(MSH%nDim, MSH%xNTotal))
 
-        write(get_fileId(),*) "shape(xPoints) = ", shape(xPoints)
-
-
         !Internal Points
         counterXPoints = 0;
-        write(get_fileId(),*) "BEFORE tempXNStep"
         tempXNStep = find_xNStep(MSH%xMinLoc, MSH%xMaxLoc, MSH%xStep)
-        write(get_fileId(),*) "AFTER tempXNStep"
         do i = 1, product(tempXNStep)
             call get_Permutation(i, MSH%xMaxLoc, tempXNStep, xPoints(:,i), MSH%xMinLoc, snapExtremes = .true.);
         end do
 
         counterXPoints = counterXPoints + product(tempXNStep);
-
-        write(get_fileId(),*) "AFTER Internal Points"
-
-        call show_MESH(MSH, "MSH", unit_in = get_fileId())
+        MSH%indexLocal(1,1) = 1
+        MSH%indexLocal(2,1) = counterXPoints
 
         !Border Points
-        do j = 1, size(MSH%xMaxNeigh, 2)
-            if(MSH%neigh(j)<0) cycle
-!            write(get_fileId(),*) "Dir = ", j
-!            write(get_fileId(),*) "Neigh Rang = ", MSH%neigh(j)
-            tempXNStep = find_xNStep(MSH%xMinNeigh(:,j), MSH%xMaxNeigh(:,j), MSH%xStep)
-!            write(get_fileId(),*) "tempXNStep = ", tempXNStep
-!            write(get_fileId(),*) "product(tempXNStep) = ", product(tempXNStep)
-!            write(get_fileId(),*) "counterXPoints = ", counterXPoints
-!            write(get_fileId(),*) "tempXNStep = ", tempXNStep
-!            write(get_fileId(),*) "MSH%xMaxNeigh(:,j) = ", MSH%xMaxNeigh(:,j)
-!            write(get_fileId(),*) "MSH%xMinNeigh(:,j) = ", MSH%xMinNeigh(:,j)
-
-            do i = 1, product(tempXNStep)
-                 !write(get_fileId(),*) "i = ", i
-                 call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), snapExtremes = .true.);
+        if(MSH%independent) then
+            do j = 1, size(MSH%xMaxNeigh, 2)
+                if(MSH%neigh(j)<0) cycle
+                tempXNStep = find_xNStep(MSH%xMinNeigh(:,j), MSH%xMaxNeigh(:,j), MSH%xStep)
+                do i = 1, product(tempXNStep)
+                     call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), snapExtremes = .true.);
+                end do
+                MSH%indexNeigh(1, j) = counterXPoints + 1
+                counterXPoints = counterXPoints + product(tempXNStep);
+                MSH%indexNeigh(2,j) = counterXPoints
             end do
-
-            write(get_fileId(),*) "AFTER Border"
-
-            MSH%indexNeigh(1, j) = counterXPoints + 1
-            counterXPoints = counterXPoints + product(tempXNStep);
-            MSH%indexNeigh(2,j) = counterXPoints
-        end do
+        end if
 
         RDF%xPoints => xPoints
 
         deallocate(tempXNStep)
 
-    end subroutine set_XPoints_independent
+    end subroutine set_XPoints
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_XPoints(MSH, RDF, xPoints)
+    subroutine get_XPoints_globCoords(RDF, MSH)
         implicit none
 
         !INPUT AND OUTPUT
-        type(MESH) :: MSH
-        type(RF)   :: RDF
-        double precision, dimension(:, :), allocatable, intent(out), target :: xPoints;
+        type(RF)  , intent(inout) :: RDF
+        type(MESH), intent(inout) :: MSH
 
-        !LOCAL VARIABLES
-        double precision, dimension(:), allocatable :: xBottom, xTop
-        integer :: i
-        double precision :: norm
+        RDF%origin = find_xNStep(MSH%xMinGlob, MSH%xMinLoc, MSH%xStep)
+        RDF%stride = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
 
-        write(get_fileId(),*) "-> Creating xPoints";
-
-        allocate(xBottom(MSH%nDim))
-        allocate(xTop(MSH%nDim))
-
-        do i = 1, MSH%nDim
-            norm = (MSH%xMaxGlob(i)-MSH%xMinGlob(i))/MSH%xStep(i)
-            if(MSH%rang == 0 .and. (.not. areEqual(norm, dble(nint(norm))))) then
-                write(*,*) "WARNING!! In dimension ", i, "extremes and step are incompatible"
-                write(*,*) "   xMinGlob = ", MSH%xMinGlob(i)
-                write(*,*) "   xMaxGlob = ", MSH%xMaxGlob(i)
-                write(*,*) "   xStep    = ", MSH%xStep(i)
-            end if
-            xBottom(i) = (MSH%xStep(i) * intDivisor((MSH%xMin(i) - MSH%xMinGlob(i)), MSH%xStep(i), up = .true.)) &
-                         + MSH%xMinGlob(i)
-            xTop(i)    = (MSH%xStep(i) * intDivisor((MSH%xMax(i) - MSH%xMinGlob(i)), MSH%xStep(i), up = .false.)) &
-                         + MSH%xMinGlob(i)
-            if(areEqual(xTop(i), MSH%xMax(i))) then
-                if(.not. areEqual(xTop(i), MSH%xMaxGlob(i))) then
-                    xTop(i) = xTop(i) - MSH%xStep(i)
-                end if
-            end if
-        end do
-
-        write(get_fileId(),*) "xBottom = ", xBottom
-        write(get_fileId(),*) "   xTop = ", xTop
-
-
-        write(get_fileId(),*) "-> Finding xNStep";
-        MSH%xNStep = find_xNStep(xBottom, xTop, MSH%xStep)
-        MSH%xNTotal = product(MSH%xNStep)
-        RDF%xNTotal = MSH%xNTotal
-        RDF%xMaxBound = xTop
-        RDF%xMinBound = xBottom
-
-        allocate(xPoints(MSH%nDim, MSH%xNTotal))
-
-        write(get_fileId(),*) "-> Filling xPoints";
-        do i = 1, MSH%xNTotal
-            call get_Permutation(i, xTop, MSH%xNStep, xPoints(:,i), xBottom, snapExtremes = .true.);
-        end do
-
-        RDF%xPoints => xPoints
-
-        !call show_MESH(MSH)
-        !call dispCarvalhol(transpose(RDF%xPoints), "transpose(RDF%xPoints)")
-
-        deallocate(xBottom)
-        deallocate(xTop)
-
-    end subroutine set_XPoints
-
+    end subroutine get_XPoints_globCoords
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -266,112 +197,111 @@ contains
 
     end subroutine set_XPoints_perCorrL
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine set_Local_Extremes_Mesh (xMin, xMax, xMinGlob, xMaxGlob, rang, nb_procs)
-        !Find the Boundaries for the box in each processor when using automatic mesh
-        implicit none
-
-        !INPUT
-        integer                        , intent(in) :: rang, nb_procs;
-        double precision, dimension(1:), intent(in) :: xMaxGlob;
-        double precision, dimension(1:), intent(in) :: xMinGlob;
-        !OUTPUT
-        double precision, dimension(1:), intent(out) :: xMax;
-        double precision, dimension(1:), intent(out) :: xMin;
-
-        !LOCAL VARIABLES
-        integer :: i, j, testRang = 0;
-        integer :: baseStep
-        integer :: seedStep, nDim, basicStep;
-        integer, allocatable, dimension(:) :: bStepVec
-        double precision, dimension(:), allocatable :: xProcDelta;
-        double precision :: procIterations
-
-        nDim = size(xMin);
-        baseStep = nint(dble(nb_procs)**(1.0d0/nDim))
-        write(get_fileId(),*) "Setting Local Extremes"
-        allocate (xProcDelta(nDim))
-
-
-        if (nb_procs == baseStep**nDim) then
-            write(get_fileId(),*) "Exact Division"
-            basicStep  = nint(dble(nb_procs)**(1.0d0/nDim))
-            xProcDelta = (xMaxGlob-xMinGlob)/basicStep
-
-            !        if(rang == testRang) write(*,*) "nDim = ", nDim
-            !        if(rang == testRang) write(*,*) "basicStep = ", basicStep
-            !        if(rang == testRang) write(*,*) "xProcDelta = ", xProcDelta
-            !        if(rang == testRang) write(*,*) "nb_procs = ", nb_procs
-            !        if(rang == testRang) write(*,*) "dble(nb_procs)**(1/nDim) = ", dble(nb_procs)**(1/nDim)
-            !        if(rang == testRang) write(*,*) "nint(dble(nb_procs)**(1/nDim)) = ", nint(dble(nb_procs)**(1/nDim))
-
-            do j = 1, nDim
-                seedStep = basicStep**(nDim-j);
-                i = cyclicMod(int(rang/seedStep) + 1, basicStep)
-                !if(rang == testRang) write(*,*) "i = ", i, " seedStep = ", seedStep, "seedStep", seedStep
-                xMin(j) = (dble(i-1))*xProcDelta(j);
-                xMax(j) = xMin(j) + xProcDelta(j)
-                !if(rang == testRang) write(*,*) "AFTER xMin ", j, " = ", xMin(j)
-            end do
-
-
-
-            !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
-
-        !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
-        !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
-
-        else if (isPowerOf(dble(nb_procs), 2)) then
-            write(get_fileId(),*) "Power of two"
-            allocate (bStepVec(nDim))
-
-            !Defining the basic Step for each dimension
-            bStepVec(:) = 1
-            if(nb_procs /= 1) then
-                procIterations = log(dble(nb_procs))/log(2.0D0)
-                do j = 1, nint(procIterations)
-                    i = cyclicMod(j, nDim)
-                    bStepVec(i) = bStepVec(i)*2
-                    !write(*,*) "i = ", i
-                    !write(*,*) "bStepVec = ", bStepVec
-                end do
-            end if
-            !Defining coordinates in each proc
-            xProcDelta = (xMaxGlob-xMinGlob)/bStepVec
-
-            write(get_fileId(),*) "procIterations = ", procIterations
-            write(get_fileId(),*) "xMaxGlob = ", xMaxGlob
-            write(get_fileId(),*) "xMinGlob = ", xMinGlob
-            write(get_fileId(),*) "nb_procs = ", nb_procs
-            write(get_fileId(),*) "bStepVec = ", bStepVec
-            write(get_fileId(),*) "xProcDelta = ", xProcDelta
-
-            do j = 1, nDim
-                seedStep = product(bStepVec(j+1:));
-                if (j == nDim) seedStep = 1;
-                i = cyclicMod(int(rang/seedStep) + 1, bStepVec(j))
-                !if(rang == testRang) write(*,*) "i = ", i, " seedStep = ", seedStep, "seedStep", seedStep
-                xMin(j) = (dble(i-1))*xProcDelta(j);
-                xMax(j) = xMin(j) + xProcDelta(j)
-                !if(rang == testRang) write(*,*) "AFTER xMin ", j, " = ", xMin(j)
-            end do
-            deallocate (bStepVec)
-        else
-            stop "ERROR, no mesh division algorithm for this number of procs"
-        end if
-
-        do i = 1, nDim
-            write(get_fileId(),*) "Dim ", i
-            write(get_fileId(),fmt="(2A30)") "xMin", "xMax"
-            write(get_fileId(),fmt="(2F30.15)") xMin(i), xMax(i)
-        end do
-
-        deallocate (xProcDelta)
-
-    end subroutine set_Local_Extremes_Mesh
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine set_Local_Extremes_Mesh (xMin, xMax, xMinGlob, xMaxGlob, rang, nb_procs)
+!        !Find the Boundaries for the box in each processor when using automatic mesh
+!        implicit none
+!
+!        !INPUT
+!        integer                        , intent(in) :: rang, nb_procs;
+!        double precision, dimension(1:), intent(in) :: xMaxGlob;
+!        double precision, dimension(1:), intent(in) :: xMinGlob;
+!        !OUTPUT
+!        double precision, dimension(1:), intent(out) :: xMax;
+!        double precision, dimension(1:), intent(out) :: xMin;
+!
+!        !LOCAL VARIABLES
+!        integer :: i, j, testRang = 0;
+!        integer :: baseStep
+!        integer :: seedStep, nDim, basicStep;
+!        integer, allocatable, dimension(:) :: bStepVec
+!        double precision, dimension(:), allocatable :: xProcDelta;
+!        double precision :: procIterations
+!
+!        nDim = size(xMin);
+!        baseStep = nint(dble(nb_procs)**(1.0d0/nDim))
+!        write(get_fileId(),*) "Setting Local Extremes"
+!        allocate (xProcDelta(nDim))
+!
+!
+!        if (nb_procs == baseStep**nDim) then
+!            write(get_fileId(),*) "Exact Division"
+!            basicStep  = nint(dble(nb_procs)**(1.0d0/nDim))
+!            xProcDelta = (xMaxGlob-xMinGlob)/basicStep
+!
+!            !        if(rang == testRang) write(*,*) "nDim = ", nDim
+!            !        if(rang == testRang) write(*,*) "basicStep = ", basicStep
+!            !        if(rang == testRang) write(*,*) "xProcDelta = ", xProcDelta
+!            !        if(rang == testRang) write(*,*) "nb_procs = ", nb_procs
+!            !        if(rang == testRang) write(*,*) "dble(nb_procs)**(1/nDim) = ", dble(nb_procs)**(1/nDim)
+!            !        if(rang == testRang) write(*,*) "nint(dble(nb_procs)**(1/nDim)) = ", nint(dble(nb_procs)**(1/nDim))
+!
+!            do j = 1, nDim
+!                seedStep = basicStep**(nDim-j);
+!                i = cyclicMod(int(rang/seedStep) + 1, basicStep)
+!                !if(rang == testRang) write(*,*) "i = ", i, " seedStep = ", seedStep, "seedStep", seedStep
+!                xMin(j) = (dble(i-1))*xProcDelta(j)+xMinGlob(j);
+!                xMax(j) = xMin(j) + xProcDelta(j)
+!                !if(rang == testRang) write(*,*) "AFTER xMin ", j, " = ", xMin(j)
+!            end do
+!
+!
+!
+!            !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
+!
+!        !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
+!        !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
+!
+!        else if (isPowerOf(dble(nb_procs), 2)) then
+!            write(get_fileId(),*) "Power of two"
+!            allocate (bStepVec(nDim))
+!
+!            !Defining the basic Step for each dimension
+!            bStepVec(:) = 1
+!            if(nb_procs /= 1) then
+!                procIterations = log(dble(nb_procs))/log(2.0D0)
+!                do j = 1, nint(procIterations)
+!                    i = cyclicMod(j, nDim)
+!                    bStepVec(i) = bStepVec(i)*2
+!                    !write(*,*) "i = ", i
+!                    !write(*,*) "bStepVec = ", bStepVec
+!                end do
+!            end if
+!            !Defining coordinates in each proc
+!            xProcDelta = (xMaxGlob-xMinGlob)/bStepVec
+!
+!            write(get_fileId(),*) "xMaxGlob = ", xMaxGlob
+!            write(get_fileId(),*) "xMinGlob = ", xMinGlob
+!            write(get_fileId(),*) "nb_procs = ", nb_procs
+!            write(get_fileId(),*) "bStepVec = ", bStepVec
+!            write(get_fileId(),*) "xProcDelta = ", xProcDelta
+!
+!            do j = 1, nDim
+!                seedStep = product(bStepVec(j+1:));
+!                if (j == nDim) seedStep = 1;
+!                i = cyclicMod(int(rang/seedStep) + 1, bStepVec(j))
+!                !if(rang == testRang) write(*,*) "i = ", i, " seedStep = ", seedStep, "seedStep", seedStep
+!                xMin(j) = (dble(i-1))*xProcDelta(j)+xMinGlob(j);
+!                xMax(j) = xMin(j) + xProcDelta(j)
+!                !if(rang == testRang) write(*,*) "AFTER xMin ", j, " = ", xMin(j)
+!            end do
+!            deallocate (bStepVec)
+!        else
+!            stop "ERROR, no mesh division algorithm for this number of procs"
+!        end if
+!
+!        do i = 1, nDim
+!            write(get_fileId(),*) "Dim ", i
+!            write(get_fileId(),fmt="(2A30)") "xMin", "xMax"
+!            write(get_fileId(),fmt="(2F30.15)") xMin(i), xMax(i)
+!        end do
+!
+!        deallocate (xProcDelta)
+!
+!    end subroutine set_Local_Extremes_Mesh
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -384,22 +314,25 @@ contains
         type(MESH) :: MSH
 
         !LOCAL
-        double precision, dimension(:), allocatable :: procDelta
-
-        allocate(procDelta(MSH%nDim))
+        double precision, dimension(MSH%nDim) :: procDelta
+        integer :: i
 
         procDelta = (MSH%xMaxGlob - MSH%xMinGlob)/MSH%procPerDim
 
         MSH%xMin = procDelta*MSH%coords + MSH%xMinGlob
         MSH%xMax = MSH%xMin + procDelta
+
+        write(*,*) " MSH%coords = ", MSH%coords
+
+
+        if(.not. MSH%independent) then
+            do i = 1, MSH%nDim
+                if(MSH%coords(i) /= MSH%procPerDim(i)-1) MSH%xMax(i) = MSH%xMax(i)-MSH%xStep(i)
+            end do
+        end if
+
         MSH%xMinLoc = MSH%xMin
         MSH%xMaxLoc = MSH%xMax
-
-        write(get_fileId(),*) " MSH%xMin = ", MSH%xMin
-        write(get_fileId(),*) " MSH%xMax = ", MSH%xMax
-        write(get_fileId(),*) " MSH%xMinLoc = ", MSH%xMinLoc
-        write(get_fileId(),*) " MSH%xMaxLoc = ", MSH%xMaxLoc
-        deallocate(procDelta)
 
     end subroutine set_Local_Extremes_From_Coords
 
@@ -620,28 +553,29 @@ contains
         type(MESH) :: MSH
         type(RF)   :: RDF
         integer, intent(in) :: pointsPerCorrL
+        double precision, dimension(MSH%nDim) :: delta, half
 
         !LOCAL
         integer :: i
-        integer :: testrank = 4
 
-        MSH%xStep = RDF%corrL / dble(pointsPerCorrL);
-
-        write(get_fileId(),*) " BEFORE:"
-        write(get_fileId(),*) " MSH%xMinGlob = ", MSH%xMinGlob
-        write(get_fileId(),*) " MSH%xMaxGlob = ", MSH%xMaxGlob
-
-        !Redefining global extremes
+        !Redefining MSH%xStep
         do i = 1, MSH%nDim
-            MSH%xMinGlob(i) = dble(MSH%procPerDim(i))*MSH%xStep(i) * &
-                              intDivisor(MSH%xMinGlob(i), MSH%xStep(i)*dble(MSH%procPerDim(i)), up = .false.)
-            MSH%xMaxGlob(i) = dble(MSH%procPerDim(i))*MSH%xStep(i) * &
-                              intDivisor(MSH%xMaxGlob(i), MSH%xStep(i)*dble(MSH%procPerDim(i)), up = .true.)
+            if(nint(MSH%xStep(i)/RDF%corrL(i)) > 0) MSH%xStep(i) = RDF%corrL(i) &
+                                                    * dble(nint(MSH%xStep(i)/RDF%corrL(i)));
         end do
 
-        write(get_fileId(),*) " AFTER:"
-        write(get_fileId(),*) " MSH%xMinGlob = ", MSH%xMinGlob
-        write(get_fileId(),*) " MSH%xMaxGlob = ", MSH%xMaxGlob
+        !Redefining global extremes
+        delta = MSH%xMaxGlob - MSH%xMinGlob
+        half  = (MSH%xMaxGlob + MSH%xMinGlob)/2.0D0
+        do i = 1, MSH%nDim
+            delta(i) = dble(MSH%procPerDim(i))*MSH%xStep(i) * &
+                              intDivisor(delta(i), MSH%xStep(i)*dble(MSH%procPerDim(i)), up = .true.)
+        end do
+
+        MSH%xMinGlob = half - delta/2.0D0
+        MSH%xMaxGlob = half + delta/2.0D0
+
+
 
     end subroutine redefine_Global_Extremes
 
@@ -725,7 +659,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine redefine_extremes (MSH, corrL)
+    subroutine redefine_extremes_for_overlap (MSH, corrL)
 
         implicit none
 
@@ -744,25 +678,10 @@ contains
 
         allocate(tempExtreme(MSH%nDim))
 
-        call show_MESH(MSH, "   REDEFINE EXTREMES INPUT MESH", unit_in = get_fileId())
-
-        !Redefining Overlap
-        !write(get_fileId(),*)"  OLD overlap value = ", MSH%overlap
-        !write(get_fileId(),*)"  (MSH%xMax(:) - MSH%xMin(:))/corrL(:) = ", (MSH%xMax(:) - MSH%xMin(:))/corrL(:)
-
-
-        !write(get_fileId(),*)"  NEW overlap value = ", MSH%overlap
-
-
         !Redimensioning the internal part
         do neighPos = 1, 2*MSH%nDim
-            !if(MSH%rang == testrank) write(*,*) "neighPos = ", neighPos
+
             if(MSH%neigh(neighPos) < 0) cycle
-
-            !call MPI_CART_COORDS (MSH%topComm, MSH%neigh(neighPos), MSH%nDim, shift, code)
-
-            !write(get_fileId(),*) "neighPos = ", neighPos
-            !write(get_fileId(),*) "MSH%neighShift(:,neighPos) = ", MSH%neighShift(:,neighPos)
 
             do i = 1, MSH%nDim
                 if(MSH%neighShift(i,neighPos) < 0) then
@@ -789,25 +708,7 @@ contains
 
             end do
 
-            !write(get_fileId(),*) "MSH%xMinLoc = ", MSH%xMinLoc
-            !write(get_fileId(),*) "MSH%xMaxLoc = ", MSH%xMaxLoc
-
         end do
-
-!        !tempExtreme = MSH%xMinLoc
-!        do i = 1, MSH%nDim
-!            if(MSH%xMinLoc(i) > MSH%xMaxLoc(i)) then
-!                write(get_fileId(),*)"WARNING xMin/xMaxLoc were put to the center (non-overlapping area doesn't exist)"
-!                MSH%xMinLoc(i) = (MSH%xMin(i) + MSH%xMax(i))/2
-!                MSH%xMaxLoc(i) = MSH%xMinLoc(i)
-!            end if
-!        end do
-
-        !write(get_fileId(),*) "AFTER Internal Redefining Extremes"
-        !write(get_fileId(),*) "MSH%xMinLoc = ", MSH%xMinLoc
-        !write(get_fileId(),*) "MSH%xMaxLoc = ", MSH%xMaxLoc
-        !write(get_fileId(),*) "MSH%xMin = ", MSH%xMin
-        !write(get_fileId(),*) "MSH%xMax = ", MSH%xMax
 
         !Dimensioning overlapping area
         do neighPos = 1, size(MSH%neigh)
@@ -841,20 +742,12 @@ contains
                     write(get_fileId(),*)"MSH%xMaxGlob(i)    = ", MSH%xMaxGlob(i)
                     MSH%xMaxNeigh(i,neighPos) = MSH%xMaxGlob(i)
                 end if
-!                if(MSH%xMinNeigh(i,neighPos) >= MSH%xMaxNeigh(i,neighPos)) then
-!                    write(get_fileId(),*)"WARNING xMin/xMaxNeigh were put to -1.0 (non-overlapping area doesn't exist)"
-!                    MSH%xMinNeigh(i,neighPos) = notPresent
-!                    MSH%xMaxNeigh(i,neighPos) = notPresent
-!                end if
-
             end do
         end do
 
-        call show_MESH(MSH, "   REDEFINE EXTREMES OUTPUT MESH", unit_in = get_fileId())
-
         deallocate(tempExtreme)
 
-    end subroutine redefine_extremes
+    end subroutine redefine_extremes_for_overlap
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

@@ -31,6 +31,7 @@ module type_RF
         double precision, dimension(:, :), allocatable :: xPoints_Local
         double precision, dimension(:, :), allocatable :: randField_Local
         integer, dimension(:)  , allocatable :: kNStep, xNStep
+        integer, dimension(:)  , allocatable :: origin, stride
         integer, dimension(:,:), allocatable :: neighSeed
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:,:), allocatable :: neighRange;
@@ -66,6 +67,8 @@ module type_RF
             allocate(RF_a%calculate(Nmc))
             allocate(RF_a%xMaxBound(nDim))
             allocate(RF_a%xMinBound(nDim))
+            allocate(RF_a%origin(nDim))
+            allocate(RF_a%stride(nDim))
             call random_seed(size = n)
             allocate(RF_a%seed(n))
             allocate(RF_a%neighSeed(n,(3**nDim)-1))
@@ -239,6 +242,8 @@ module type_RF
             if(allocated(RF_a%kNStep))     deallocate(RF_a%kNStep)
             if(allocated(RF_a%xNStep))     deallocate(RF_a%xNStep)
             if(allocated(RF_a%kDelta))     deallocate(RF_a%kDelta)
+            if(allocated(RF_a%origin))     deallocate(RF_a%origin)
+            if(allocated(RF_a%stride))     deallocate(RF_a%stride)
             if(associated(RF_a%xPoints))   nullify(RF_a%xPoints)
             if(associated(RF_a%randField)) nullify(RF_a%randField)
             RF_a%init = .false.

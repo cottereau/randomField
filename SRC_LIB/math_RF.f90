@@ -46,8 +46,10 @@ contains
 
         if (present(qmin)) then
             do j = 1, nDim
-                seedStep = product(nStep(j+1:));
-                if (j == nDim) seedStep = 1;
+                !seedStep = product(nStep(j+1:));
+                !if (j == nDim) seedStep = 1;
+                seedStep = product(nStep(1:j-1));
+                if (j == 1) seedStep = 1;
                 i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
                 pVec(j) = (dble(i)-0.5d0-contrib/2.0d0)         &
                           *(qmax(j)-qmin(j))/(nStep(j)-contrib) &
@@ -55,8 +57,10 @@ contains
             end do
         else
             do j = 1, nDim
-                seedStep = product(nStep(j+1:));
-                if (j == nDim) seedStep = 1;
+                !seedStep = product(nStep(j+1:));
+                !if (j == nDim) seedStep = 1;
+                seedStep = product(nStep(1:j-1));
+                if (j == 1) seedStep = 1;
                 i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
                 pVec(j) = (dble(i)-0.5d0-contrib/2.0d0) &
                           *(qmax(j))/(nStep(j)-contrib); !qmin = 0
@@ -65,6 +69,8 @@ contains
 
     end subroutine get_Permutation
 
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
 
@@ -87,13 +93,49 @@ contains
 
 
         do j = 1, nDim
-            seedStep = product(nStep(j+1:));
-            if (j == nDim) seedStep = 1;
+            seedStep = product(nStep(1:j-1));
+            if (j == 1) seedStep = 1;
             i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
             posVec(j) = i;
         end do
 
     end subroutine find_Permutation
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+
+    subroutine find_Position(posVec, nStep, pos)
+
+        implicit none
+
+        !INPUT
+        integer, dimension(1:), intent(in) :: posVec;
+        integer, dimension(1:), intent(in)  :: nStep;
+        !OUTPUT
+        integer, intent(out)                 :: pos;
+        !LOCAL VARIABLES
+        integer :: i, j;
+        integer :: seedStep, nDim;
+        double precision :: contrib
+
+        nDim = size(nStep);
+        contrib = 0.0d0
+        pos = 0
+
+
+        do j = 1, nDim
+            seedStep = product(nStep(1:j-1));
+            if (j == 1) seedStep = 1;
+            i = posVec(j);
+            stop("find_Position NOT IMPLEMENTED")
+!            pos = pos + posVec(j)*seedStep*nStep(j)
+!            posVec(j) = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
+!            pos = cyclicMod(posVec(j)*seedStep, nStep(j)) - 1
+        end do
+
+    end subroutine find_Position
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

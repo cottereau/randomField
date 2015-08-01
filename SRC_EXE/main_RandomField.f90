@@ -13,6 +13,7 @@ program main_RandomField
 	use common_variables_RF
 	use type_RF
 	use type_MESH
+	use readUNV_RF
 
     implicit none
 
@@ -21,13 +22,16 @@ program main_RandomField
     character (len=30), parameter :: mesh_input = "mesh_input"
     character (len=30), parameter :: gen_input  = "gen_input"
     character (len=30), parameter :: test_input = "test_input"
+    character (len=30), parameter :: unv_input  = "unv_files/Maroua1.unv "!"unv_files/Luciano_Cube.unv"
     logical :: step_variate, nmc_variate, corrL_variate
     logical :: step_speedUp, nmc_speedUp, corrL_fix_pointsPerCorrL
     integer :: step_nIter, nmc_nIter, corrL_nIter
     integer :: nmc_initial, corrL_pointsPerCorrL
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
-    logical :: writeFiles = .false.
-    logical :: sameFolder = .false.
+    logical :: writeFiles = .true.
+    logical :: sameFolder = .true.
+    logical :: explodedView = .false.
+    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
 
     double precision, dimension(:), allocatable :: step_mult, step_add, step_initial
     double precision, dimension(:), allocatable :: corrL_mult, corrL_add, corrL_initial
@@ -44,6 +48,9 @@ program main_RandomField
     character(len=30) , dimension(:,:), allocatable :: dataTable;
     integer, dimension(:), allocatable :: seed
     logical, dimension(:), allocatable :: periods
+    double precision, dimension(:,:), allocatable, target :: coordList
+    integer         , dimension(:,:), allocatable :: connectList
+    logical :: monotype
 
 
     double precision :: t1, t2, t3, t4, t5, t6;
@@ -57,9 +64,6 @@ program main_RandomField
 
     type(RF)   :: RDF
     type(MESH) :: MSH
-    !type(TEST) :: TST
-
-
 
     !Initializing MPI
     call init_communication(MPI_COMM_WORLD)
@@ -232,26 +236,28 @@ program main_RandomField
 
             call set_DataTable(path, dataTable)
             call read_DataTable(dataTable, "nDim", nDim)
-            call read_DataTable(dataTable, "meshType", MSH%meshType)
+            !call read_DataTable(dataTable, "meshType", MSH%meshType)
             call read_DataTable(dataTable, "meshMod", MSH%meshMod)
             call init_MESH(MSH, nDim, comm, rang, nb_procs)
 
-            if (MSH%meshType == "structured" .or. MSH%meshType == "unstructured") then
-               select case (MSH%meshMod)
-                   case("manual")
-                       write(rangChar,'(I7)') rang
-                       call read_DataTable(dataTable, "Max"//trim(adjustl(rangChar)), MSH%xMax)
-                       call read_DataTable(dataTable, "Min"//trim(adjustl(rangChar)), MSH%xMin)
-                   case("automatic")
-                        baseStep = nint(dble(nb_procs)**(1.0d0/nDim))
-                        call read_DataTable(dataTable, "Max", MSH%xMaxGlob)
-                        call read_DataTable(dataTable, "Min", MSH%xMinGlob)
-                        call read_DataTable(dataTable, "Step", MSH%xStep)
-                end select
-            else
-                write(*,*) "meshType not accepted: ", MSH%meshType
-                call MPI_ABORT(MPI_COMM_WORLD, error, code)
-            end if
+            select case (MSH%meshMod)
+                case("unv")
+                    write(*,*) "Read input UNV"
+                    call readUNV(unv_input, nDim, coordList, connectList, monotype, rang, nb_procs, comm)
+                    !call dispCarvalhol(coordList, "coordList", "(F20.5)",unit_in = get_fileId())
+                    !call dispCarvalhol(connectList, "connectList",unit_in = get_fileId())
+                case("automatic")
+                    baseStep = nint(dble(nb_procs)**(1.0d0/nDim))
+                    call read_DataTable(dataTable, "Min", MSH%xMinGlob)
+                    call read_DataTable(dataTable, "Max", MSH%xMaxGlob)
+                    call read_DataTable(dataTable, "Step", MSH%xStep)
+                    !write(rangChar,'(I7)') rang
+                    !call read_DataTable(dataTable, "Max"//trim(adjustl(rangChar)), MSH%xMax)
+                    !call read_DataTable(dataTable, "Min"//trim(adjustl(rangChar)), MSH%xMin)
+                case default
+                    write(*,*) "meshMod not accepted: ", MSH%meshMod
+                    call MPI_ABORT(MPI_COMM_WORLD, error, code)
+            end select
 
             deallocate(dataTable)
 
@@ -339,35 +345,61 @@ program main_RandomField
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
+
         subroutine define_topography()
 
             allocate(periods(MSH%nDim))
             periods(:) = .false.
 
-            write(get_fileId(),*) "-> set_procPerDim"
 
-            call set_procPerDim (MSH)
-            write(get_fileId(),*) "-> MPI_CART_CREATE"
-            call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
-            write(get_fileId(),*) "-> MPI_CART_COORDS"
-            call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
+            if (MSH%meshMod == "unv") then
+                RDF%xPoints => coordList
+                write(get_fileId(),*) "-> defining_UNV_extremes"
+                call get_Global_Extremes_Mesh(RDF%xPoints, MSH%xMinGlob, MSH%xMaxGlob, RDF%comm)
+                RDF%xNTotal = MSH%xNTotal
+                RDF%xMinBound = MSH%xMinGlob
+                RDF%xMaxBound = MSH%xMaxGlob
+                MSH%xMinBound = MSH%xMinGlob
+                MSH%xMaxBound = MSH%xMaxGlob
+                MSH%xMin    = minval(RDF%xPoints, 2)
+                MSH%xMax    = maxval(RDF%xPoints, 2)
+                MSH%xNTotal = size(RDF%xPoints, 2)
+                RDF%xNTotal = MSH%xNTotal
 
-            if(RDF%independent) then
+            else
+                write(get_fileId(),*) "-> set_procPerDim"
+                call set_procPerDim (MSH)
+                write(get_fileId(),*) "-> MPI_CART_CREATE"
+                call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
+                write(get_fileId(),*) "-> MPI_CART_COORDS"
+                call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
                 write(get_fileId(),*) "-> redefine_Global_Extremes"
+                write(get_fileId(),*) "     BEFORE:"
+                write(get_fileId(),*) "     MSH%xStep    = ", MSH%xStep
+                write(get_fileId(),*) "     MSH%xMinGlob = ", MSH%xMinGlob
+                write(get_fileId(),*) "     MSH%xMaxGlob = ", MSH%xMaxGlob
                 call redefine_Global_Extremes (MSH, RDF, pointsPerCorrL = 10)
+                write(get_fileId(),*) "     AFTER:"
+                write(get_fileId(),*) "     MSH%xStep    = ", MSH%xStep
+                write(get_fileId(),*) "     MSH%xMinGlob = ", MSH%xMinGlob
+                write(get_fileId(),*) "     MSH%xMaxGlob = ", MSH%xMaxGlob
+                write(get_fileId(),*) " "
                 write(get_fileId(),*) "-> set_Local_Extremes_From_Coords"
                 call set_Local_Extremes_From_Coords (MSH)
-                write(get_fileId(),*) "-> set_neighbours"
-                call set_neighbours (MSH)
-                write(get_fileId(),*) "-> redefine_Overlap"
-                call redefine_Overlap (MSH, RDF)
-                write(get_fileId(),*) "-> redefine_extremes"
-                call redefine_extremes (MSH, RDF%corrL)
-            else
-                call set_Local_Extremes_Mesh (MSH%xMin, MSH%xMax, MSH%xMinGlob, MSH%xMaxGlob, MSH%rang, MSH%nb_procs)
-            end if
+                write(get_fileId(),*) "-> Getting Global Matrix Reference"
+                call get_XPoints_globCoords(RDF, MSH)
+                write(get_fileId(),*) "     RDF%origin = ", RDF%origin
+                write(get_fileId(),*) "     RDF%stride = ", RDF%stride
+                if(RDF%independent) then
+                    write(get_fileId(),*) "-> set_neighbours"
+                    call set_neighbours (MSH)
+                    write(get_fileId(),*) "-> redefine_Overlap"
+                    call redefine_Overlap (MSH, RDF)
+                    write(get_fileId(),*) "-> redefine_extremes_for_overlap"
+                    call redefine_extremes_for_overlap (MSH, RDF%corrL)
+                end if
 
-            call show_MESH(MSH, "MSH", unit_in = get_fileId())
+            end if
 
             deallocate(periods)
 
@@ -382,27 +414,31 @@ program main_RandomField
             implicit none
             double precision, dimension(:), allocatable :: seedStartVec
 
-            write(get_fileId(),*) "Defining Topography"
+            write(get_fileId(),*) "-> Defining Topography"
             call define_topography()
-            write(get_fileId(),*) "Initializing Random Seed"
-            call calculate_random_seed(RDF%seed, RDF%seedStart)
-            call init_random_seed(RDF%seed)
 
+            write(get_fileId(),*) "-> Initializing Random Seed"
             if(MSH%independent) then
                 !Define independent seed in each proc
                 call calculate_random_seed(RDF%seed, RDF%seedStart+RDF%rang)
                 call init_random_seed(RDF%seed)
-                !Building xPoints
-                write(get_fileId(),*) "Setting xPoints (independent)"
-                call set_XPoints_independent(MSH, RDF, RDF%xPoints_Local)
+
             else
-                !Building xPoints
-                call set_XPoints(MSH, RDF, RDF%xPoints_Local)
+                call calculate_random_seed(RDF%seed, RDF%seedStart)
+                call init_random_seed(RDF%seed)
             end if
 
+            write(get_fileId(),*) "-> Setting xPoints"
+            call set_XPoints(MSH, RDF, RDF%xPoints_Local)
+            write(get_fileId(),*) "     shape(RDF%xPoints)    = ", shape(RDF%xPoints)
+            write(get_fileId(),*) "     maxval(RDF%xPoints,2) = ", maxval(RDF%xPoints,2)
+            write(get_fileId(),*) "     minval(RDF%xPoints,2) = ", minval(RDF%xPoints,2)
+
+            if(size(RDF%xPoints,2) <50) call dispCarvalhol(transpose(RDF%xPoints), "transpose(RDF%xPoints)", "(F20.5)",unit_in = get_fileId())
 
             call allocate_randField(RDF, RDF%randField_Local)
 
+            write(get_fileId(),*) "-> Setting folder path"
             single_path = string_vec_join([results_path,"/",results_folder_name])
             write(get_fileId(),*) "single_path = ", single_path
 
@@ -418,17 +454,30 @@ program main_RandomField
 
             write(get_fileId(),*) "Generating Random Field"
             call create_RF_Unstruct_Init (RDF, MSH)
-            call show_RF(RDF, "RDF", unit_in = get_fileId())
 
             t2 = MPI_Wtime();
             call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
             if(RDF%rang == 0) write(*,*) "Generation Time = ", all_t2 - all_t1
             all_t3 = -1.0D0
 
+            if(explodedView .and. RDF%independent) then
+                do i = 1, RDF%nDim
+                    RDF%xPoints(i,:) = RDF%xPoints(i,:) + 1.5*MSH%coords(i)*RDF%corrL(i)*MSH%overlap
+                end do
+            end if
+
             if(writeFiles) then
                 write(get_fileId(),*) "-> Writing XMF and hdf5 files";
-                call write_Mono_XMF_h5(RDF%xPoints, RDF%randField, "trans_", RDF%rang, single_path, &
-                                                    MPI_COMM_WORLD, ["_proc_"], [RDF%rang], 0)
+
+                if(outputStyle==1) then
+                    write(get_fileId(),*) "   (Parallel)";
+                    call write_Mono_XMF_h5(RDF, MSH, connectList, monotype, "trans_", RDF%rang, single_path, &
+                                                    MPI_COMM_WORLD, ["_All"], [0], 0, style=outputStyle)
+                else
+                    write(get_fileId(),*) "   (Per Proc)";
+                    call write_Mono_XMF_h5(RDF, MSH, connectList, monotype, "trans_", RDF%rang, single_path, &
+                                                    MPI_COMM_WORLD, ["_All"], [RDF%rang], 0, style=outputStyle)
+                end if
                 t3 = MPI_Wtime();
                 call MPI_ALLREDUCE (t3, all_t3, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
                 if(RDF%rang == 0) write(*,*) "Writing Files Time = ", all_t3 - all_t2
@@ -461,6 +510,9 @@ program main_RandomField
             if(allocated(step_mult)) deallocate(step_mult);
             if(allocated(step_add))  deallocate(step_add);
             if(allocated(step_div))  deallocate(step_div);
+
+            if(allocated(coordList))   deallocate(coordList)
+            if(allocated(connectList)) deallocate(connectList)
 
         end subroutine deallocate_all
 

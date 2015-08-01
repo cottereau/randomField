@@ -73,6 +73,7 @@ contains
 
         select case (RDF%method)
             case(ISOTROPIC)
+                write(get_fileId(),*) "RDF%kDelta = ", RDF%kDelta
 
             case(SHINOZUKA)
                 RDF%kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:))); !Number of points in k

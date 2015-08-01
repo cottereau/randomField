@@ -21,11 +21,12 @@ module type_MESH
         integer         , dimension(:), allocatable :: xNStep, procPerDim;
         integer         , dimension(:), allocatable :: neigh, coords;
         double precision, dimension(:), allocatable :: xMax, xMin; !Exact Values of the division
+        double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:), allocatable :: xStep;
         double precision, dimension(:), allocatable :: xMaxLoc, xMinLoc; !Rounded Values of the non-overlapping area
         double precision, dimension(:), allocatable :: xMaxBound, xMinBound; !Bounding box of the domain in this proc
-        double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:,:), allocatable :: xMaxNeigh, xMinNeigh; !Rounded Values of the overlapping area
+        integer         , dimension(2,1) :: indexLocal
         integer         , dimension(:,:), allocatable :: indexNeigh, neighShift
         double precision :: overlap !Size of the overlap (in corrL)
         logical :: init = .false.
@@ -74,6 +75,7 @@ module type_MESH
             MESH_a%xMaxLoc  = -1
             MESH_a%xMinLoc  = -1
             MESH_a%procPerDim = -1
+            MESH_a%coords(:)  = -1
             MESH_a%xMaxNeigh(:,:) = 0
             MESH_a%xMinNeigh(:,:) = 0
             MESH_a%indexNeigh(:,:) = -1
