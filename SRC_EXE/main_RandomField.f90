@@ -386,10 +386,6 @@ program main_RandomField
                 write(get_fileId(),*) " "
                 write(get_fileId(),*) "-> set_Local_Extremes_From_Coords"
                 call set_Local_Extremes_From_Coords (MSH)
-                write(get_fileId(),*) "-> Getting Global Matrix Reference"
-                call get_XPoints_globCoords(RDF, MSH)
-                write(get_fileId(),*) "     RDF%origin = ", RDF%origin
-                write(get_fileId(),*) "     RDF%stride = ", RDF%stride
                 if(RDF%independent) then
                     write(get_fileId(),*) "-> set_neighbours"
                     call set_neighbours (MSH)
@@ -398,6 +394,11 @@ program main_RandomField
                     write(get_fileId(),*) "-> redefine_extremes_for_overlap"
                     call redefine_extremes_for_overlap (MSH, RDF%corrL)
                 end if
+                write(get_fileId(),*) "-> Getting Global Matrix Reference"
+                call get_XPoints_globCoords(RDF, MSH)
+                write(get_fileId(),*) "     RDF%origin = ", RDF%origin
+                write(get_fileId(),*) "     RDF%stride = ", RDF%stride
+
 
             end if
 
@@ -407,8 +408,7 @@ program main_RandomField
 
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------
+
         subroutine single_realization()
 
             implicit none
@@ -454,7 +454,10 @@ program main_RandomField
 
             write(get_fileId(),*) "Generating Random Field"
             call create_RF_Unstruct_Init (RDF, MSH)
+            !RDF%randField(:,:) = RDF%rang            
 
+            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) call reorderRandomFieldStruct(RDF, MSH) 
+ 
             t2 = MPI_Wtime();
             call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
             if(RDF%rang == 0) write(*,*) "Generation Time = ", all_t2 - all_t1

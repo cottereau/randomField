@@ -1011,7 +1011,67 @@ contains
         call finalize_RF(tmpRDF)
 
     end subroutine create_RF_overlap
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine reorderRandomFieldStruct(RDF, MSH)
+        implicit none
+        
+        type(RF)  , intent(inout) :: RDF
+        type(MESH), intent(in)    :: MSH
 
+        !LOCAL
+        integer, dimension(MSH%nDim) :: ind3D, offset
+        double precision, dimension(MSH%nDim) :: orig, coordValue, tempCoordValue, xStep
+        double precision, dimension(RDF%Nmc)  :: tempRFValue, RFValue
+        integer :: ind1D
+        integer :: i, placedPoints
+
+        orig  = (dble(RDF%origin-1)*MSH%xStep + MSH%xMinGlob)
+        xStep = MSH%xStep
+
+        offset(1) = 1
+        do i = 2, MSH%nDim
+          offset(i) = product(MSH%xNStep(1:i-1))
+        end do
+
+        write(get_fileId(),*) "orig   = ", orig
+        write(get_fileId(),*) "offset = ", offset
+        write(get_fileId(),*) "MSH%xNTotal = ", MSH%xNTotal
+        write(get_fileId(),*) "RDF%origin  = ", RDF%origin
+        write(get_fileId(),*) "xStep = ", xStep
+        write(get_fileId(),*) "size(RDF%randField,1) = ", size(RDF%randField,1)
+        write(get_fileId(),*) " "
+
+        call dispCarvalhol(transpose(RDF%xPoints(:,1:50)), "BEFORE REORD transpose(RDF%xPoints(:,1:50))", unit_in = get_fileId())
+
+        placedPoints = 0
+        do i = 1, size(RDF%randField,1)
+          coordValue = RDF%xPoints(:,i)
+
+          ind3D = nint((coordValue-orig)/xStep)
+          ind1D = sum(ind3D*offset) + 1
+          if(ind1D == 13) write(get_fileId(),*) "STD coordValue for 13 = ", coordValue
+
+          !The point is not whete it was supposed to be
+          do while (ind1D /= i)
+            ind3D = nint((coordValue-orig)/xStep)
+            ind1D = sum(ind3D*offset) + 1
+            tempRFValue    = RDF%randField(ind1D,:)
+            tempCoordValue = RDF%xPoints(:, ind1D)
+            RDF%randField(ind1D,:) = RFvalue
+            RDF%xPoints(:, ind1D)  = coordValue 
+            RFValue     = tempRFValue
+            coordValue  = tempCoordValue            
+          end do
+
+          
+       end do
+
+       call dispCarvalhol(transpose(RDF%xPoints(:,:)), "AFTER REORD transpose(RDF%xPoints(:,1:50))", unit_in = get_fileId())
+        
+    end subroutine reorderRandomFieldStruct
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

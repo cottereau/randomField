@@ -71,7 +71,7 @@ contains
                                                communicator=communicator, &
                                                HDF5Name=HDF5Names(3), xSz=xSz(3), ySz=ySz(3), transp = .false.)
                     case("automatic")
-                        fileName2 = "samples"
+                        fileName2 = "samples"                     
                         call write_pHDF5_Str(  MSH=MSH, &
                                                RDF=RDF, &
                                                fileName=fileName2, &

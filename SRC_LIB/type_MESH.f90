@@ -143,7 +143,7 @@ module type_MESH
                 write(unit,"(A,("//dblFmt//"))") " |  |xMaxLoc    = ", MESH_a%xMaxLoc
                 write(unit,"(A,("//dblFmt//"))") " |  |xMinBound  = ", MESH_a%xMinBound
                 write(unit,"(A,("//dblFmt//"))") " |  |xMaxBound  = ", MESH_a%xMaxBound
-                call show_MESHneigh(MESH_a, onlyExisting = .true., unit_in = unit)
+                call show_MESHneigh(MESH_a, onlyExisting = .false., unit_in = unit)
 
             else
                 write(unit,*) "|  init     = ", MESH_a%init

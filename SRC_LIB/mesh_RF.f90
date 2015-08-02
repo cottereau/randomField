@@ -23,8 +23,11 @@ contains
 
         !LOCAL
         integer :: i, j, counterXPoints
-        integer, dimension(MSH%nDim) :: tempXNStep, xMinForStep, xMaxForStep
+        integer, dimension(MSH%nDim) :: tempXNStep
+        double precision, dimension(MSH%nDim) :: xMinForStep, xMaxForStep
 
+        
+        call show_Mesh(MSH, unit_in=get_fileId())
         !Snaping points to the grid and discover the bounding box
         call snap_to_grid(MSH, MSH%xMinLoc, MSH%xMaxLoc)
         MSH%xMaxBound = MSH%xMaxLoc;
@@ -42,24 +45,36 @@ contains
                     if (MSH%xMinNeigh(j,i) < MSH%xMinBound(j)) MSH%xMinBound(j) = MSH%xMinNeigh(j,i)
                     if (MSH%xMaxNeigh(j,i) > MSH%xMaxBound(j)) MSH%xMaxBound(j) = MSH%xMaxNeigh(j,i)
 
-                    if (MSH%neighShift(j,i) == 1)
-                        if (MSH%xMinNeigh(j,i) < MSH%xMinForStep(j)) MSH%xMinForStep(j) = MSH%xMinNeigh(j,i)
-                        if (MSH%xMaxNeigh(j,i) > MSH%xMaxForStep(j)) MSH%xMaxForStep(j) = MSH%xMaxNeigh(j,i)
+                    if (MSH%neighShift(j,i) == 1) then
+                        if (MSH%xMinNeigh(j,i) < xMinForStep(j)) xMinForStep(j) = MSH%xMinNeigh(j,i)
+                        if (MSH%xMaxNeigh(j,i) > xMaxForStep(j)) xMaxForStep(j) = MSH%xMaxNeigh(j,i)
                     end if
 
                 end do
             end do
         end if
 
-        MSH%xNStep = find_xNStep(MSH%xMinForStep, MSH%xMaxForStep, MSH%xStep)
+        MSH%xNStep = find_xNStep(xMinForStep, xMaxForStep, MSH%xStep)
         MSH%xNTotal = product(MSH%xNStep)
         RDF%xNTotal = MSH%xNTotal
+
+        write(get_fileId(),*) "      xMinForStep    = ", xMinForStep
+        write(get_fileId(),*) "      xMaxForStep    = ", xMaxForStep
+        write(get_fileId(),*) "      MSH%xMinBound  = ", MSH%xMinBound
+        write(get_fileId(),*) "      MSH%xMaxBound  = ", MSH%xMaxBound
+        write(get_fileId(),*) "      MSH%xNStep     = ", MSH%xNStep
 
         allocate(xPoints(MSH%nDim, MSH%xNTotal))
 
         !Internal Points
         counterXPoints = 0;
         tempXNStep = find_xNStep(MSH%xMinLoc, MSH%xMaxLoc, MSH%xStep)
+        write(get_fileId(),*) "   Internal Points"
+        write(get_fileId(),*) "      MSH%xMinLoc = ", MSH%xMinLoc
+        write(get_fileId(),*) "      MSH%xMaxLoc = ", MSH%xMaxLoc
+        write(get_fileId(),*) "      MSH%xStep   = ", MSH%xStep
+        write(get_fileId(),*) "      tempXNStep  = ", tempXNStep
+
         do i = 1, product(tempXNStep)
             call get_Permutation(i, MSH%xMaxLoc, tempXNStep, xPoints(:,i), MSH%xMinLoc, snapExtremes = .true.);
         end do
@@ -72,7 +87,6 @@ contains
         if(MSH%independent) then
             do j = 1, size(MSH%xMaxNeigh, 2)
 
-                isNeeded = .true.
                 !Check if the neighbour exist
                 if(MSH%neigh(j)<0) cycle
 
@@ -332,9 +346,6 @@ contains
 
         MSH%xMin = procDelta*MSH%coords + MSH%xMinGlob
         MSH%xMax = MSH%xMin + procDelta
-
-        write(*,*) " MSH%coords = ", MSH%coords
-
 
         if(.not. MSH%independent) then
             do i = 1, MSH%nDim
@@ -610,12 +621,14 @@ contains
 
 
         do i = 1, MSH%nDim
+            !if(MSH%overlap*RDF%corrL(i) > (MSH%xMax(i) - MSH%xMin(i)) - 4*MSH%xStep(i)) then
             if(MSH%overlap > ((MSH%xMax(i) - MSH%xMin(i))/RDF%corrL(i)) - 4*MSH%xStep(i)) then
-
+		!Obs: 4 meshstep are needed because the border points can be taken away in the rounding process
                 write(get_fileId(),*)"WARNING overlap exceeded local dimensions (consider changing the overlap size)"
                 write(get_fileId(),*)"  Dim = ", i
                 write(get_fileId(),*)"  OLD overlap value = ", MSH%overlap
                 MSH%overlap = ((MSH%xMax(i) - MSH%xMin(i))/RDF%corrL(i)) - 4*MSH%xStep(i)
+                !MSH%overlap = ((MSH%xMax(i) - MSH%xMin(i)) - 4*MSH%xStep(i))/RDF%corrL(i)
                 write(get_fileId(),*)"  NEW overlap value = ", MSH%overlap
 
             end if
