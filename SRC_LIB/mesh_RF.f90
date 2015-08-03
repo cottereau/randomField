@@ -575,10 +575,16 @@ contains
         type(MESH) :: MSH
         type(RF)   :: RDF
         integer, intent(in) :: pointsPerCorrL
-        double precision, dimension(MSH%nDim) :: delta, half
+        double precision, dimension(MSH%nDim) :: delta, half, deltaMin
 
         !LOCAL
         integer :: i
+
+        !Redefining MSH%xStep
+        !MSH%xStep = RDF%corrL/dble(pointsPerCorrL-1)
+
+        !Defining deltaMin
+        !deltaMin =
 
         !Redefining MSH%xStep
         do i = 1, MSH%nDim

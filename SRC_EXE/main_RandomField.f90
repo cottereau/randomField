@@ -454,9 +454,13 @@ program main_RandomField
 
             write(get_fileId(),*) "Generating Random Field"
             call create_RF_Unstruct_Init (RDF, MSH)
-            !RDF%randField(:,:) = RDF%rang            
 
-            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) call reorderRandomFieldStruct(RDF, MSH) 
+
+            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
+                write(get_fileId(),*) "Reordering Random Field"
+                call reorderRandomFieldStruct(RDF, MSH)
+            end if
+
  
             t2 = MPI_Wtime();
             call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
