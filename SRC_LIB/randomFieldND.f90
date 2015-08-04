@@ -97,19 +97,8 @@ contains
         !Getting Mesh Information
         RDF%xNStep = MSH%xNStep
 
-        !call get_Global_Extremes_Mesh(RDF%xPoints, RDF%xMinGlob, RDF%xMaxGlob)
-
-        !Defining random seed
-        !call calculate_random_seed(RDF%seed, RDF%seedStart)
-        !call init_random_seed(RDF%seed)
-
         !Generating standard Gaussian Field
         call gen_Std_Gauss(RDF, MSH)
-
-        if(MSH%rang == 0) then
-            !call show_MESH(MSH)
-            !call show_RF(RDF)
-        end if
 
     end subroutine create_RF_Unstruct_Init
 
@@ -126,11 +115,11 @@ contains
 
         !LOCAL VARIABLES
         integer :: i;
-
-        if(RDF%rang == 0) write(*,*) "Inside gen_Std_Gauss"
+        integer :: minIndexNeigh, maxIndexNeigh
+        logical, dimension(size(MSH%neigh)) :: considerNeighbour
+        double precision, dimension(:), allocatable :: normFactor
 
         !Normalization
-        write(get_fileId(),*) "Normalizing"
         do i = 1, RDF%nDim
             RDF%xPoints(i,:) = RDF%xPoints(i,:)/RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
@@ -167,15 +156,24 @@ contains
             write(get_fileId(),*) "GENERATING BORDER RANDOM FIELDS"
             write(get_fileId(),*) "-------------------------------"
             write(get_fileId(),*) ""
-            write(get_fileId(),*) "Discovering neighbours seed"
+            write(get_fileId(),*) "->Discovering neighbours seed"
             call get_neighbours_info(RDF, MSH)
-            write(get_fileId(),*) "Calculating tmpRDF"
-            call create_RF_overlap(RDF, MSH)
+            write(get_fileId(),*) "Creating Overlaps"
+            call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
+            allocate(normFactor(minIndexNeigh:maxIndexNeigh))
+            call findNormalizationFactors(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, normFactor)
+            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
+            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, normFactor)
+
+            !RDF%randField(:, 1) = 0
+            !RDF%randField(minIndexNeigh:maxIndexNeigh, 1) = normFactor
+            !call create_RF_overlap(RDF, MSH)
 
         end if
 
         !Reverting Normalization
-        write(get_fileId(),*) "Reverting Normalization"
+        write(get_fileId(),*) " "
+        write(get_fileId(),*) "->Reverting Normalization"
         do i = 1, RDF%nDim
             RDF%xPoints(i,:) = RDF%xPoints(i,:)*RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)*RDF%corrL(i)
@@ -185,6 +183,8 @@ contains
             MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)*RDF%corrL(i)
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
         end do
+
+        if(allocated(normFactor)) deallocate(normFactor)
 
     end subroutine gen_Std_Gauss
 
@@ -251,17 +251,17 @@ contains
         integer :: n, i, j, m
         logical :: randomK
 
-        write(get_fileId(),*) "Inside Shinozuka"
+        !write(get_fileId(),*) "Inside Shinozuka"
 
         randomK = .false.
         if(present(randomK_in)) randomK = randomK_in
         call init_random_seed(RDF%seed)
 
-        write(get_fileId(),*) "Defining kPoints and SkVec"
+        !write(get_fileId(),*) "Defining kPoints and SkVec"
         call set_kPoints(RDF)
         call set_SkVec(RDF)
 
-        write(get_fileId(),*) "Calculating Fields"
+        !write(get_fileId(),*) "Calculating Fields"
         allocate(k_x_phi (RDF%xNTotal, 1))
         allocate(kSign (2**(RDF%nDim-1), RDF%nDim));
         allocate(kVec(RDF%nDim, 1))
@@ -271,24 +271,29 @@ contains
         allocate(phiK (RDF%kNTotal, size(kSign,1)));
 
         if(randomK) then
-            write(get_fileId(),*) "Shinozuka, k random"
+            write(get_fileId(),*) "-----Shinozuka, k random-----"
             ampMult = 2.0d0*sqrt(1/(RDF%kNTotal*(2.0d0*PI)**(dble(RDF%nDim))))
         else
-            write(get_fileId(),*) "Shinozuka, k discrete"
+            write(get_fileId(),*) "-----Shinozuka, k discrete-----"
             ampMult = 2.0d0*sqrt(product(RDF%kDelta)/((2.0d0*PI)**(dble(RDF%nDim))))
         end if
+
+        write(get_fileId(),*) "     kNStep  = ", RDF%kNStep
+        write(get_fileId(),*) "     kNTotal = ", RDF%kNTotal
+        write(get_fileId(),*) "     xNTotal = ", size(RDF%xPoints, 2)
 
         RDF%randField(:,:) = 0.0d0;
 
         do n = 1, RDF%Nmc
+            write(get_fileId(),*) "  --Generating Field Number ", n
 
             if(.not. RDF%calculate(n)) cycle
 
             call random_number(phiK(:,:))
             phiK(:,:) = 2.0D0*pi*phiK(:,:)
 
-            write(get_fileId(),*) "First PhiK = ", phiK(1,1)
-            write(get_fileId(),*) "Last PhiK  = ", phiK(size(phiK,1), size(phiK,2))
+            write(get_fileId(),*) "     First PhiK = ", phiK(1,1)
+            write(get_fileId(),*) "     Last PhiK  = ", phiK(size(phiK,1), size(phiK,2))
 
             !Loop on k sign
             do m = 1, size(kSign,1)
@@ -320,27 +325,6 @@ contains
 
         RDF%randField(:,:) = ampMult * RDF%randField(:,:);
 
-!        else
-!            if(RDF%rang == 0) write(*,*) "Shinozuka, k random"
-!            !call show_RF(RDF, "Shinozuka Random Before Generation")
-!            RDF%randField(:,:) = 0.0d0;
-!            ampMult = 2.0d0*sqrt(1/(RDF%kNTotal*(2.0d0*PI)**(dble(RDF%nDim))))
-!
-!            do n = 1, RDF%Nmc
-!                if(.not. RDF%calculate(n)) cycle
-!                !write(*,*) "Before filling phiK"
-!                call random_number(phiK(:))
-!                !write(*,*) "Before PhiK Replication"
-!                k_dot_x_plus_phi(:,:) = transpose(spread( source=2.0D0*pi*phiK , dim =2 , ncopies = RDF%xNTotal)) !2pi*phiK replicated xNTotal times
-!                !write(*,*) "Before First DGEMM"
-!                call DGEMM_simple(RDF%xPoints, RDF%kPoints, k_dot_x_plus_phi, "T", "N") !x*k + 2pi*phiK
-!                !write(*,*) "Before Second DGEMM"
-!                call DGEMM_simple(cos(k_dot_x_plus_phi), reshape(source = ampMult * sqrt(RDF%SkVec), shape = [size(RDF%SkVec),1]) , RDF%randField(:,n:n), "N", "N")
-!            end do
-
-            !call show_RF(RDF, "Shinozuka Random After Generation")
-!        end if
-
         if(allocated(dgemm_mult))       deallocate(dgemm_mult)
         if(allocated(phiK))             deallocate(phiK);
         if(allocated(k_x_phi))          deallocate(k_x_phi)
@@ -362,7 +346,7 @@ contains
         !LOCAL
         logical :: randomK;
 
-        write(get_fileId(),*) "Inside Randomization"
+        write(get_fileId(),*) "-----Randomization-----"
 
         randomK = .true.
 
@@ -398,7 +382,7 @@ contains
         allocate(rVec (RDF%nDim));
         allocate(dgemm_mult(RDF%xNTotal))
 
-        write(get_fileId(),*) "Inside Isotropic"
+        write(get_fileId(),*) "-----Inside Isotropic-----"
 
         !r Definition
         call set_kMaxND(RDF%corrMod, rMaxVec)
@@ -407,10 +391,10 @@ contains
         rDelta  = maxval(RDF%kDelta(:))/5.0D0 !Delta min in between two wave numbers to avoid periodicity
         rNTotal = ceiling(rMax/rDelta) + 1;
 
-        write(get_fileId(),*) "rMax = ", rMax
-        write(get_fileId(),*) "rDelta = ", rDelta
-        write(get_fileId(),*) "rNTotal = ", rNTotal
-        write(get_fileId(),*) "RDF%calculate = ", RDF%calculate
+        !write(get_fileId(),*) "rMax = ", rMax
+        !write(get_fileId(),*) "rDelta = ", rDelta
+        !write(get_fileId(),*) "rNTotal = ", rNTotal
+        !write(get_fileId(),*) "RDF%calculate = ", RDF%calculate
 
         !Generating random field samples
         step      = rMax/dble(rNTotal)
@@ -775,140 +759,45 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine create_RF_overlap(RDF, MSH)
-        implicit none
-
-        !INPUT OUTPUT
-        type(RF), intent(inout) :: RDF
-
+    subroutine getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
         !INPUT
         type(MESH), intent(in) :: MSH
-
-        !LOCAL
-        integer :: i, j, n
-        double precision, dimension(:, :), allocatable :: originList
-        double precision, dimension(:), allocatable :: normFactor, power, powerSF
-        double precision, dimension(:), allocatable :: originCorner, neighOrCorner
-        integer :: minPos, maxPos, neighPos, minPosGlob, maxPosGlob
-        integer, dimension(:), allocatable :: tempXNStep, shift, counterDir
-        integer :: shiftScal
-        integer :: direction, zeroVal, nVertices
-        double precision :: errorTol = 0.000001, dilatation
-        logical, dimension(:,:), allocatable :: first
-        logical ::sndRcv
-        logical, dimension(size(MSH%neigh)) :: considerNeighbour
-        type(RF) :: tmpRDF
-
-        !call show_RF(tmpRDF, "tmpRDF", unit_in = get_fileId())
-
-        write(get_fileId(), *) "Creating overlap"
-
-        allocate(originList(MSH%nDim, 2**MSH%nDim))
-        allocate(originCorner(MSH%nDim))
-        allocate(neighOrCorner(MSH%nDim))
-        allocate(tempXNStep(MSH%nDim))
-        allocate(shift(MSH%nDim))
-        allocate(first(-1:1, MSH%nDim))
+        !OUTPUT
+        integer, intent(out) :: minIndexNeigh, maxIndexNeigh
+        logical, dimension(:), intent(out) :: considerNeighbour
 
         considerNeighbour = .true.
-        do direction = 1, size(MSH%neigh)
-            if(minval(MSH%neighShift(:,direction)) == -1) considerNeighbour(direction) = .false.
-            if(MSH%neigh(direction) < 0) considerNeighbour(direction) = .false.
-        end do
+        where(MSH%neigh < 0) considerNeighbour = .false.
+        where(minval(MSH%neighShift,1) < 0) considerNeighbour = .false.
 
-        minPosGlob = minval(pack(MSH%indexNeigh(1,:), considerNeighbour))
-        maxPosGlob = maxval(pack(MSH%indexNeigh(2,:), considerNeighbour))
-        allocate(normFactor(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
-        allocate(power(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
-        allocate(powerSF(minPosGlob:maxPosGlob))
-        allocate(counterDir(MSH%nDim))
+        !Global Min and Max positions
+        minIndexNeigh = minval(pack(MSH%indexNeigh(1,:), considerNeighbour))
+        maxIndexNeigh = maxval(pack(MSH%indexNeigh(2,:), considerNeighbour))
 
-        dilatation = -log(errorTol**2)/2
+    end subroutine getNeighIndexRange
 
-        !Modify extremes of local Random Field and find normalization values-------------------------------------------------------
-        normFactor(:) = 0
-        power(:) = 0
-
-        !Loop on directions
-        do direction = 1, size(MSH%neigh)
-
-            !if(direction/=2) cycle
-
-            write(get_fileId(), *) "  DIRECTION = ", direction, "-------------------------------------"
-
-            if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
-
-            !Positions in temp Vector
-            minPos = MSH%indexNeigh(1,direction)
-            maxPos = MSH%indexNeigh(2,direction)
-
-            !Finding origin
-            originCorner = MSH%xMinNeigh(:, direction)
-            do i = 1, MSH%nDim
-                if(MSH%neighShift(i, direction) == -1) then
-                    originCorner(i) = MSH%xMaxNeigh(i, direction)
-                end if
-            end do
-
-            write(get_fileId(), *) "  originCorner = ", originCorner
-
-            !Finding all vertices
-            tempXNStep = 2
-            do i = 1, 2**MSH%nDim
-                call get_Permutation(i, MSH%xMaxNeigh(:,direction), tempXNStep, originList(:, i), &
-                                     MSH%xMinNeigh(:,direction), snapExtremes = .true.);
-            end do
-
-            !Normalization values
-            first = .true.
-            normFactor(minPos:maxPos) = 0
-            power(minPos:maxPos) = 0
-            zeroVal = MSH%nDim - (sum((MSH%neighShift(:, direction))**2))
-
-
-            !We sweep al vertices in this direction
-            do j = 1, size(originList, 2)
-
-                power(minPos:maxPos) = 0
-
-                do i = 1, MSH%nDim
-
-                    if(MSH%neighShift(i, direction) == 0) cycle
-
-                    power(minPos:maxPos) = (RDF%xPoints(i, minPos:maxPos) - originList(i, j))**2 &
-                                               + power(minPos:maxPos);
-
-                end do
-
-                where (sqrt(power(minPos:maxPos)) > MSH%overlap) power(minPos:maxPos) = MSH%overlap**2
-                power(minPos:maxPos) = sqrt(power(minPos:maxPos)/(MSH%overlap**2))
-                normFactor(minPos:maxPos) = sqrt((cos((PI)*(power(minPos:maxPos)))+1.0D0)/2.0D0) + normFactor(minPos:maxPos)
-
-
-            end do !Neighbours
-
-            normFactor(minPos:maxPos) = normFactor(minPos:maxPos)/(2.0**zeroVal)
-
-            !Shape Function multiplication (Obs: redefinition of power, should come after Normalization values calculation)
-            powerSF(minPos:maxPos) = 0
-            do i = 1, MSH%nDim
-                if(MSH%neighShift(i, direction) == 0) cycle
-
-                powerSF(minPos:maxPos) = (RDF%xPoints(i, minPos:maxPos) - originCorner(i))**2 &
-                                       + powerSF(minPos:maxPos)
-            end do
-
-            where (sqrt(powerSF(minPos:maxPos)) > MSH%overlap) powerSF(minPos:maxPos) = MSH%overlap**2
-            powerSF(minPos:maxPos) = sqrt(powerSF(minPos:maxPos)/(MSH%overlap**2))
-
-        end do !Direction
-
-        RDF%randField(minPosGlob:maxPosGlob,1) = RDF%randField(minPosGlob:maxPosGlob,1) &
-                                                 * sqrt((cos(PI*(powerSF))+1.0D0)/2.0D0)
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, normFactor)
+        !INPUT
+        type(MESH), intent(in) :: MSH
+        integer, intent(in) :: minIndexNeigh, maxIndexNeigh
+        logical, dimension(:), intent(in) ::considerNeighbour
+        double precision, dimension(minIndexNeigh:maxIndexNeigh), intent(in) :: normFactor
+        !OUTPUT
+        type(RF), intent(inout) :: RDF
+        !LOCAL
+        double precision, dimension(MSH%nDim) :: neighOrCorner
+        logical :: sndRcv
+        integer :: i, direction, neighPos, minPos, maxPos
+        double precision, dimension(minIndexNeigh:maxIndexNeigh) :: power
+        type(RF) :: tmpRDF
 
 
         !Taking the contributions from neighbours------------------------------------------------------
-
+        write(get_fileId(), *) "   Taking the contributions from neighbours "
         call init_RF(tmpRDF, RDF%nDim, RDF%Nmc, RDF%comm, RDF%rang, RDF%nb_procs)
         call copy_RF_properties(RDF, tmpRDF)
 
@@ -916,17 +805,11 @@ contains
 
             if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
 
-            write(get_fileId(),*) "Direction = ", direction
+            write(get_fileId(), *) " "
+            write(get_fileId(), *) "  DIRECTION      = ", direction
+            write(get_fileId(), *) "  Neighbour Rank = ", MSH%neigh(direction)
 
-            !Finding origin
-            originCorner = MSH%xMinNeigh(:, direction)
-            do i = 1, MSH%nDim
-                if(MSH%neighShift(i, direction) == -1) then
-                    originCorner(i) = MSH%xMaxNeigh(i, direction)
-                end if
-            end do
-
-            write(get_fileId(),*) "originCorner = ", originCorner
+            !write(get_fileId(),*) "Direction = ", direction
 
             !Preparing the xPoints of a given direction
             call copy_RF_xPoints(MSH, RDF, tmpRDF, tmpRDF%xPoints_Local, direction)
@@ -952,25 +835,19 @@ contains
                 !From this point we know that we want the contribution of this neighbour in this direction
                 if (sndRcv) then
 
-                    write(get_fileId(),*) "sndRcv = ", sndRcv
-
                     tmpRDF%xMinBound = 0.0D0
                     tmpRDF%xMaxBound = RDF%neighRange(:,neighPos)
                     tmpRDF%seed      = RDF%neighSeed(:,neighPos)
 
                     !Generating Standard Gaussian Field
-                    write(get_fileId(),*) "Generating Standard Gaussian Field"
                     select case (tmpRDF%method)
                         case(SHINOZUKA)
-                            write(get_fileId(),*) "SHINOZUKA"
                             call gen_Std_Gauss_Shinozuka(tmpRDF)
                         case(ISOTROPIC)
                             call gen_Std_Gauss_Isotropic(tmpRDF)
                         case(RANDOMIZATION)
                             call gen_Std_Gauss_Randomization(tmpRDF)
                     end select
-
-                    write(get_fileId(),*) "After select case"
 
                     !Finding origin for Shape Function
                     neighOrCorner = originCorner + MSH%overlap*MSH%neighShift(:, neighPos)
@@ -980,12 +857,12 @@ contains
                     do i = 1, MSH%nDim
                         if(MSH%neighShift(i, direction) == 0) cycle
 
-                        power(minPos:maxPos) = (tmpRDF%xPoints(i, :) - neighOrCorner(i))**2 &
+                        power(minPos:maxPos) = ((tmpRDF%xPoints(i, :) - neighOrCorner(i))/MSH%overlap)**2 &
                                                    + power(minPos:maxPos)
                     end do
 
-                    where (sqrt(power(minPos:maxPos)) > MSH%overlap) power(minPos:maxPos) = MSH%overlap**2
-                    power(minPos:maxPos) = power(minPos:maxPos)/(MSH%overlap**2)
+                    power(minPos:maxPos) = sqrt(power(minPos:maxPos))
+                    where (power > 1.0D0) power = 1.0
 
                     RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
                                                      (tmpRDF%randField(:,1) * sqrt((cos((PI)*(power(minPos:maxPos)))+1.0D0)/2.0D0))
@@ -994,21 +871,357 @@ contains
         end do !Directions
 
         !Normalizing Field---------------------------------------------------------------
-
-        RDF%randField(minPosGlob:maxPosGlob,1) = RDF%randField(minPosGlob:maxPosGlob,1)/normFactor(:)
-
-        deallocate(originList)
-        deallocate(tempXNStep)
-        deallocate(originCorner)
-        deallocate(normFactor)
-        deallocate(power)
-        deallocate(shift)
-        deallocate(first)
-        deallocate(counterDir)
-        deallocate(neighOrCorner)
-        deallocate(powerSF)
+        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1)/normFactor(:)
 
         call finalize_RF(tmpRDF)
+
+    end subroutine takeNeighboursContribution
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
+        !INPUT
+        type(RF), intent(in) :: RDF
+        type(MESH), intent(in) :: MSH
+        integer, intent(in) :: minIndexNeigh, maxIndexNeigh
+        logical, dimension(:), intent(in) ::considerNeighbour
+
+        !LOCAL
+        integer :: direction, minPos, maxPos, i
+        double precision, dimension(minIndexNeigh:maxIndexNeigh) :: powerWF
+        double precision, dimension(MSH%nDim) :: originCorner
+
+        !Modify extremes of local Random Field-------------------------------------------------------
+
+        !Loop on directions
+        do direction = 1, size(MSH%neigh)
+
+            if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
+
+            !Positions in temp Vector
+            minPos = MSH%indexNeigh(1,direction)
+            maxPos = MSH%indexNeigh(2,direction)
+
+            !Finding origin
+            originCorner = MSH%xMinNeigh(:, direction)
+            where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
+            !write(get_fileId(), *) "  originCorner = ", originCorner
+
+            !Shape Function multiplication (Obs: redefinition of power, should come after Normalization values calculation)
+            powerWF(minPos:maxPos) = 0.0D0
+            do i = 1, MSH%nDim
+                if(MSH%neighShift(i, direction) == 0) cycle
+
+                powerWF(minPos:maxPos) = ((RDF%xPoints(i, minPos:maxPos) - originCorner(i))/MSH%overlap(i))**2 &
+                                         + powerWF(minPos:maxPos)
+            end do
+
+            powerWF(minPos:maxPos) = sqrt(powerWF(minPos:maxPos))
+            where (powerWF(minPos:maxPos) > 1.0D0) powerWF(minPos:maxPos) = 1.0D0
+
+        end do !Direction
+
+        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
+                                                 * sqrt((cos(PI*(powerWF))+1.0D0)/2.0D0)
+
+    end subroutine applyWeightingFunctions
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine findNormalizationFactors(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, normFactor)
+
+        implicit none
+
+        !INPUT
+        type(RF), intent(in) :: RDF
+        type(MESH), intent(in) :: MSH
+        integer, intent(in) :: minIndexNeigh, maxIndexNeigh
+        logical, dimension(:), intent(in) ::considerNeighbour
+
+        !OUTPUT
+        double precision, dimension(minIndexNeigh:maxIndexNeigh), intent(out) :: normFactor
+
+        !LOCAL
+        integer :: i, j, n
+        double precision, dimension(MSH%nDim, 2**MSH%nDim) :: originList
+        double precision, dimension(minIndexNeigh:maxIndexNeigh) :: power
+        integer, dimension(MSH%nDim) :: tempXNStep
+        double precision :: distance
+        integer :: minPos, maxPos
+        integer :: direction, zeroVal
+
+        !Find normalization values-------------------------------------------------------
+        normFactor(:) = 0
+        power(:) = 0
+
+        !Loop on directions
+        write(get_fileId(), *) "   Finding normalization Factors "
+        do direction = 1, size(MSH%neigh)
+
+            if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
+
+            !Positions in temp Vector
+            minPos = MSH%indexNeigh(1,direction)
+            maxPos = MSH%indexNeigh(2,direction)
+
+
+
+            !Finding all vertices
+            tempXNStep = 2
+            do i = 1, 2**MSH%nDim
+                call get_Permutation(i, MSH%xMaxNeigh(:,direction), tempXNStep, originList(:, i), &
+                                     MSH%xMinNeigh(:,direction), snapExtremes = .true.);
+            end do
+
+            !Normalization values
+            normFactor(minPos:maxPos) = 0 !TO DELETE
+            zeroVal = MSH%nDim - (sum((MSH%neighShift(:, direction))**2))
+
+            !We sweep all vertices in this direction
+            do j = 1, size(originList, 2)
+                power(minPos:maxPos) = 0
+                do i = 1, MSH%nDim
+                    if(MSH%neighShift(i, direction) == 0) cycle
+
+                    power(minPos:maxPos) = ((RDF%xPoints(i, minPos:maxPos) - originList(i, j))/MSH%overlap(i))**2 &
+                                               + power(minPos:maxPos);
+                end do
+
+                power(minPos:maxPos) = sqrt(power(minPos:maxPos))
+                where (power(minPos:maxPos) > 1.0D0) power(minPos:maxPos) = 1.0D0
+                normFactor(minPos:maxPos) = sqrt((cos((PI)*(power(minPos:maxPos)))+1.0D0)/2.0D0) + normFactor(minPos:maxPos)
+
+
+            end do !Neighbours
+
+            normFactor(minPos:maxPos) = normFactor(minPos:maxPos)/(2.0**zeroVal)
+
+        end do !Direction
+
+    end subroutine findNormalizationFactors
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine create_RF_overlap(RDF, MSH)
+        implicit none
+
+        !INPUT OUTPUT
+        type(RF), intent(inout) :: RDF
+
+        !INPUT
+        type(MESH), intent(in) :: MSH
+
+!        !LOCAL
+!        integer :: i, j, n
+!        double precision, dimension(:, :), allocatable :: originList
+!        double precision, dimension(:), allocatable :: normFactor, power, powerSF
+!        double precision, dimension(:), allocatable :: originCorner, neighOrCorner
+!        integer :: minPos, maxPos, neighPos, minPosGlob, maxPosGlob
+!        integer, dimension(:), allocatable :: tempXNStep, shift, counterDir
+!        integer :: shiftScal
+!        integer :: direction, zeroVal, nVertices
+!        logical, dimension(:,:), allocatable :: first
+!        logical ::sndRcv
+!        logical, dimension(size(MSH%neigh)) :: considerNeighbour
+!        type(RF) :: tmpRDF
+!
+!        allocate(originList(MSH%nDim, 2**MSH%nDim))
+!        allocate(originCorner(MSH%nDim))
+!        allocate(neighOrCorner(MSH%nDim))
+!        allocate(tempXNStep(MSH%nDim))
+!        allocate(shift(MSH%nDim))
+!        allocate(first(-1:1, MSH%nDim))
+!
+!        considerNeighbour = .true.
+!        do direction = 1, size(MSH%neigh)
+!            if(minval(MSH%neighShift(:,direction)) == -1) considerNeighbour(direction) = .false.
+!            if(MSH%neigh(direction) < 0) considerNeighbour(direction) = .false.
+!        end do
+!
+!        minPosGlob = minval(pack(MSH%indexNeigh(1,:), considerNeighbour))
+!        maxPosGlob = maxval(pack(MSH%indexNeigh(2,:), considerNeighbour))
+!        allocate(normFactor(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
+!        allocate(power(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
+!        allocate(powerSF(minPosGlob:maxPosGlob))
+!        allocate(counterDir(MSH%nDim))
+!
+!        !Modify extremes of local Random Field and find normalization values-------------------------------------------------------
+!        normFactor(:) = 0
+!        power(:) = 0
+!
+!        !Loop on directions
+!        do direction = 1, size(MSH%neigh)
+!
+!            if(MSH%neigh(direction) <0) cycle !Don't consider Neighbours in this direction
+!
+!            !Positions in temp Vector
+!            minPos = MSH%indexNeigh(1,direction)
+!            maxPos = MSH%indexNeigh(2,direction)
+!
+!            !Finding origin
+!            originCorner = MSH%xMinNeigh(:, direction)
+!            do i = 1, MSH%nDim
+!                if(MSH%neighShift(i, direction) == -1) then
+!                    originCorner(i) = MSH%xMaxNeigh(i, direction)
+!                end if
+!            end do
+!
+!            !write(get_fileId(), *) "  originCorner = ", originCorner
+!
+!            !Finding all vertices
+!            tempXNStep = 2
+!            do i = 1, 2**MSH%nDim
+!                call get_Permutation(i, MSH%xMaxNeigh(:,direction), tempXNStep, originList(:, i), &
+!                                     MSH%xMinNeigh(:,direction), snapExtremes = .true.);
+!            end do
+!
+!            !Normalization values
+!            first = .true.
+!            normFactor(minPos:maxPos) = 0
+!            power(minPos:maxPos) = 0
+!            zeroVal = MSH%nDim - (sum((MSH%neighShift(:, direction))**2))
+!
+!
+!            !We sweep al vertices in this direction
+!            do j = 1, size(originList, 2)
+!
+!                power(minPos:maxPos) = 0
+!
+!                do i = 1, MSH%nDim
+!
+!                    if(MSH%neighShift(i, direction) == 0) cycle
+!
+!                    power(minPos:maxPos) = (RDF%xPoints(i, minPos:maxPos) - originList(i, j))**2 &
+!                                               + power(minPos:maxPos);
+!
+!                end do
+!
+!                where (sqrt(power(minPos:maxPos)) > MSH%overlap) power(minPos:maxPos) = MSH%overlap**2
+!                power(minPos:maxPos) = sqrt(power(minPos:maxPos)/(MSH%overlap**2))
+!                normFactor(minPos:maxPos) = sqrt((cos((PI)*(power(minPos:maxPos)))+1.0D0)/2.0D0) + normFactor(minPos:maxPos)
+!
+!
+!            end do !Neighbours
+!
+!            normFactor(minPos:maxPos) = normFactor(minPos:maxPos)/(2.0**zeroVal)
+!
+!            !Shape Function multiplication (Obs: redefinition of power, should come after Normalization values calculation)
+!            powerSF(minPos:maxPos) = 0
+!            do i = 1, MSH%nDim
+!                if(MSH%neighShift(i, direction) == 0) cycle
+!
+!                powerSF(minPos:maxPos) = (RDF%xPoints(i, minPos:maxPos) - originCorner(i))**2 &
+!                                       + powerSF(minPos:maxPos)
+!            end do
+!
+!            where (sqrt(powerSF(minPos:maxPos)) > MSH%overlap) powerSF(minPos:maxPos) = MSH%overlap**2
+!            powerSF(minPos:maxPos) = sqrt(powerSF(minPos:maxPos)/(MSH%overlap**2))
+!
+!        end do !Direction
+
+!        RDF%randField(minPosGlob:maxPosGlob,1) = RDF%randField(minPosGlob:maxPosGlob,1) &
+!                                                 * sqrt((cos(PI*(powerSF))+1.0D0)/2.0D0)
+
+!        RDF%randField(minPosGlob:maxPosGlob,1) = powerSF
+
+
+!        !Taking the contributions from neighbours------------------------------------------------------
+!        write(get_fileId(), *) "   Taking the contributions from neighbours "
+!        call init_RF(tmpRDF, RDF%nDim, RDF%Nmc, RDF%comm, RDF%rang, RDF%nb_procs)
+!        call copy_RF_properties(RDF, tmpRDF)
+!
+!        do direction = 1, size(MSH%neigh)
+!
+!            if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
+!
+!            write(get_fileId(), *) " "
+!            write(get_fileId(), *) "  DIRECTION      = ", direction
+!            write(get_fileId(), *) "  Neighbour Rank = ", MSH%neigh(direction)
+!
+!            !write(get_fileId(),*) "Direction = ", direction
+!
+!            !Finding origin
+!            originCorner = MSH%xMinNeigh(:, direction)
+!            do i = 1, MSH%nDim
+!                if(MSH%neighShift(i, direction) == -1) then
+!                    originCorner(i) = MSH%xMaxNeigh(i, direction)
+!                end if
+!            end do
+!
+!            !write(get_fileId(),*) "originCorner = ", originCorner
+!
+!            !Preparing the xPoints of a given direction
+!            call copy_RF_xPoints(MSH, RDF, tmpRDF, tmpRDF%xPoints_Local, direction)
+!            call allocate_randField(tmpRDF, tmpRDF%randField_Local)
+!            minPos = MSH%indexNeigh(1,direction)
+!            maxPos = MSH%indexNeigh(2,direction)
+!
+!            do neighPos = 1, size(MSH%neigh)
+!
+!                if(.not. considerNeighbour(neighPos)) cycle !Don't consider Neighbours in this direction
+!
+!                sndRcv = .true.
+!
+!                !Checking if this neighbour should be taking into account in this part of the field
+!                do i = 1, MSH%nDim
+!                    if(       (MSH%neighShift(i, neighPos) /= 0) &
+!                        .and. (MSH%neighShift(i, neighPos) /= MSH%neighShift(i, direction))) then
+!                        sndRcv = .false.
+!                        exit
+!                    end if
+!                end do
+!
+!                !From this point we know that we want the contribution of this neighbour in this direction
+!                if (sndRcv) then
+!
+!                    !write(get_fileId(),*) "sndRcv = ", sndRcv
+!
+!                    tmpRDF%xMinBound = 0.0D0
+!                    tmpRDF%xMaxBound = RDF%neighRange(:,neighPos)
+!                    tmpRDF%seed      = RDF%neighSeed(:,neighPos)
+!
+!                    !Generating Standard Gaussian Field
+!                    !write(get_fileId(),*) "Generating Standard Gaussian Field"
+!                    select case (tmpRDF%method)
+!                        case(SHINOZUKA)
+!                            write(get_fileId(),*) "SHINOZUKA"
+!                            call gen_Std_Gauss_Shinozuka(tmpRDF)
+!                        case(ISOTROPIC)
+!                            call gen_Std_Gauss_Isotropic(tmpRDF)
+!                        case(RANDOMIZATION)
+!                            call gen_Std_Gauss_Randomization(tmpRDF)
+!                    end select
+!
+!                    !Finding origin for Shape Function
+!                    neighOrCorner = originCorner + MSH%overlap*MSH%neighShift(:, neighPos)
+!
+!                    !Shape Function multiplication and sum of the contribution
+!                    power(minPos:maxPos) = 0
+!                    do i = 1, MSH%nDim
+!                        if(MSH%neighShift(i, direction) == 0) cycle
+!
+!                        power(minPos:maxPos) = (tmpRDF%xPoints(i, :) - neighOrCorner(i))**2 &
+!                                                   + power(minPos:maxPos)
+!                    end do
+!
+!                    where (sqrt(power(minPos:maxPos)) > MSH%overlap) power(minPos:maxPos) = MSH%overlap**2
+!                    power(minPos:maxPos) = power(minPos:maxPos)/(MSH%overlap**2)
+!
+!                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
+!                                                     (tmpRDF%randField(:,1) * sqrt((cos((PI)*(power(minPos:maxPos)))+1.0D0)/2.0D0))
+!                end if
+!            end do !Neighbours
+!        end do !Directions
+!
+!        !Normalizing Field---------------------------------------------------------------
+!
+!        RDF%randField(minPosGlob:maxPosGlob,1) = RDF%randField(minPosGlob:maxPosGlob,1)/normFactor(:)
 
     end subroutine create_RF_overlap
     !-----------------------------------------------------------------------------------------------
@@ -1025,8 +1238,8 @@ contains
         integer, dimension(MSH%nDim) :: ind3D, offset
         double precision, dimension(MSH%nDim) :: orig, coordValue, tempCoordValue, xStep
         double precision, dimension(RDF%Nmc)  :: tempRFValue, RFValue
-        integer :: ind1D, oldInd1D
-        integer :: i, placedPoints
+        integer :: ind1D
+        integer :: i
 
         orig  = (dble(RDF%origin-1)*MSH%xStep + MSH%xMinGlob)
         xStep = MSH%xStep
@@ -1036,16 +1249,15 @@ contains
           offset(i) = product(MSH%xNStep(1:i-1))
         end do
 
-        write(get_fileId(),*) "  "
-        write(get_fileId(),*) " orig        = ", orig
-        write(get_fileId(),*) " offset      = ", offset
-        write(get_fileId(),*) " RDF%origin  = ", RDF%origin
-        write(get_fileId(),*) " xStep       = ", xStep
-        write(get_fileId(),*) " MSH%xNTotal = ", MSH%xNTotal
-        write(get_fileId(),*) " MSH%xNStep  = ", MSH%xNStep
-        write(get_fileId(),*) "  "
+        !write(get_fileId(),*) "  "
+        !write(get_fileId(),*) " orig        = ", orig
+        !write(get_fileId(),*) " offset      = ", offset
+        !write(get_fileId(),*) " RDF%origin  = ", RDF%origin
+        !write(get_fileId(),*) " xStep       = ", xStep
+        !write(get_fileId(),*) " MSH%xNTotal = ", MSH%xNTotal
+        !write(get_fileId(),*) " MSH%xNStep  = ", MSH%xNStep
+        !write(get_fileId(),*) "  "
 
-        placedPoints = 0
         do i = 1, size(RDF%randField,1)
           coordValue = RDF%xPoints(:,i)
           RFValue    = RDF%randField(i,:)
@@ -1066,11 +1278,6 @@ contains
             !Going to the next coordinate (the one that was in the index we took)
             RFValue     = tempRFValue
             coordValue  = tempCoordValue
-            !if(ind1D == i) then
-            !  RDF%randField(oldInd1D,:) = RFvalue
-            !  RDF%xPoints(:, oldInd1D)  = coordValue
-            !end if
-            !oldInd1D = ind1D
           end do
 
           
@@ -1140,219 +1347,6 @@ contains
         destRDF%xNTotal = totalSize
 
     end subroutine copy_RF_xPoints
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine extremes_to_neighbours (RDF, MSH)
-        implicit none
-
-        !INPUT OUTPUT
-        type(RF), intent(inout) :: RDF
-
-        !INPUT
-        type(MESH), intent(in) :: MSH
-
-        !LOCAL
-        integer :: i, direction, neighPos
-        integer :: code;
-        integer :: minPos, maxPos,totalSize
-        double precision, dimension(:,:), allocatable :: tempRandField
-        !integer, dimension(:), allocatable :: request
-        integer, dimension(:)  , allocatable :: request
-        integer, dimension(:,:), allocatable :: status
-        integer :: requestSize, countReq, stage
-        integer :: tag, sumCoords
-        logical :: sndRcv, isEven
-
-        isEven = .false.
-        if(mod(sum(MSH%coords),2) == 0) isEven = .true.
-
-        write(get_fileId(),*) "rang = ", MSH%rang, "isEven = ", isEven
-
-
-        if(RDF%nDim == 1) then
-            requestSize = 2* (2*1)
-        else if(RDF%nDim == 2) then
-            requestSize = 2* (4*1 +  4*3)
-        else if(RDF%nDim == 3) then
-            requestSize = 2* (8*1 + 12*3 + 6*9)
-        else
-            stop("No requestSize for this dimension")
-        end if
-
-
-        countReq = 0
-        tag = 0
-
-        !Allocation
-        allocate(request(requestSize))
-        allocate(status(MPI_STATUS_SIZE, size(request)))
-
-        !Allocating Temp Random Field
-        minPos = minval(pack(MSH%indexNeigh(1,:), MSH%neigh(:) >= 0))
-        maxPos = maxval(pack(MSH%indexNeigh(2,:), MSH%neigh(:) >= 0))
-        allocate(tempRandField(minPos:maxPos, RDF%Nmc)) !Obs: first index doesn't start in "1"
-        tempRandField = 0
-        countReq = 0
-
-        do stage = 1, 2 !Sending and then receiving
-            do neighPos = 1, size(MSH%neigh)
-
-                if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
-
-                do direction = 1, size(MSH%neigh)
-
-                    if(MSH%neigh(direction) < 0) cycle !Check if this direction exists
-
-                    minPos = MSH%indexNeigh(1,direction)
-                    maxPos = MSH%indexNeigh(2,direction)
-                    totalSize = (maxPos - minPos + 1)*RDF%Nmc
-
-                    sndRcv = .true.
-
-                    do i = 1, MSH%nDim
-                        if(       (MSH%neighShift(i, neighPos) /= 0) &
-                            .and. (MSH%neighShift(i, neighPos) /= MSH%neighShift(i, direction))) then
-                            sndRcv = .false.
-                            exit
-                        end if
-                    end do
-
-                    if (sndRcv) then
-
-                        if(stage == 1) then
-                            countReq = countReq + 1
-                            tag = findTag(MSH, neighPos, direction, send = .true.)
-                            call MPI_ISEND (RDF%randField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
-                                            MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
-
-                        else if(stage == 2) then
-                            countReq = countReq + 1
-                            tag = findTag(MSH, neighPos, direction, send = .false.)
-                            call MPI_RECV (tempRandField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
-                                           MSH%neigh(neighPos), tag, RDF%comm, status(:,countReq), code)
-                            RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + tempRandField(minPos:maxPos,1)
-                        end if
-                    end if
-                end do
-            end do
-        end do
-
-        deallocate(tempRandField)
-        deallocate(request)
-        deallocate(status)
-
-
-    end subroutine extremes_to_neighbours
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine modify_RF_interface(RDF, MSH)
-        implicit none
-
-        !INPUT OUTPUT
-        type(RF), intent(inout) :: RDF
-
-        !INPUT
-        type(MESH), intent(in) :: MSH
-
-        !LOCAL
-        integer :: i, j, n
-        double precision, dimension(:, :), allocatable :: originList
-        double precision, dimension(:), allocatable :: normFactor, power
-        double precision, dimension(:), allocatable :: originCorner
-        integer :: minPos, maxPos, neighPos, minPosGlob, maxPosGlob
-        integer, dimension(:), allocatable :: tempXNStep, shift
-        integer :: nNeigh, zeroVal
-        double precision :: errorTol = 1.0
-
-
-        allocate(originList(MSH%nDim, 2**MSH%nDim))
-        allocate(originCorner(MSH%nDim))
-        allocate(tempXNStep(MSH%nDim))
-        allocate(shift(MSH%nDim))
-
-        tempXNStep = 2
-        minPosGlob = minval(pack(MSH%indexNeigh(1,:), MSH%neigh(:) >= 0))
-        maxPosGlob = maxval(pack(MSH%indexNeigh(2,:), MSH%neigh(:) >= 0))
-        allocate(normFactor(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
-        allocate(power(minPosGlob:maxPosGlob)) !Obs: first index doesn't start in "1"
-
-        normFactor = 0
-
-        do neighPos = 1, size(MSH%neigh)
-            if(MSH%neigh(neighPos) < 0) cycle
-
-            nNeigh = 2**(sum((MSH%neighShift(:, neighPos))**2))
-            !Positions in temp Vector
-            minPos = MSH%indexNeigh(1,neighPos)
-            maxPos = MSH%indexNeigh(2,neighPos)
-
-            !Finding all vertex
-            do i = 1, 2**MSH%nDim
-                call get_Permutation(i, MSH%xMaxNeigh(:,neighPos), tempXNStep, originList(:, i), &
-                                     MSH%xMinNeigh(:,neighPos), snapExtremes = .true.);
-            end do
-
-            !Finding origin
-            originCorner = MSH%xMinNeigh(:, neighPos)
-            do i = 1, MSH%nDim
-                if(MSH%neighShift(i, neighPos) == -1) then
-                    originCorner(i) = MSH%xMaxNeigh(i, neighPos)
-
-                end if
-            end do
-
-            if(MSH%rang == TESTRANK) then
-                write(*,*) "----------------------------------"
-                write(*,*) "neighPos = ", neighPos
-                write(*,*) "origin = ", originCorner
-                write(*,*) "nNeigh = ", nNeigh
-                call dispCarvalhol(originList, " originList ")
-            end if
-
-            !Normalization values
-            zeroVal = MSH%nDim - (sum((MSH%neighShift(:, neighPos))**2))
-            normFactor(minPos:maxPos) = 0
-            do j = 1, size(originList, 2)
-                power(minPos:maxPos) = 0
-                do i = 1, MSH%nDim
-                    if(MSH%neighShift(i, neighPos) == 0) cycle
-
-                    power(minPos:maxPos) = (RDF%xPoints(i, minPos:maxPos) - originList(i, j))**2 &
-                                           + power(minPos:maxPos)
-                end do
-
-                normFactor(minPos:maxPos) = sqrt(exp(-(power(minPos:maxPos)/MSH%overlap))) + normFactor(minPos:maxPos)
-            end do
-
-            normFactor(minPos:maxPos) = normFactor(minPos:maxPos)/(2 ** zeroVal)
-
-            !Shape Function multiplication (Obs: redefinition of power, should come after Normalization values calculation)
-            power(minPos:maxPos) = 0
-            do i = 1, MSH%nDim
-                if(MSH%neighShift(i, neighPos) == 0) cycle
-
-                power(minPos:maxPos) = (RDF%xPoints(i, minPos:maxPos) - originCorner(i))**2 &
-                                           + power(minPos:maxPos)
-            end do
-
-        end do
-
-        RDF%randField(minPosGlob:maxPosGlob,1) = (RDF%randField(minPosGlob:maxPosGlob,1) * sqrt(exp(-(power(:)/MSH%overlap))))/normFactor(:)
-
-        deallocate(originList)
-        deallocate(tempXNStep)
-        deallocate(originCorner)
-        deallocate(normFactor)
-        deallocate(power)
-        deallocate(shift)
-
-    end subroutine modify_RF_interface
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

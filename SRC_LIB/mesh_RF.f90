@@ -26,8 +26,6 @@ contains
         integer, dimension(MSH%nDim) :: tempXNStep
         double precision, dimension(MSH%nDim) :: xMinForStep, xMaxForStep
 
-        
-        call show_Mesh(MSH, unit_in=get_fileId())
         !Snaping points to the grid and discover the bounding box
         call snap_to_grid(MSH, MSH%xMinLoc, MSH%xMaxLoc)
         MSH%xMaxBound = MSH%xMaxLoc;
@@ -58,22 +56,22 @@ contains
         MSH%xNTotal = product(MSH%xNStep)
         RDF%xNTotal = MSH%xNTotal
 
-        write(get_fileId(),*) "      xMinForStep    = ", xMinForStep
-        write(get_fileId(),*) "      xMaxForStep    = ", xMaxForStep
-        write(get_fileId(),*) "      MSH%xMinBound  = ", MSH%xMinBound
-        write(get_fileId(),*) "      MSH%xMaxBound  = ", MSH%xMaxBound
-        write(get_fileId(),*) "      MSH%xNStep     = ", MSH%xNStep
+        !write(get_fileId(),*) "      xMinForStep    = ", xMinForStep
+        !write(get_fileId(),*) "      xMaxForStep    = ", xMaxForStep
+        !write(get_fileId(),*) "      MSH%xMinBound  = ", MSH%xMinBound
+        !write(get_fileId(),*) "      MSH%xMaxBound  = ", MSH%xMaxBound
+        !write(get_fileId(),*) "      MSH%xNStep     = ", MSH%xNStep
 
         allocate(xPoints(MSH%nDim, MSH%xNTotal))
 
         !Internal Points
         counterXPoints = 0;
         tempXNStep = find_xNStep(MSH%xMinLoc, MSH%xMaxLoc, MSH%xStep)
-        write(get_fileId(),*) "   Internal Points"
-        write(get_fileId(),*) "      MSH%xMinLoc = ", MSH%xMinLoc
-        write(get_fileId(),*) "      MSH%xMaxLoc = ", MSH%xMaxLoc
-        write(get_fileId(),*) "      MSH%xStep   = ", MSH%xStep
-        write(get_fileId(),*) "      tempXNStep  = ", tempXNStep
+        !write(get_fileId(),*) "   Internal Points"
+        !write(get_fileId(),*) "      MSH%xMinLoc = ", MSH%xMinLoc
+        !write(get_fileId(),*) "      MSH%xMaxLoc = ", MSH%xMaxLoc
+        !write(get_fileId(),*) "      MSH%xStep   = ", MSH%xStep
+        !write(get_fileId(),*) "      tempXNStep  = ", tempXNStep
 
         do i = 1, product(tempXNStep)
             call get_Permutation(i, MSH%xMaxLoc, tempXNStep, xPoints(:,i), MSH%xMinLoc, snapExtremes = .true.);
@@ -119,7 +117,6 @@ contains
         type(MESH), intent(inout) :: MSH
 
         RDF%origin = find_xNStep(MSH%xMinGlob, MSH%xMinLoc, MSH%xStep)
-        RDF%stride = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
 
     end subroutine get_XPoints_globCoords
     !-----------------------------------------------------------------------------------------------
@@ -348,9 +345,7 @@ contains
         MSH%xMax = MSH%xMin + procDelta
 
         if(.not. MSH%independent) then
-            do i = 1, MSH%nDim
-                if(MSH%coords(i) /= MSH%procPerDim(i)-1) MSH%xMax(i) = MSH%xMax(i)-MSH%xStep(i)
-            end do
+            where(MSH%coords /= MSH%procPerDim-1) MSH%xMax = MSH%xMax-MSH%xStep
         end if
 
         MSH%xMinLoc = MSH%xMin
@@ -372,19 +367,15 @@ contains
         integer :: i, j;
         double  precision :: procRootDim, logProc2;
 
-
-        write(get_fileId(),*) "Setting Local Extremes"
-        !write(*,*) "Setting Local Extremes"
-
         procRootDim = dble(MSH%nb_procs)**(1/dble(MSH%nDim))
         logProc2   = log(dble(MSH%nb_procs))/log(2.0D0)
 
         if (areEqual(procRootDim, dble(nint(procRootDim)))) then
-            write(get_fileId(),*) "Exact Division"
+            write(get_fileId(),*) "    Exact Division"
             !write(*,*) "Exact Division"
             MSH%procPerDim(:) = nint(dble(MSH%nb_procs)**(1.0d0/MSH%nDim))
         else if(areEqual(logProc2, dble(nint(logProc2)))) then
-            write(get_fileId(),*) "Power of two"
+            write(get_fileId(),*) "    Power of two"
             !write(*,*) "Power of two"
 
             MSH%procPerDim(:) = 1
@@ -567,95 +558,63 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine redefine_Global_Extremes (MSH, RDF, pointsPerCorrL)
+    subroutine define_generation_geometry (MSH, RDF)
 
         implicit none
 
         !INPUT AND OUTPUT
         type(MESH) :: MSH
-        type(RF)   :: RDF
-        integer, intent(in) :: pointsPerCorrL
-        double precision, dimension(MSH%nDim) :: delta, half, deltaMin
+        type(RF), intent(in) :: RDF
 
         !LOCAL
         integer :: i
+        double precision, dimension(MSH%nDim) :: delta, half, localSpace, localBase
+        double precision :: constBase
+        !Defining MSH%xStep
+        MSH%xStep = RDF%corrL/dble(MSH%pointsPerCorrL)
+        !write(get_fileId(), *) " 	MSH%xStep = ", MSH%xStep
 
-        !Redefining MSH%xStep
-        !MSH%xStep = RDF%corrL/dble(pointsPerCorrL-1)
+        !Rounding overlap        
+        if(MSH%independent) then
+            MSH%overlap = ceiling(MSH%overlap*RDF%corrL/(2*MSH%xStep)) * 2*MSH%xStep/RDF%corrL
+            !write(get_fileId(), *) " 	Rounded MSH%overlap = ", MSH%overlap
+        else
+            MSH%overlap = 0
+        end if
 
-        !Defining deltaMin
-        !deltaMin =
-
-        !Redefining MSH%xStep
-        do i = 1, MSH%nDim
-            if(nint(MSH%xStep(i)/RDF%corrL(i)) > 0) MSH%xStep(i) = RDF%corrL(i) &
-                                                    * dble(nint(MSH%xStep(i)/RDF%corrL(i)));
-        end do
-
+        !Local areas
+        localSpace = (MSH%xMaxGlob - MSH%xMinGlob) - MSH%overlap*dble(MSH%procPerDim-1)
+        localBase  = MSH%xStep*MSH%procPerDim
+        constBase = 1.0D0
+        if(MSH%independent) constBase = 2.0D0
+        
+        where(localSpace < constBase*localBase) 
+            localSpace = constBase*localBase
+        elsewhere
+            localSpace = dble(ceiling(localSpace/localBase)) * localBase
+        end where
+        !write(get_fileId(), *) " 	localSpace = ", localSpace
+        
         !Redefining global extremes
-        delta = MSH%xMaxGlob - MSH%xMinGlob
         half  = (MSH%xMaxGlob + MSH%xMinGlob)/2.0D0
-        do i = 1, MSH%nDim
-            delta(i) = dble(MSH%procPerDim(i))*MSH%xStep(i) * &
-                              intDivisor(delta(i), MSH%xStep(i)*dble(MSH%procPerDim(i)), up = .true.)
-        end do
-
+        !Defining rounded delta between max and min
+        delta = localSpace + MSH%overlap*(dble(MSH%procPerDim)-1) 
+        !write(get_fileId(), *) " delta  = ", MSH%xMaxGlob - MSH%xMinGlob
         MSH%xMinGlob = half - delta/2.0D0
         MSH%xMaxGlob = half + delta/2.0D0
 
+        !write(get_fileId(), *) " 	MSH%xMinGlob = ", MSH%xMinGlob
+        !write(get_fileId(), *) " 	MSH%xMaxGlob = ", MSH%xMaxGlob
+        write(get_fileId(), *) " "
+        write(get_fileId(), *) "       nProcsPerDim      "
+        write(get_fileId(), *) "   ", MSH%procPerDim
+        write(get_fileId(), *) " 	Area For Overlap  "
+        write(get_fileId(), *) "   ", MSH%overlap * dble(MSH%procPerDim-1)
+        write(get_fileId(), *) " 	Area For Local    "
+        write(get_fileId(), *) "   ", delta - (MSH%overlap * dble(MSH%procPerDim-1))
+        write(get_fileId(), *) " "
 
-
-    end subroutine redefine_Global_Extremes
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine redefine_Overlap (MSH, RDF)
-
-        implicit none
-
-        !INPUT AND OUTPUT
-        type(MESH) :: MSH
-        type(RF)   :: RDF
-
-        !LOCAL
-        integer :: i
-
-        write(get_fileId(),*) " BEFORE:"
-        write(get_fileId(),*) " MSH%overlap  = ", MSH%overlap
-
-
-        do i = 1, MSH%nDim
-            !if(MSH%overlap*RDF%corrL(i) > (MSH%xMax(i) - MSH%xMin(i)) - 4*MSH%xStep(i)) then
-            if(MSH%overlap > ((MSH%xMax(i) - MSH%xMin(i))/RDF%corrL(i)) - 4*MSH%xStep(i)) then
-		!Obs: 4 meshstep are needed because the border points can be taken away in the rounding process
-                write(get_fileId(),*)"WARNING overlap exceeded local dimensions (consider changing the overlap size)"
-                write(get_fileId(),*)"  Dim = ", i
-                write(get_fileId(),*)"  OLD overlap value = ", MSH%overlap
-                MSH%overlap = ((MSH%xMax(i) - MSH%xMin(i))/RDF%corrL(i)) - 4*MSH%xStep(i)
-                !MSH%overlap = ((MSH%xMax(i) - MSH%xMin(i)) - 4*MSH%xStep(i))/RDF%corrL(i)
-                write(get_fileId(),*)"  NEW overlap value = ", MSH%overlap
-
-            end if
-        end do
-
-        !Redefining overlap
-        MSH%overlap = 2*MSH%xStep(1) * intDivisor(MSH%overlap, MSH%xStep(1)*2, up = .true.)
-
-        if(MSH%overlap < 0.0D0) then
-            write(get_fileId(),*)"WARNING overlap is not adapted to this problem, overlap too big or mesh too coarse (try an non-overlapping approach)"
-            MSH%overlap = 0.0D0
-        end if
-
-!        do i = 1, MSH%nDim
-!            if(MSH%overlap(i) > (MSH%xMaxGlob(i) - MSH%xMinGlob(i))) MSH%overlap(i) = (MSH%xMaxGlob(i) - MSH%xMinGlob(i))
-!        end do
-
-        write(get_fileId(),*) " AFTER:"
-        write(get_fileId(),*) " MSH%overlap  = ", MSH%overlap
-
-    end subroutine redefine_Overlap
+    end subroutine define_generation_geometry
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -689,7 +648,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine redefine_extremes_for_overlap (MSH, corrL)
+    subroutine get_overlap_geometry (MSH, corrL)
 
         implicit none
 
@@ -702,41 +661,44 @@ contains
         !LOCAL VARIABLES
         integer :: i, d
         integer :: code, neighPos;
-        integer :: testrank = 4
         double precision, parameter :: notPresent = -1.0D0
-        double precision, dimension(:), allocatable :: tempExtreme
-
-        allocate(tempExtreme(MSH%nDim))
+        double precision, dimension(MSH%nDim) :: tempExtreme
 
         !Redimensioning the internal part
         do neighPos = 1, 2*MSH%nDim
 
             if(MSH%neigh(neighPos) < 0) cycle
 
-            do i = 1, MSH%nDim
-                if(MSH%neighShift(i,neighPos) < 0) then
-                    MSH%xMinLoc(i) = MSH%xMin(i) + MSH%overlap*corrL(i)/2 + MSH%xStep(i)
-                else if (MSH%neighShift(i,neighPos) > 0) then
-                    MSH%xMaxLoc(i) = MSH%xMax(i) - MSH%overlap*corrL(i)/2 - MSH%xStep(i)
-                end if
+            where(MSH%neighShift(:,neighPos) < 0)
+                MSH%xMinLoc = MSH%xMin + MSH%overlap*corrL/2.0D0 + MSH%xStep
+            elsewhere(MSH%neighShift(:,neighPos) > 0)
+                MSH%xMaxLoc = MSH%xMax - MSH%overlap*corrL/2.0D0 - MSH%xStep
+            end where
 
-                !Checking if the points are in the range
-                if(MSH%xMinLoc(i) < MSH%xMinGlob(i)) then
-                    write(get_fileId(),*)"WARNING xMinLoc exceeded global dimensions (consider changing the overlap size or the global size)"
-                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
-                    write(get_fileId(),*)"MSH%xMinLoc(i) = ", MSH%xMinLoc(i)
-                    write(get_fileId(),*)"MSH%xMinGlob(i)    = ", MSH%xMinGlob(i)
-                    MSH%xMinLoc(i) = MSH%xMinGlob(i)
-                end if
-                if(MSH%xMaxLoc(i) > MSH%xMaxGlob(i)) then
-                    write(get_fileId(),*)"WARNING xMaxLoc exceeded global dimensions (consider changing the overlap size or the global size)"
-                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
-                    write(get_fileId(),*)"MSH%xMaxLoc(i) = ", MSH%xMaxLoc(i)
-                    write(get_fileId(),*)"MSH%xMaxGlob(i)    = ", MSH%xMaxGlob(i)
-                    MSH%xMaxLoc(i) = MSH%xMaxGlob(i)
-                end if
-
-            end do
+!            do i = 1, MSH%nDim
+!                if(MSH%neighShift(i,neighPos) < 0) then
+!                    MSH%xMinLoc(i) = MSH%xMin(i) + MSH%overlap(i)*corrL(i)/2 + MSH%xStep(i)
+!                else if (MSH%neighShift(i,neighPos) > 0) then
+!                    MSH%xMaxLoc(i) = MSH%xMax(i) - MSH%overlap(i)*corrL(i)/2 - MSH%xStep(i)
+!                end if
+!
+!                !Checking if the points are in the range
+!                if(MSH%xMinLoc(i) < MSH%xMinGlob(i)) then
+!                    write(get_fileId(),*)"WARNING xMinLoc exceeded global dimensions (consider changing the overlap size or the global size)"
+!                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
+!                    write(get_fileId(),*)"MSH%xMinLoc(i) = ", MSH%xMinLoc(i)
+!                    write(get_fileId(),*)"MSH%xMinGlob(i)    = ", MSH%xMinGlob(i)
+!                    MSH%xMinLoc(i) = MSH%xMinGlob(i)
+!                end if
+!                if(MSH%xMaxLoc(i) > MSH%xMaxGlob(i)) then
+!                    write(get_fileId(),*)"WARNING xMaxLoc exceeded global dimensions (consider changing the overlap size or the global size)"
+!                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
+!                    write(get_fileId(),*)"MSH%xMaxLoc(i) = ", MSH%xMaxLoc(i)
+!                    write(get_fileId(),*)"MSH%xMaxGlob(i)    = ", MSH%xMaxGlob(i)
+!                    MSH%xMaxLoc(i) = MSH%xMaxGlob(i)
+!                end if
+!
+!            end do
 
         end do
 
@@ -744,40 +706,49 @@ contains
         do neighPos = 1, size(MSH%neigh)
             if(MSH%neigh(neighPos) < 0) cycle
 
-            do i = 1, MSH%nDim
-                if(MSH%neighShift(i,neighPos) > 0) then
-                    MSH%xMaxNeigh(i,neighPos) = MSH%xMax(i) + MSH%overlap*corrL(i)/2
-                    MSH%xMinNeigh(i,neighPos) = MSH%xMax(i) - MSH%overlap*corrL(i)/2
-                else if (MSH%neighShift(i,neighPos) < 0) then
-                    MSH%xMaxNeigh(i,neighPos) = MSH%xMin(i) + MSH%overlap*corrL(i)/2
-                    MSH%xMinNeigh(i,neighPos) = MSH%xMin(i) - MSH%overlap*corrL(i)/2
-                else
-                    MSH%xMaxNeigh(i,neighPos) = MSH%xMaxLoc(i)
-                    MSH%xMinNeigh(i,neighPos) = MSH%xMinLoc(i)
+            where(MSH%neighShift(:,neighPos) > 0)
+                MSH%xMaxNeigh(:,neighPos) = MSH%xMax + MSH%overlap*corrL/2
+                MSH%xMinNeigh(:,neighPos) = MSH%xMax - MSH%overlap*corrL/2
+            elsewhere(MSH%neighShift(:,neighPos) < 0)
+                MSH%xMaxNeigh(:,neighPos) = MSH%xMin + MSH%overlap*corrL/2
+                MSH%xMinNeigh(:,neighPos) = MSH%xMin - MSH%overlap*corrL/2
+            elsewhere
+                MSH%xMaxNeigh(:,neighPos) = MSH%xMaxLoc
+                MSH%xMinNeigh(:,neighPos) = MSH%xMinLoc
+            end where
 
-                end if
-
-                !Checking if the points are in the range
-                if(MSH%xMinNeigh(i,neighPos) < MSH%xMinGlob(i)) then
-                    write(get_fileId(),*)"WARNING!! MSH%xMinNeigh exceeded global dimensions (consider changing the overlap size or the global size)"
-                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
-                    write(get_fileId(),*)"MSH%xMinNeigh(i,neighPos) = ", MSH%xMinNeigh(i,neighPos)
-                    write(get_fileId(),*)"MSH%xMinGlob(i)    = ", MSH%xMinGlob(i)
-                    MSH%xMinNeigh(i,neighPos) = MSH%xMinGlob(i)
-                end if
-                if(MSH%xMaxNeigh(i,neighPos) > MSH%xMaxGlob(i)) then
-                    write(get_fileId(),*)"WARNING!! MSH%xMaxNeigh exceeded global dimensions (consider changing the overlap size or the global size)"
-                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
-                    write(get_fileId(),*)"MSH%xMaxNeigh(i,neighPos) = ", MSH%xMaxNeigh(i,neighPos)
-                    write(get_fileId(),*)"MSH%xMaxGlob(i)    = ", MSH%xMaxGlob(i)
-                    MSH%xMaxNeigh(i,neighPos) = MSH%xMaxGlob(i)
-                end if
-            end do
+!            do i = 1, MSH%nDim
+!                if(MSH%neighShift(i,neighPos) > 0) then
+!                    MSH%xMaxNeigh(i,neighPos) = MSH%xMax(i) + MSH%overlap(i)*corrL(i)/2
+!                    MSH%xMinNeigh(i,neighPos) = MSH%xMax(i) - MSH%overlap(i)*corrL(i)/2
+!                else if (MSH%neighShift(i,neighPos) < 0) then
+!                    MSH%xMaxNeigh(i,neighPos) = MSH%xMin(i) + MSH%overlap(i)*corrL(i)/2
+!                    MSH%xMinNeigh(i,neighPos) = MSH%xMin(i) - MSH%overlap(i)*corrL(i)/2
+!                else
+!                    MSH%xMaxNeigh(i,neighPos) = MSH%xMaxLoc(i)
+!                    MSH%xMinNeigh(i,neighPos) = MSH%xMinLoc(i)
+!
+!                end if
+!
+!                !Checking if the points are in the range
+!                if(MSH%xMinNeigh(i,neighPos) < MSH%xMinGlob(i)) then
+!                    write(get_fileId(),*)"WARNING!! MSH%xMinNeigh exceeded global dimensions (consider changing the overlap size or the global size)"
+!                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
+!                    write(get_fileId(),*)"MSH%xMinNeigh(i,neighPos) = ", MSH%xMinNeigh(i,neighPos)
+!                    write(get_fileId(),*)"MSH%xMinGlob(i)    = ", MSH%xMinGlob(i)
+!                    MSH%xMinNeigh(i,neighPos) = MSH%xMinGlob(i)
+!                end if
+!                if(MSH%xMaxNeigh(i,neighPos) > MSH%xMaxGlob(i)) then
+!                    write(get_fileId(),*)"WARNING!! MSH%xMaxNeigh exceeded global dimensions (consider changing the overlap size or the global size)"
+!                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
+!                    write(get_fileId(),*)"MSH%xMaxNeigh(i,neighPos) = ", MSH%xMaxNeigh(i,neighPos)
+!                    write(get_fileId(),*)"MSH%xMaxGlob(i)    = ", MSH%xMaxGlob(i)
+!                    MSH%xMaxNeigh(i,neighPos) = MSH%xMaxGlob(i)
+!                end if
+!            end do
         end do
 
-        deallocate(tempExtreme)
-
-    end subroutine redefine_extremes_for_overlap
+    end subroutine get_overlap_geometry
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

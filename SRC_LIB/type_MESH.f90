@@ -23,12 +23,13 @@ module type_MESH
         double precision, dimension(:), allocatable :: xMax, xMin; !Exact Values of the division
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:), allocatable :: xStep;
+        integer         , dimension(:), allocatable :: pointsPerCorrL;
         double precision, dimension(:), allocatable :: xMaxLoc, xMinLoc; !Rounded Values of the non-overlapping area
         double precision, dimension(:), allocatable :: xMaxBound, xMinBound; !Bounding box of the domain in this proc
         double precision, dimension(:,:), allocatable :: xMaxNeigh, xMinNeigh; !Rounded Values of the overlapping area
         integer         , dimension(2,1) :: indexLocal
         integer         , dimension(:,:), allocatable :: indexNeigh, neighShift
-        double precision :: overlap !Size of the overlap (in corrL)
+        double precision, dimension(:), allocatable :: overlap !Size of the overlap (in corrL)
         logical :: init = .false.
 
     end type MESH
@@ -63,9 +64,9 @@ module type_MESH
             allocate(MESH_a%xMinNeigh(nDim,(3**nDim)-1))
             allocate(MESH_a%indexNeigh(2,(3**nDim)-1))
             allocate(MESH_a%neighShift(nDim,(3**nDim)-1))
-            !allocate(MESH_a%intShift(nDim,(3**nDim)-1))
+            allocate(MESH_a%overLap(nDim))
+            allocate(MESH_a%pointsPerCorrL(nDim))
 
-            !allocate(MESH_a%overLap(nDim))
             MESH_a%xMax     = -1
             MESH_a%xMin     = -1
             MESH_a%xStep    = -1
@@ -79,7 +80,7 @@ module type_MESH
             MESH_a%xMaxNeigh(:,:) = 0
             MESH_a%xMinNeigh(:,:) = 0
             MESH_a%indexNeigh(:,:) = -1
-            MESH_a%overlap = 0.0D0
+            MESH_a%overlap(:) = -1.0D0
             MESH_a%neigh(:) = -2 !-1 is already the default when the proc is in the topology border
             MESH_a%neighShift(:,:) = 0
 
@@ -226,6 +227,8 @@ module type_MESH
             if (allocated(MESH_a%xMaxBound))  deallocate(MESH_a%xMaxBound)
             if (allocated(MESH_a%xMinBound))  deallocate(MESH_a%xMinBound)
             if (allocated(MESH_a%neighShift)) deallocate(MESH_a%neighShift)
+            if (allocated(MESH_a%overlap))    deallocate(MESH_a%overlap)
+            if (allocated(MESH_a%pointsPerCorrL)) deallocate(MESH_a%pointsPerCorrL)
 
             MESH_a%init = .false.
 

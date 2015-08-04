@@ -200,9 +200,9 @@ contains
         end if
 
         !Creating file name
-        write(*,*) "xDim = ", xDim
-        write(*,*) "yDim = ", yDim
-        write(*,*) "all_n_Dim = ", all_n_Dim
+        !write(*,*) "xDim = ", xDim
+        !write(*,*) "yDim = ", yDim
+        !write(*,*) "all_n_Dim = ", all_n_Dim
         dsetname = trim(adjustL(fileName)) ! Dataset name
         fileHDF5Name = trim(fileName)//"-ALLproc.h5"
         fullPath     = string_join(folderPath,"/"//fileHDF5Name)
@@ -585,18 +585,11 @@ contains
                         all_mask, size(mask), MPI_LOGICAL,     &
                         0      , effectComm       , code)
 
-        if(rang == 0) write(get_fileId(),*) "all_nPointList   = ", all_nPointList
-        if(rang == 0) write(get_fileId(),*) "all_HDF5nameList = ", all_HDF5nameList
-        if(rang == 0) write(get_fileId(),*) "all_mask = ", all_mask
 
         if(rang == 0 .and. (nDim == 1 .or. nDim == 2 .or. nDim == 3)) then
 
             fileXMFName = string_join(fileName,".xmf")
             fullPathXMF = string_join(folderPath, "/"//fileXMFName)
-            !if(rang == 0) write(*,*) "all_nPointList in rang 0 = ", all_nPointList
-            !if(rang == 0) write(*,*) "all_HDF5nameList in rang 0 = ", all_HDF5nameList
-            write(get_fileId(),*) "fileXMFName = ", fileXMFName
-            write(get_fileId(),*) "fullPathXMF = ", fullPathXMF
             !Optional inputs
             !write(*,*) "treating attName"
             if(present(attName)) then
@@ -615,8 +608,6 @@ contains
             else
                 effecHDF5path = "./"
             end if
-
-            write(get_fileId(),*) "effecHDF5path   = ", effecHDF5path
 
             !Building file
             file=21;
@@ -759,7 +750,7 @@ contains
         !PREPARING ENVIROMENT
         dims = total_xNStep
         !dims = dims(size(dims):1:-1) !transpose
-        write(get_fileId(),*) "dims = ", dims
+        !write(get_fileId(),*) "dims = ", dims
 
         !if(transp) dims = [xDim, sum(all_n_Dim)]
         call h5open_f(error) ! Initialize FORTRAN interface.
@@ -778,7 +769,7 @@ contains
         !CHOOSING SPACE IN MEMORY FOR THIS PROC
         count = RDF%xNStep
         !count = count(size(count):1:-1) !transpose
-        write(get_fileId(),*) "count = ", count
+        !write(get_fileId(),*) "count = ", count
         call h5screate_simple_f(rank, count, memspace, error)  !Initialize memspace
 
         ! Select hyperslab in the file.
@@ -867,8 +858,6 @@ contains
                 dimText = trim(dimText)//" "//trim(numb2String(total_xNStep(i)))
             end do
             dimText = trim(adjustL(dimText))
-
-            write(get_fileId(),*) "dimText    = ", dimText
 
             !Building file
             file=21;
@@ -997,7 +986,7 @@ contains
             if(RDF%method == SHINOZUKA) write(fileId,*) "SHINOZUKA"
             if(RDF%method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
             write(fileId,*) "--independent-----------------------"
-            if(MSH%overlap == -2.0D0) then
+            if(MSH%overlap(1) == -2.0D0) then
                 write(fileId,*) .true. !Exception for monoproc cases
             else
                 write(fileId,*) RDF%independent
