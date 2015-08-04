@@ -789,7 +789,7 @@ contains
         !OUTPUT
         type(RF), intent(inout) :: RDF
         !LOCAL
-        double precision, dimension(MSH%nDim) :: neighOrCorner
+        double precision, dimension(MSH%nDim) :: neighOrCorner, originCorner
         logical :: sndRcv
         integer :: i, direction, neighPos, minPos, maxPos
         double precision, dimension(minIndexNeigh:maxIndexNeigh) :: power
@@ -809,6 +809,10 @@ contains
             write(get_fileId(), *) "  DIRECTION      = ", direction
             write(get_fileId(), *) "  Neighbour Rank = ", MSH%neigh(direction)
 
+            originCorner = MSH%xMinNeigh(:, direction)
+            where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
+
+
             !write(get_fileId(),*) "Direction = ", direction
 
             !Preparing the xPoints of a given direction
@@ -816,6 +820,8 @@ contains
             call allocate_randField(tmpRDF, tmpRDF%randField_Local)
             minPos = MSH%indexNeigh(1,direction)
             maxPos = MSH%indexNeigh(2,direction)
+
+            call dispCarvalhol(transpose(tmpRDF%xPoints(:,1:50)), "tmpRDF%xPoints")
 
             do neighPos = 1, size(MSH%neigh)
 
@@ -839,6 +845,10 @@ contains
                     tmpRDF%xMaxBound = RDF%neighRange(:,neighPos)
                     tmpRDF%seed      = RDF%neighSeed(:,neighPos)
 
+                    write(*,*) "NEIGHPOS ", neighPos
+                    write(*,*) "tmpRDF%xMaxBound = ", tmpRDF%xMaxBound
+                    write(*,*) "tmpRDF%seed      = ", tmpRDF%seed
+
                     !Generating Standard Gaussian Field
                     select case (tmpRDF%method)
                         case(SHINOZUKA)
@@ -851,13 +861,14 @@ contains
 
                     !Finding origin for Shape Function
                     neighOrCorner = originCorner + MSH%overlap*MSH%neighShift(:, neighPos)
+                    write(*,*) "neighOrCorner      = ", neighOrCorner
 
                     !Shape Function multiplication and sum of the contribution
                     power(minPos:maxPos) = 0
                     do i = 1, MSH%nDim
                         if(MSH%neighShift(i, direction) == 0) cycle
 
-                        power(minPos:maxPos) = ((tmpRDF%xPoints(i, :) - neighOrCorner(i))/MSH%overlap)**2 &
+                        power(minPos:maxPos) = ((tmpRDF%xPoints(i, :) - neighOrCorner(i))/MSH%overlap(i))**2 &
                                                    + power(minPos:maxPos)
                     end do
 
