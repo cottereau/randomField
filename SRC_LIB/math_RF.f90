@@ -99,6 +99,13 @@ contains
             posVec(j) = i;
         end do
 
+        !do j = 1, nDim
+        !    seedStep = product(nStep(j+1:));
+        !    if (j == nDim) seedStep = 1;
+        !    i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
+        !    posVec(j) = i;
+        !end do
+
     end subroutine find_Permutation
 
     !-----------------------------------------------------------------------------------------------

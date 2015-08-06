@@ -14,6 +14,7 @@ program main_RandomField
 	use type_RF
 	use type_MESH
 	use readUNV_RF
+	use calls_RF
 
     implicit none
 
@@ -47,7 +48,6 @@ program main_RandomField
     character(len=110), dimension(:)  , allocatable :: HDF5Name
     character(len=30) , dimension(:,:), allocatable :: dataTable;
     integer, dimension(:), allocatable :: seed
-    logical, dimension(:), allocatable :: periods
     double precision, dimension(:,:), allocatable, target :: coordList
     integer         , dimension(:,:), allocatable :: connectList
     logical :: monotype
@@ -343,93 +343,6 @@ program main_RandomField
 
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------
-
-        subroutine define_topography()
-
-            allocate(periods(MSH%nDim))
-            periods(:) = .false.
-
-
-            if (MSH%meshMod == "unv") then
-                RDF%xPoints => coordList
-                write(get_fileId(),*) "-> defining_UNV_extremes"
-                call get_Global_Extremes_Mesh(RDF%xPoints, MSH%xMinGlob, MSH%xMaxGlob, RDF%comm)
-                RDF%xNTotal = MSH%xNTotal
-                RDF%xMinBound = MSH%xMinGlob
-                MSH%xMinBound = MSH%xMinGlob
-                RDF%xMaxBound = MSH%xMaxGlob
-                MSH%xMaxBound = MSH%xMaxGlob
-                MSH%xMin    = minval(RDF%xPoints, 2)
-                MSH%xMax    = maxval(RDF%xPoints, 2)
-                MSH%xNTotal = size(RDF%xPoints, 2)
-                RDF%xNTotal = MSH%xNTotal
-
-            else
-                write(get_fileId(),*) "-> set_procPerDim"
-                call set_procPerDim (MSH)
-                write(get_fileId(),*) "-> MPI_CART_CREATE"
-                call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
-                write(get_fileId(),*) "-> MPI_CART_COORDS"
-                call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
-                write(get_fileId(),*) "-> define_generation_geometry"
-                write(get_fileId(),*) " "
-                write(get_fileId(),*) "     BEFORE:"
-                write(get_fileId(),*) "         MSH%overlap "
-                write(get_fileId(),*) "     ", MSH%overlap
-                write(get_fileId(),*) "         MSH%xMinGlob "
-                write(get_fileId(),*) "     ", MSH%xMinGlob
-                write(get_fileId(),*) "         MSH%xMaxGlob "
-                write(get_fileId(),*) "     ", MSH%xMaxGlob
-                write(get_fileId(),*) " "
-                call define_generation_geometry (MSH, RDF)
-                write(get_fileId(),*) " "
-                write(get_fileId(),*) "     AFTER:"
-                write(get_fileId(),*) "         MSH%overlap "
-                write(get_fileId(),*) "     ", MSH%overlap
-                write(get_fileId(),*) "         MSH%xMinGlob "
-                write(get_fileId(),*) "     ", MSH%xMinGlob
-                write(get_fileId(),*) "         MSH%xMaxGlob "
-                write(get_fileId(),*) "     ", MSH%xMaxGlob
-                write(get_fileId(),*) "         MSH%xStep "
-                write(get_fileId(),*) "     ", MSH%xStep
-                write(get_fileId(),*) " "
-                write(get_fileId(),*) "-> set_Local_Extremes_From_Coords"
-                call set_Local_Extremes_From_Coords (MSH)
-                write(get_fileId(),*) "         MSH%xMinLoc "
-                write(get_fileId(),*) "     ", MSH%xMinLoc
-                write(get_fileId(),*) "         MSH%xMaxLoc "
-                write(get_fileId(),*) "     ", MSH%xMaxLoc
-                write(get_fileId(),*) " "
-
-                if(RDF%independent) then
-                    write(get_fileId(),*) "-> set_neighbours"
-                    call set_neighbours (MSH)
-                    write(get_fileId(),*) "-> get_overlap_geometry"
-                    call get_overlap_geometry (MSH, RDF%corrL)
-                    write(get_fileId(),*) "  Neighbours rank = ", MSH%rang
-                    write(get_fileId(),*) "       (coords = ", MSH%coords, ")"
-                    write(get_fileId(),*) "         MSH%xMinLoc "
-                    write(get_fileId(),*) "     ", MSH%xMinLoc
-                    write(get_fileId(),*) "         MSH%xMaxLoc "
-                    write(get_fileId(),*) "     ", MSH%xMaxLoc
-                    call show_MESHneigh(MSH, " ", onlyExisting = .true., unit_in = get_fileId())
-                end if
-
-                write(get_fileId(),*) "-> Getting Global Matrix Reference"
-                call get_XPoints_globCoords(RDF, MSH)
-                write(get_fileId(),*) "     RDF%origin = ", RDF%origin
-                write(get_fileId(),*) " "
-
-            end if
-
-            deallocate(periods)
-
-        end subroutine define_topography
-
-        !---------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------
 
         subroutine single_realization()
 
@@ -438,7 +351,11 @@ program main_RandomField
             double precision :: tLoc1, tLoc2
 
             write(get_fileId(),*) "-> Defining Topography"
-            call define_topography()
+            if (MSH%meshMod == "unv") then
+                call define_topography(RDF, MSH, coordList)
+            else
+                call define_topography(RDF, MSH)
+            end if
 
             write(get_fileId(),*) "-> Initializing Random Seed"
             if(MSH%independent) then

@@ -248,4 +248,33 @@ module type_RF
 
         end subroutine finalize_RF
 
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine copy_RF_properties(orRDF, destRDF)
+        implicit none
+
+        !INPUT AND OUTPUT
+        type(RF), intent(in)   :: orRDF
+        type(RF) ::destRDF
+
+        destRDF%nDim     = orRDF%nDim
+        destRDF%Nmc      = orRDF%Nmc
+        destRDF%comm     = orRDF%comm
+        destRDF%rang     = orRDF%rang
+        destRDF%nb_procs = orRDF%nb_procs
+        destRDF%corrL    = orRDF%corrL
+        destRDF%corrMod  = orRDF%corrMod
+        destRDF%kMax     = orRDF%kMax
+        destRDF%xMinGlob = orRDF%xMinGlob
+        destRDF%xMaxGlob = orRDF%xMaxGlob
+        destRDF%calculate   = orRDF%calculate
+        destRDF%method      = orRDF%method
+        destRDF%corrL       = orRDF%corrL
+        destRDF%kMax        = orRDF%kMax
+        destRDF%independent =  orRDF%independent
+
+    end subroutine copy_RF_properties
+
 end module type_RF

@@ -9,7 +9,7 @@ module mesh_RF
     implicit none
 
 contains
-    !-----------------------------------------------------------------------------------------------
+    !--------------²---------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -170,160 +170,6 @@ contains
         RDF%xPoints => xPoints
 
     end subroutine allocate_xPoints
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine set_XPoints_perCorrL(xMin, xMax, pointsPerCorrL, corrL, xPoints, xMinGlob, xMaxGlob, cutExtremes)
-        implicit none
-
-        !INPUT
-        double precision, dimension(:), intent(in) :: corrL;
-        double precision, dimension(:), intent(inout) :: xMin, xMax;
-        integer, intent(in) :: pointsPerCorrL
-        double precision, dimension(:), intent(in), optional :: xMinGlob, xMaxGlob
-        logical, optional, intent(in) :: cutExtremes
-
-        !OUTPUT
-        double precision, dimension(:,:), allocatable, intent(OUT) :: xPoints;
-
-
-        !LOCAL VARIABLES
-        integer :: nDim, i, xNTotal;
-        double precision, dimension(:), allocatable :: xStep
-
-        nDim    = size(xMax)
-        allocate(xStep(nDim))
-
-        xStep = corrL/dble(pointsPerCorrL-1)
-        !call recalculate_xStep(xMin, xMax, xStep)
-
-        write(*,*) "xStep = ", xStep
-        write(*,*) "xMax  = ", xMax
-        write(*,*) "xMin  = ", xMin
-        write(*,*) "corrL = ", corrL
-        write(*,*) "pointsPerCorrL = ", pointsPerCorrL
-
-!        if(present(cutExtremes)) then
-!            if(cutExtremes) call cutBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
-!        end if
-
-        !call set_XPoints(xMin, xMax, xStep, xPoints)
-
-!        if(present(cutExtremes)) then
-!            if(cutExtremes) call restoreBorders(xMin, xMinGlob , xMax, xMaxGlob, xStep)
-!        end if
-
-        deallocate(xStep)
-
-    end subroutine set_XPoints_perCorrL
-
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    subroutine set_Local_Extremes_Mesh (xMin, xMax, xMinGlob, xMaxGlob, rang, nb_procs)
-!        !Find the Boundaries for the box in each processor when using automatic mesh
-!        implicit none
-!
-!        !INPUT
-!        integer                        , intent(in) :: rang, nb_procs;
-!        double precision, dimension(1:), intent(in) :: xMaxGlob;
-!        double precision, dimension(1:), intent(in) :: xMinGlob;
-!        !OUTPUT
-!        double precision, dimension(1:), intent(out) :: xMax;
-!        double precision, dimension(1:), intent(out) :: xMin;
-!
-!        !LOCAL VARIABLES
-!        integer :: i, j, testRang = 0;
-!        integer :: baseStep
-!        integer :: seedStep, nDim, basicStep;
-!        integer, allocatable, dimension(:) :: bStepVec
-!        double precision, dimension(:), allocatable :: xProcDelta;
-!        double precision :: procIterations
-!
-!        nDim = size(xMin);
-!        baseStep = nint(dble(nb_procs)**(1.0d0/nDim))
-!        write(get_fileId(),*) "Setting Local Extremes"
-!        allocate (xProcDelta(nDim))
-!
-!
-!        if (nb_procs == baseStep**nDim) then
-!            write(get_fileId(),*) "Exact Division"
-!            basicStep  = nint(dble(nb_procs)**(1.0d0/nDim))
-!            xProcDelta = (xMaxGlob-xMinGlob)/basicStep
-!
-!            !        if(rang == testRang) write(*,*) "nDim = ", nDim
-!            !        if(rang == testRang) write(*,*) "basicStep = ", basicStep
-!            !        if(rang == testRang) write(*,*) "xProcDelta = ", xProcDelta
-!            !        if(rang == testRang) write(*,*) "nb_procs = ", nb_procs
-!            !        if(rang == testRang) write(*,*) "dble(nb_procs)**(1/nDim) = ", dble(nb_procs)**(1/nDim)
-!            !        if(rang == testRang) write(*,*) "nint(dble(nb_procs)**(1/nDim)) = ", nint(dble(nb_procs)**(1/nDim))
-!
-!            do j = 1, nDim
-!                seedStep = basicStep**(nDim-j);
-!                i = cyclicMod(int(rang/seedStep) + 1, basicStep)
-!                !if(rang == testRang) write(*,*) "i = ", i, " seedStep = ", seedStep, "seedStep", seedStep
-!                xMin(j) = (dble(i-1))*xProcDelta(j)+xMinGlob(j);
-!                xMax(j) = xMin(j) + xProcDelta(j)
-!                !if(rang == testRang) write(*,*) "AFTER xMin ", j, " = ", xMin(j)
-!            end do
-!
-!
-!
-!            !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
-!
-!        !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
-!        !write(*,*) "Proc = ", rang, "xMin = ", xMin!, "xMax = ", xMax;
-!
-!        else if (isPowerOf(dble(nb_procs), 2)) then
-!            write(get_fileId(),*) "Power of two"
-!            allocate (bStepVec(nDim))
-!
-!            !Defining the basic Step for each dimension
-!            bStepVec(:) = 1
-!            if(nb_procs /= 1) then
-!                procIterations = log(dble(nb_procs))/log(2.0D0)
-!                do j = 1, nint(procIterations)
-!                    i = cyclicMod(j, nDim)
-!                    bStepVec(i) = bStepVec(i)*2
-!                    !write(*,*) "i = ", i
-!                    !write(*,*) "bStepVec = ", bStepVec
-!                end do
-!            end if
-!            !Defining coordinates in each proc
-!            xProcDelta = (xMaxGlob-xMinGlob)/bStepVec
-!
-!            write(get_fileId(),*) "xMaxGlob = ", xMaxGlob
-!            write(get_fileId(),*) "xMinGlob = ", xMinGlob
-!            write(get_fileId(),*) "nb_procs = ", nb_procs
-!            write(get_fileId(),*) "bStepVec = ", bStepVec
-!            write(get_fileId(),*) "xProcDelta = ", xProcDelta
-!
-!            do j = 1, nDim
-!                seedStep = product(bStepVec(j+1:));
-!                if (j == nDim) seedStep = 1;
-!                i = cyclicMod(int(rang/seedStep) + 1, bStepVec(j))
-!                !if(rang == testRang) write(*,*) "i = ", i, " seedStep = ", seedStep, "seedStep", seedStep
-!                xMin(j) = (dble(i-1))*xProcDelta(j)+xMinGlob(j);
-!                xMax(j) = xMin(j) + xProcDelta(j)
-!                !if(rang == testRang) write(*,*) "AFTER xMin ", j, " = ", xMin(j)
-!            end do
-!            deallocate (bStepVec)
-!        else
-!            stop "ERROR, no mesh division algorithm for this number of procs"
-!        end if
-!
-!        do i = 1, nDim
-!            write(get_fileId(),*) "Dim ", i
-!            write(get_fileId(),fmt="(2A30)") "xMin", "xMax"
-!            write(get_fileId(),fmt="(2F30.15)") xMin(i), xMax(i)
-!        end do
-!
-!        deallocate (xProcDelta)
-!
-!    end subroutine set_Local_Extremes_Mesh
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -558,68 +404,6 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine define_generation_geometry (MSH, RDF)
-
-        implicit none
-
-        !INPUT AND OUTPUT
-        type(MESH) :: MSH
-        type(RF), intent(in) :: RDF
-
-        !LOCAL
-        integer :: i
-        double precision, dimension(MSH%nDim) :: delta, half, localSpace, localBase
-        double precision :: constBase
-        !Defining MSH%xStep
-        MSH%xStep = RDF%corrL/dble(MSH%pointsPerCorrL)
-        !write(get_fileId(), *) " 	MSH%xStep = ", MSH%xStep
-
-        !Rounding overlap        
-        if(MSH%independent) then
-            MSH%overlap = ceiling(MSH%overlap*RDF%corrL/(2*MSH%xStep)) * 2*MSH%xStep/RDF%corrL
-            !write(get_fileId(), *) " 	Rounded MSH%overlap = ", MSH%overlap
-        else
-            MSH%overlap = 0
-        end if
-
-        !Local areas
-        localSpace = (MSH%xMaxGlob - MSH%xMinGlob) - MSH%overlap*dble(MSH%procPerDim-1)
-        localBase  = MSH%xStep*MSH%procPerDim
-        constBase = 1.0D0
-        if(MSH%independent) constBase = 2.0D0
-        
-        where(localSpace < constBase*localBase) 
-            localSpace = constBase*localBase
-        elsewhere
-            localSpace = dble(ceiling(localSpace/localBase)) * localBase
-        end where
-        !write(get_fileId(), *) " 	localSpace = ", localSpace
-        
-        !Redefining global extremes
-        half  = (MSH%xMaxGlob + MSH%xMinGlob)/2.0D0
-        !Defining rounded delta between max and min
-        delta = localSpace + MSH%overlap*(dble(MSH%procPerDim)-1) 
-        !write(get_fileId(), *) " delta  = ", MSH%xMaxGlob - MSH%xMinGlob
-        MSH%xMinGlob = half - delta/2.0D0
-        MSH%xMaxGlob = half + delta/2.0D0
-
-        !write(get_fileId(), *) " 	MSH%xMinGlob = ", MSH%xMinGlob
-        !write(get_fileId(), *) " 	MSH%xMaxGlob = ", MSH%xMaxGlob
-        write(get_fileId(), *) " "
-        write(get_fileId(), *) "       nProcsPerDim      "
-        write(get_fileId(), *) "   ", MSH%procPerDim
-        write(get_fileId(), *) " 	Area For Overlap  "
-        write(get_fileId(), *) "   ", MSH%overlap * dble(MSH%procPerDim-1)
-        write(get_fileId(), *) " 	Area For Local    "
-        write(get_fileId(), *) "   ", delta - (MSH%overlap * dble(MSH%procPerDim-1))
-        write(get_fileId(), *) " "
-
-    end subroutine define_generation_geometry
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
     subroutine set_shift (MSH)
 
         implicit none
@@ -675,31 +459,6 @@ contains
                 MSH%xMaxLoc = MSH%xMax - MSH%overlap*corrL/2.0D0 - MSH%xStep
             end where
 
-!            do i = 1, MSH%nDim
-!                if(MSH%neighShift(i,neighPos) < 0) then
-!                    MSH%xMinLoc(i) = MSH%xMin(i) + MSH%overlap(i)*corrL(i)/2 + MSH%xStep(i)
-!                else if (MSH%neighShift(i,neighPos) > 0) then
-!                    MSH%xMaxLoc(i) = MSH%xMax(i) - MSH%overlap(i)*corrL(i)/2 - MSH%xStep(i)
-!                end if
-!
-!                !Checking if the points are in the range
-!                if(MSH%xMinLoc(i) < MSH%xMinGlob(i)) then
-!                    write(get_fileId(),*)"WARNING xMinLoc exceeded global dimensions (consider changing the overlap size or the global size)"
-!                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
-!                    write(get_fileId(),*)"MSH%xMinLoc(i) = ", MSH%xMinLoc(i)
-!                    write(get_fileId(),*)"MSH%xMinGlob(i)    = ", MSH%xMinGlob(i)
-!                    MSH%xMinLoc(i) = MSH%xMinGlob(i)
-!                end if
-!                if(MSH%xMaxLoc(i) > MSH%xMaxGlob(i)) then
-!                    write(get_fileId(),*)"WARNING xMaxLoc exceeded global dimensions (consider changing the overlap size or the global size)"
-!                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
-!                    write(get_fileId(),*)"MSH%xMaxLoc(i) = ", MSH%xMaxLoc(i)
-!                    write(get_fileId(),*)"MSH%xMaxGlob(i)    = ", MSH%xMaxGlob(i)
-!                    MSH%xMaxLoc(i) = MSH%xMaxGlob(i)
-!                end if
-!
-!            end do
-
         end do
 
         !Dimensioning overlapping area
@@ -717,35 +476,6 @@ contains
                 MSH%xMinNeigh(:,neighPos) = MSH%xMinLoc
             end where
 
-!            do i = 1, MSH%nDim
-!                if(MSH%neighShift(i,neighPos) > 0) then
-!                    MSH%xMaxNeigh(i,neighPos) = MSH%xMax(i) + MSH%overlap(i)*corrL(i)/2
-!                    MSH%xMinNeigh(i,neighPos) = MSH%xMax(i) - MSH%overlap(i)*corrL(i)/2
-!                else if (MSH%neighShift(i,neighPos) < 0) then
-!                    MSH%xMaxNeigh(i,neighPos) = MSH%xMin(i) + MSH%overlap(i)*corrL(i)/2
-!                    MSH%xMinNeigh(i,neighPos) = MSH%xMin(i) - MSH%overlap(i)*corrL(i)/2
-!                else
-!                    MSH%xMaxNeigh(i,neighPos) = MSH%xMaxLoc(i)
-!                    MSH%xMinNeigh(i,neighPos) = MSH%xMinLoc(i)
-!
-!                end if
-!
-!                !Checking if the points are in the range
-!                if(MSH%xMinNeigh(i,neighPos) < MSH%xMinGlob(i)) then
-!                    write(get_fileId(),*)"WARNING!! MSH%xMinNeigh exceeded global dimensions (consider changing the overlap size or the global size)"
-!                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
-!                    write(get_fileId(),*)"MSH%xMinNeigh(i,neighPos) = ", MSH%xMinNeigh(i,neighPos)
-!                    write(get_fileId(),*)"MSH%xMinGlob(i)    = ", MSH%xMinGlob(i)
-!                    MSH%xMinNeigh(i,neighPos) = MSH%xMinGlob(i)
-!                end if
-!                if(MSH%xMaxNeigh(i,neighPos) > MSH%xMaxGlob(i)) then
-!                    write(get_fileId(),*)"WARNING!! MSH%xMaxNeigh exceeded global dimensions (consider changing the overlap size or the global size)"
-!                    write(get_fileId(),*)"neigh = ",neighPos," dim = ", i
-!                    write(get_fileId(),*)"MSH%xMaxNeigh(i,neighPos) = ", MSH%xMaxNeigh(i,neighPos)
-!                    write(get_fileId(),*)"MSH%xMaxGlob(i)    = ", MSH%xMaxGlob(i)
-!                    MSH%xMaxNeigh(i,neighPos) = MSH%xMaxGlob(i)
-!                end if
-!            end do
         end do
 
     end subroutine get_overlap_geometry
@@ -768,8 +498,6 @@ contains
         double precision, dimension(:), allocatable :: xMinLoc, xMaxLoc;
         integer :: effectComm
 
-        !write(*,*) ">>>>>>>>> Communicating Extremes (unstructured) "
-
         if(present(communicator)) then
             effectComm = communicator
         else
@@ -778,7 +506,6 @@ contains
 
         nDim = size(xPoints, 1)
 
-        !write(*,*) "nDim = ", nDim
 
         allocate(xMinLoc(nDim))
         allocate(xMaxLoc(nDim))
@@ -786,26 +513,17 @@ contains
         xMinLoc = minval(xPoints, 2)
         xMaxLoc = maxval(xPoints, 2)
 
-        !call dispCarvalhol(xMinLoc, "xMinLoc")
-        !call dispCarvalhol(xMaxLoc, "xMaxLoc")
-
         do i = 1, nDim
-            !write(*,*) "i = ", i
             call MPI_ALLREDUCE (xMinLoc(i), xMinGlob(i), 1, MPI_DOUBLE_PRECISION, &
                 MPI_MIN, effectComm, code)
             call MPI_ALLREDUCE (xMaxLoc(i), xMaxGlob(i), 1, MPI_DOUBLE_PRECISION, &
                 MPI_MAX, effectComm, code)
         end do
 
-        !call dispCarvalhol(xMinGlob, "xMinGlob")
-        !call dispCarvalhol(xMaxGlob, "xMaxGlob")
-
         deallocate(xMinLoc)
         deallocate(xMaxLoc)
 
     end subroutine get_Global_Extremes_Mesh
-
-
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -823,12 +541,6 @@ contains
 
         allocate(xNStep(size(xStep)))
 
-!        write(*,*) "HERE find_xNStep"
-!        write(*,*) " (xMax-xMin) = ", (xMax-xMin)
-!        write(*,*) " (xStep) = ", (xStep)
-!        write(*,*) " nint((xMax-xMin)/(xStep)) = ", nint((xMax-xMin)/(xStep))
-!        write(*,*) " 1 + nint((xMax-xMin)/(xStep)) = ", 1 + nint((xMax-xMin)/(xStep))
-
         xNStep = 1 + nint((xMax-xMin)/(xStep));
 
         do i = 1, size(xStep)
@@ -837,40 +549,196 @@ contains
 
     end function find_xNStep
 
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+
+    subroutine define_topography(RDF, MSH, coordList)
+
+        implicit none
+        !INPUT OUTPUT
+        type(RF)   :: RDF
+        type(MESH) :: MSH
+        !INPUT
+        double precision, dimension(:,:), target, intent(in), optional :: coordList
+        !LOCAL
+        logical, dimension(MSH%nDim) :: periods
+        integer :: code
+
+        periods(:) = .false.
+
+
+        if (MSH%meshMod == "unv") then
+            RDF%xPoints => coordList
+            write(get_fileId(),*) "-> defining_UNV_extremes"
+            call get_Global_Extremes_Mesh(RDF%xPoints, MSH%xMinGlob, MSH%xMaxGlob, RDF%comm)
+            RDF%xNTotal = MSH%xNTotal
+            RDF%xMinBound = MSH%xMinGlob
+            MSH%xMinBound = MSH%xMinGlob
+            RDF%xMaxBound = MSH%xMaxGlob
+            MSH%xMaxBound = MSH%xMaxGlob
+            MSH%xMin    = minval(RDF%xPoints, 2)
+            MSH%xMax    = maxval(RDF%xPoints, 2)
+            MSH%xNTotal = size(RDF%xPoints, 2)
+            RDF%xNTotal = MSH%xNTotal
+
+        else
+            write(get_fileId(),*) "-> set_procPerDim"
+            call set_procPerDim (MSH)
+            write(get_fileId(),*) "-> MPI_CART_CREATE"
+            call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
+            write(get_fileId(),*) "-> MPI_CART_COORDS"
+            call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
+            write(get_fileId(),*) "-> define_generation_geometry"
+            write(get_fileId(),*) " "
+            write(get_fileId(),*) "     BEFORE:"
+            write(get_fileId(),*) "         MSH%overlap "
+            write(get_fileId(),*) "     ", MSH%overlap
+            write(get_fileId(),*) "         MSH%xMinGlob "
+            write(get_fileId(),*) "     ", MSH%xMinGlob
+            write(get_fileId(),*) "         MSH%xMaxGlob "
+            write(get_fileId(),*) "     ", MSH%xMaxGlob
+            write(get_fileId(),*) " "
+            call define_generation_geometry (MSH, RDF)
+            write(get_fileId(),*) " "
+            write(get_fileId(),*) "     AFTER:"
+            write(get_fileId(),*) "         MSH%overlap "
+            write(get_fileId(),*) "     ", MSH%overlap
+            write(get_fileId(),*) "         MSH%xMinGlob "
+            write(get_fileId(),*) "     ", MSH%xMinGlob
+            write(get_fileId(),*) "         MSH%xMaxGlob "
+            write(get_fileId(),*) "     ", MSH%xMaxGlob
+            write(get_fileId(),*) "         MSH%xStep "
+            write(get_fileId(),*) "     ", MSH%xStep
+            write(get_fileId(),*) " "
+            write(get_fileId(),*) "-> set_Local_Extremes_From_Coords"
+            call set_Local_Extremes_From_Coords (MSH)
+            write(get_fileId(),*) "         MSH%xMinLoc "
+            write(get_fileId(),*) "     ", MSH%xMinLoc
+            write(get_fileId(),*) "         MSH%xMaxLoc "
+            write(get_fileId(),*) "     ", MSH%xMaxLoc
+            write(get_fileId(),*) " "
+
+            if(RDF%independent) then
+                write(get_fileId(),*) "-> set_neighbours"
+                call set_neighbours (MSH)
+                write(get_fileId(),*) "-> get_overlap_geometry"
+                call get_overlap_geometry (MSH, RDF%corrL)
+                write(get_fileId(),*) "  Neighbours rank = ", MSH%rang
+                write(get_fileId(),*) "       (coords = ", MSH%coords, ")"
+                write(get_fileId(),*) "         MSH%xMinLoc "
+                write(get_fileId(),*) "     ", MSH%xMinLoc
+                write(get_fileId(),*) "         MSH%xMaxLoc "
+                write(get_fileId(),*) "     ", MSH%xMaxLoc
+                call show_MESHneigh(MSH, " ", onlyExisting = .true., unit_in = get_fileId())
+            end if
+
+            write(get_fileId(),*) "-> Getting Global Matrix Reference"
+            call get_XPoints_globCoords(RDF, MSH)
+            write(get_fileId(),*) "     RDF%origin = ", RDF%origin
+            write(get_fileId(),*) " "
+
+        end if
+
+    end subroutine define_topography
+
+!-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine get_Permutation_from_Mat(pos, matrix, nDim, pVec);
+    subroutine define_generation_geometry (MSH, RDF)
 
         implicit none
 
-        !INPUT
-        integer                        , intent(in)           :: pos;
-        double precision, dimension(1:, 1:), intent(in)           :: matrix;
-        integer, intent(in) :: nDim
+        !INPUT AND OUTPUT
+        type(MESH) :: MSH
+        type(RF), intent(in) :: RDF
 
-        !OUTPUT
-        double precision, dimension(1:), intent(out) :: pVec;
-        !LOCAL VARIABLES
-        integer :: i, j;
-        integer :: seedStep;
-        integer, dimension(:), allocatable :: nStep;
+        !LOCAL
+        integer :: i
+        double precision, dimension(MSH%nDim) :: delta, half, localSpace, localBase
+        double precision :: constBase
+        !Defining MSH%xStep
+        MSH%xStep = RDF%corrL/dble(MSH%pointsPerCorrL)
+        !write(get_fileId(), *) "   MSH%xStep = ", MSH%xStep
 
-        allocate(nStep(nDim))
+        !Rounding overlap
+        if(MSH%independent) then
+            MSH%overlap = ceiling(MSH%overlap*RDF%corrL/(2*MSH%xStep)) * 2*MSH%xStep/RDF%corrL
+            !write(get_fileId(), *) "   Rounded MSH%overlap = ", MSH%overlap
+        else
+            MSH%overlap = 0
+        end if
 
-        nStep = size(matrix,1)
+        !Local areas
+        localSpace = (MSH%xMaxGlob - MSH%xMinGlob) - MSH%overlap*dble(MSH%procPerDim-1)
+        localBase  = MSH%xStep*MSH%procPerDim
+        constBase = 1.0D0
+        if(MSH%independent) constBase = 2.0D0
 
-        do j = 1, nDim
-            if (j /= nDim) seedStep = product(nStep(j+1:));
-            if (j == nDim) seedStep = 1;
-            i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
-            pVec(j) = matrix(i, j);
-        end do
+        where(localSpace < constBase*localBase)
+            localSpace = constBase*localBase
+        elsewhere
+            localSpace = dble(ceiling(localSpace/localBase)) * localBase
+        end where
+        !write(get_fileId(), *) "   localSpace = ", localSpace
 
-        deallocate(nStep)
+        !Redefining global extremes
+        half  = (MSH%xMaxGlob + MSH%xMinGlob)/2.0D0
+        !Defining rounded delta between max and min
+        delta = localSpace + MSH%overlap*(dble(MSH%procPerDim)-1)
+        !write(get_fileId(), *) " delta  = ", MSH%xMaxGlob - MSH%xMinGlob
+        MSH%xMinGlob = half - delta/2.0D0
+        MSH%xMaxGlob = half + delta/2.0D0
 
-    end subroutine get_Permutation_from_Mat
+        !write(get_fileId(), *) "   MSH%xMinGlob = ", MSH%xMinGlob
+        !write(get_fileId(), *) "   MSH%xMaxGlob = ", MSH%xMaxGlob
+        write(get_fileId(), *) " "
+        write(get_fileId(), *) "       nProcsPerDim      "
+        write(get_fileId(), *) "   ", MSH%procPerDim
+        write(get_fileId(), *) "    Area For Overlap  "
+        write(get_fileId(), *) "   ", MSH%overlap * dble(MSH%procPerDim-1)
+        write(get_fileId(), *) "    Area For Local    "
+        write(get_fileId(), *) "   ", delta - (MSH%overlap * dble(MSH%procPerDim-1))
+        write(get_fileId(), *) " "
+
+    end subroutine define_generation_geometry
+
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine get_Permutation_from_Mat(pos, matrix, nDim, pVec);
+!
+!        implicit none
+!
+!        !INPUT
+!        integer                        , intent(in)           :: pos;
+!        double precision, dimension(1:, 1:), intent(in)           :: matrix;
+!        integer, intent(in) :: nDim
+!
+!        !OUTPUT
+!        double precision, dimension(1:), intent(out) :: pVec;
+!        !LOCAL VARIABLES
+!        integer :: i, j;
+!        integer :: seedStep;
+!        integer, dimension(:), allocatable :: nStep;
+!
+!        allocate(nStep(nDim))
+!
+!        nStep = size(matrix,1)
+!
+!        do j = 1, nDim
+!            if (j /= nDim) seedStep = product(nStep(j+1:));
+!            if (j == nDim) seedStep = 1;
+!            i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
+!            pVec(j) = matrix(i, j);
+!        end do
+!
+!        deallocate(nStep)
+!
+!    end subroutine get_Permutation_from_Mat
 
 end module mesh_RF
 !! Local Variables:
