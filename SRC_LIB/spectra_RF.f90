@@ -63,12 +63,12 @@ contains
         if(allocated(RDF%kPoints)) deallocate(RDF%kPoints)
 
         call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
+        write(get_fileId(),*) " RDF%kMax1 = ", RDF%kMax
 
         if(RDF%independent) then
             RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxBound - RDF%xMinBound)) !Delta max in between two wave numbers to avoid periodicity
         else
             RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
-            !kDelta(:,1) = 2.0D0*PI/(periodMult*(RDF%xMaxBound - RDF%xMinBound))
         end if
 
         select case (RDF%method)
@@ -139,11 +139,13 @@ contains
                             allocate(RDF%Sk3D(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
                             RDF%Sk3D(:,:,:) = 0.0D0;
 
+                            write(get_fileId(),*) " INSIDE set_SkVec"
+
                             do k = 1, RDF%kNStep(3)
                                 do j = 1, RDF%kNStep(2)
                                     do i = 1, RDF%kNStep(1)
 
-                                        RDF%Sk3D(i,j,k) = exp(                                  &
+                                        RDF%Sk3D(i,j,k) = exp(                &
                                             -(((i-1)*RDF%kDelta(1))**(2.0D0)  &
                                             + ((j-1)*RDF%kDelta(2))**(2.0D0)  &
                                             + ((k-1)*RDF%kDelta(3))**(2.0D0)) &
@@ -159,6 +161,8 @@ contains
 
                                 end do
                             end do
+                            RDF%Sk3D(:,:,:) = RDF%Sk3D(:,:,:) * product(RDF%kDelta)
+
                         else
                             write(*,*) "ERROR!, FFT only is implemented in 3D)"
                             stop

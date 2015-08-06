@@ -56,22 +56,11 @@ contains
         MSH%xNTotal = product(MSH%xNStep)
         RDF%xNTotal = MSH%xNTotal
 
-        !write(get_fileId(),*) "      xMinForStep    = ", xMinForStep
-        !write(get_fileId(),*) "      xMaxForStep    = ", xMaxForStep
-        !write(get_fileId(),*) "      MSH%xMinBound  = ", MSH%xMinBound
-        !write(get_fileId(),*) "      MSH%xMaxBound  = ", MSH%xMaxBound
-        !write(get_fileId(),*) "      MSH%xNStep     = ", MSH%xNStep
-
         allocate(xPoints(MSH%nDim, MSH%xNTotal))
 
         !Internal Points
         counterXPoints = 0;
         tempXNStep = find_xNStep(MSH%xMinLoc, MSH%xMaxLoc, MSH%xStep)
-        !write(get_fileId(),*) "   Internal Points"
-        !write(get_fileId(),*) "      MSH%xMinLoc = ", MSH%xMinLoc
-        !write(get_fileId(),*) "      MSH%xMaxLoc = ", MSH%xMaxLoc
-        !write(get_fileId(),*) "      MSH%xStep   = ", MSH%xStep
-        !write(get_fileId(),*) "      tempXNStep  = ", tempXNStep
 
         do i = 1, product(tempXNStep)
             call get_Permutation(i, MSH%xMaxLoc, tempXNStep, xPoints(:,i), MSH%xMinLoc, snapExtremes = .true.);

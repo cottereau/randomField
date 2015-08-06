@@ -339,13 +339,15 @@ contains
 
         !LOCAL
         double precision, dimension(:,:,:), allocatable :: gammak, phik
-        double complex, dimension(:,:,:), allocatable :: Dk, Dk_base
+        double complex, dimension(:,:,:), allocatable :: Dk_base
+        !double complex, dimension(:,:,:), allocatable :: Dk
         double precision, dimension(:,:,:), allocatable :: realOut
         integer, dimension(3)  :: DkStart
         integer, dimension(3) :: posVec, kS, kE, kSc, kEc;
         integer :: pos, i
         integer*8 plan, planTest2
         double complex,   dimension(2000) :: testV1, testV2
+        double precision :: sizesProd
 
 
 
@@ -400,142 +402,172 @@ contains
         call set_kPoints(RDF)
         call set_SkVec(RDF)
 
-        write(get_fileId(),*) "Inside FFT"
-
         allocate(gammak (RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
         allocate(phik   (RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
         allocate(Dk_base(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
-        allocate(Dk     (2*RDF%kNStep(1)-2, 2*RDF%kNStep(2)-2, 2*RDF%kNStep(3)-2))
-!        allocate(realOut(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
-!
+        !allocate(Dk     (0:2*RDF%kNStep(1)-2-1, 0:2*RDF%kNStep(2)-2-1, 0:2*RDF%kNStep(3)-2-1))
+        allocate(realOut(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
+
         call random_number(gammak(:,:,:))
         call random_number(phik(:,:,:))
 
-        Dk_base = gammak*sqrt(RDF%Sk3D)*exp(2*pi*phik);
+        !Dk_base = product(xMaxGlob - xMinGlob) * gammak*sqrt(RDF%Sk3D)*exp(2*pi*phik);
+        if(RDF%independent) then
+            sizesProd = product(RDF%xMaxBound - RDF%xMinBound)
+        else
+            sizesProd = product(RDF%xMaxGlob - RDF%xMinGlob)
+        end if
 
-        write(get_fileId(),*) "Symmetrization"
-        !Symmetrization
-        kS  = 2
-        kE  = RDF%kNStep-1
-        kSc = RDF%kNStep + 1;
-        kEc = 2*RDF%kNStep -2;
+        Dk_base(:,:,:) = sqrt(sizesProd*RDF%Sk3D);
 
-        write(get_fileId(),*) " RDF%kNStep = ", RDF%kNStep
-        write(get_fileId(),*) " shape(Dk_base) = ", shape(Dk_base)
-        write(get_fileId(),*) " shape(Dk) = ", shape(Dk)
-        write(get_fileId(),*) " kS  = ", kS
-        write(get_fileId(),*) " kE  = ", kE
-        write(get_fileId(),*) " kSc = ", kSc
-        write(get_fileId(),*) " kEc = ", kEc
 
-        write(get_fileId(),*) "Copy"
-        !Copy
-        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = Dk_base(:,:,:)
+!        i = 0
+!        write(get_fileId(),*) " Dk_base 3x ", i
+!        write(get_fileId(),*) Dk_base (i,i,i)
+        i = 1
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
+        i = 2
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
+        i = 3
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
+        i = 4
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
+        i = 5
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
 
-        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = Dk_base(kS(1):kE(1),:,:)
-        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = Dk_base(:,kS(2):kE(2),:)
-        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = Dk_base(:,:,kS(3):kE(3))
 
-        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = Dk_base(kS(1):kE(1), kS(2):kE(2), :          ) ![-1,-1, 1]
-        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = Dk_base(:          , kS(2):kE(2), kS(3):kE(3)) ![ 1,-1,-1]
-        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = Dk_base(kS(1):kE(1), :          , kS(3):kE(3)) ![-1, 1,-1]
+!        write(get_fileId(),*) "Symmetrization"
+!        !Symmetrization
+!        kS  = 2
+!        kE  = RDF%kNStep-1
+!        kSc = RDF%kNStep + 1;
+!        kEc = 2*RDF%kNStep -2;
+!
+!        write(get_fileId(),*) " RDF%kNStep = ", RDF%kNStep
+!        write(get_fileId(),*) " shape(Dk_base) = ", shape(Dk_base)
+!        write(get_fileId(),*) " shape(Dk) = ", shape(Dk)
+!        write(get_fileId(),*) " kS  = ", kS
+!        write(get_fileId(),*) " kE  = ", kE
+!        write(get_fileId(),*) " kSc = ", kSc
+!        write(get_fileId(),*) " kEc = ", kEc
+!
+!        write(get_fileId(),*) "Copy"
+!        !Copy
+!        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = Dk_base(:,:,:)
+!
+!        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = Dk_base(kS(1):kE(1),:,:)
+!        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = Dk_base(:,kS(2):kE(2),:)
+!        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = Dk_base(:,:,kS(3):kE(3))
+!
+!        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = Dk_base(kS(1):kE(1), kS(2):kE(2), :          ) ![-1,-1, 1]
+!        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = Dk_base(:          , kS(2):kE(2), kS(3):kE(3)) ![ 1,-1,-1]
+!        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = Dk_base(kS(1):kE(1), :          , kS(3):kE(3)) ![-1, 1,-1]
+!
+!        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = Dk_base(kS(1):kE(1), kS(2):kE(2), kS(3):kE(3)) ![-1,-1,-1]
+!
+!        write(get_fileId(),*) "Hermitian Conjugate"
+!        !Hermitian Conjugate
+!        Dk(kSc(1):kEc(1), :, :) = -conjg(Dk(kEc(1):kSc(1):-1, :, :))
+!        Dk(:, kSc(2):kEc(2), :) = -conjg(Dk(:, kEc(2):kSc(2):-1, :))
+!        Dk(:, :, kSc(3):kEc(3)) = -conjg(Dk(:, :, kEc(3):kSc(3):-1))
 
-        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = Dk_base(kS(1):kE(1), kS(2):kE(2), kS(3):kE(3)) ![-1,-1,-1]
-
-        write(get_fileId(),*) "Hermitian Conjugate"
-        !Hermitian Conjugate
-        Dk(kSc(1):kEc(1), :, :) = -conjg(Dk(kEc(1):kSc(1):-1, :, :))
-        Dk(:, kSc(2):kEc(2), :) = -conjg(Dk(:, kEc(2):kSc(2):-1, :))
-        Dk(:, :, kSc(3):kEc(3)) = -conjg(Dk(:, :, kEc(3):kSc(3):-1))
-
-        write(get_fileId(),*) "FFT Execution"
+        write(get_fileId(),*) " "
+        write(get_fileId(),*) "iFFT Execution"
         !FFT Execution
-        call dfftw_plan_dft_3d(plan, size(Dk,1), size(Dk,2), size(Dk,3), &
-                               Dk, Dk, FFTW_BACKWARD, FFTW_ESTIMATE)
-
+        call dfftw_plan_dft_c2r(plan, RDF%nDim, RDF%kNStep, &
+                               Dk_base, realOut, FFTW_ESTIMATE);
         call dfftw_execute(plan)
         call dfftw_destroy_plan(plan)
 
+        !realOut = realOut*sqrt((2*PI)**RDF%nDim/sizesProd)/RDF%kNTotal
+        realOut = realOut/RDF%kNTotal
+
+        !write(*,*) " realOut = ", realOut
+
+        write(get_fileId(),*) "AFTER iFFT"
+        i = 1
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+        i = 2
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+        i = 3
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+        i = 4
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+        i = 5
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+
+        write(get_fileId(),*) " "
+        write(get_fileId(),*) "FFT Execution"
+        call dfftw_plan_dft_r2c(plan, RDF%nDim, RDF%kNStep, &
+                                 realOut, Dk_base, FFTW_ESTIMATE);
+        Dk_base = Dk_base*RDF%kNTotal
+        call dfftw_execute(plan)
+        call dfftw_destroy_plan(plan)
+
+        write(get_fileId(),*) "AFTER FFT"
+
+        i = 1
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
+        i = 2
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
+        i = 3
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
+        i = 4
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
+        i = 5
+        write(get_fileId(),*) " Dk_base 3x ", i
+        write(get_fileId(),*) Dk_base (i,i,i)
+
+        realOut = realOut*sqrt((2*PI)**RDF%nDim/sizesProd)
+
+        write(get_fileId(),*) " "
+        write(get_fileId(),*) "AFTER real mutiplication"
+        i = 1
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+        i = 2
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+        i = 3
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+        i = 4
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+        i = 5
+        write(get_fileId(),*) " realOut 3x ", i
+        write(get_fileId(),*) realOut (i,i,i)
+
+
         write(get_fileId(),*) "Mapping"
         do pos = 1, RDF%xNTotal
-             write(get_fileId(),*) "pos = ", pos
+            !write(get_fileId(),*) "pos = ", pos
             call find_Permutation(pos, RDF%kNStep, posVec)
+            !posVec = posVec -1
             !write(*,*) "pos = ", pos, "posVec = ", posVec
-            write(get_fileId(),*) "allocated(RDF%randField) = ", allocated(RDF%randField)
-            RDF%randField(pos,1) = real(Dk(posVec(1), posVec(2), posVec(3)))
+            !write(get_fileId(),*) "allocated(RDF%randField) = ", allocated(RDF%randField)
+            RDF%randField(pos,1) = (realOut(posVec(1), posVec(2), posVec(3)))
         end do
 
-!        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)) =       Dk_base(:             , :             , :             ) ![ 1, 1, 1]
-
-!        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), 1:RDF%kNStep(3)) = conjg(Dk_base(kE(1):kS(1):-1, :             , :             )) ![-1, 1, 1]
-!        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = conjg(Dk_base(:             , kE(2):kS(2):-1, :             )) ![ 1,-1, 1]
-!        Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = conjg(Dk_base(:             , :             , kE(3):kS(3):-1)) ![ 1, 1,-1]
-!
-!        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , 1:RDF%kNStep(3)) = conjg(Dk_base(kE(1):kS(1):-1, kE(2):kS(2):-1, :             )) ![-1,-1, 1]
-!        Dk(1:RDF%kNStep(1), kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = conjg(Dk_base(:             , kE(2):kS(2):-1, kE(3):kS(3):-1)) ![ 1,-1,-1]
-!        Dk(kSc(1):kEc(1)  , 1:RDF%kNStep(2), kSc(3):kEc(3)  ) = conjg(Dk_base(kE(1):kS(1):-1, :             , kE(3):kS(3):-1)) ![-1, 1,-1]
-!
-!        Dk(kSc(1):kEc(1)  , kSc(2):kEc(2)  , kSc(3):kEc(3)  ) = conjg(Dk_base(kE(1):kS(1):-1, kE(2):kS(2):-1, kE(3):kS(3):-1)) ![-1,-1,-1]
-!
-!        testV1(1:8)  = Dk_base(1:8,1,1)
-!        testV1(9:14) = conjg(Dk_base(7:2:-1,1,1))
-
-!        write(*,*) "BEFORE FFT testV1 = ", testV1
-!
-!        call dfftw_plan_dft_1d(plan, 14, &
-!                               testV1, testV1, FFTW_BACKWARD, FFTW_ESTIMATE)
-!        call dfftw_execute(plan)
-!        call dfftw_destroy_plan(plan)!
-!
-!        write(*,*) "AFTER FFT testV1 = ", testV1
-
-
-
-!        write(*,*) " Corners 1st quadrant"
-!        write(*,*) " Dk(1,1,1) = ", Dk(2, 2, 2)
-!        write(*,*) " Dk() = ", Dk(kEc(1), 2, 2)
-!        write(*,*) " Dk() = ", Dk(2, kEc(2), 2)
-!        write(*,*) " Dk() = ", Dk(2, 2, kEc(3))
-!        write(*,*) " Dk() = ", Dk(kEc(1), kEc(2), 2)
-!        write(*,*) " Dk() = ", Dk(2, kEc(2), kEc(3))
-!        write(*,*) " Dk() = ", Dk(kEc(1), 2, kEc(3))
-!        write(*,*) " Dk(N,N,N) = ", Dk(kEc(1), kEc(2), kEc(3))
-
-        !write(*,*) "Dk 111    = ", Dk(1:5, 1:5, 1:5)
-        !write(*,*) "Dk -1-1-1 = ",Dk(kSc(1)-5:kSc(1)  , kSc(2)-5:kSc(2)  , kSc(3)-5:kSc(3)  )
-
-!        write(*,*) "BEFORE Dk(1:10,1:10,1)", Dk(1:10,1:10,1)
-!
-!        call dfftw_plan_dft_3d(plan, RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3), &
-!                               Dk_base, Dk_base, FFTW_BACKWARD, FFTW_ESTIMATE)
-!        call fftw_plan_dft_c2r_3d(plan, kEc(1), kEc(2), kEc(3), &
-!                                  Dk, realOut, FFTW_ESTIMATE)
-
-
-!        call dfftw_plan_dft_3d(plan, kEc(1), kEc(2), kEc(3), &
-!                               Dk, Dk, FFTW_BACKWARD, FFTW_ESTIMATE)
-!        call dfftw_execute(plan)
-!        call dfftw_destroy_plan(plan)
-!
-!        realOut(:,:,:) = real(Dk(1:RDF%kNStep(1), 1:RDF%kNStep(2), 1:RDF%kNStep(3)))
-!
-!        !write(*,*) "AFTER Dk(1:10,1:10,1)", Dk(1:10,1:10,1)
-!        write(*,*) "AFTER realOut(1:10,1:10,1)", realOut(1:10,1:10,1)
-!
-!        !Mapping generated field back to coordinates
-!        DkStart = [1, 1, 1]
-!
-!        do pos = 1, RDF%xNTotal
-!            call find_Permutation(pos, RDF%kNStep, posVec)
-!            !write(*,*) "pos = ", pos, "posVec = ", posVec
-!            RDF%randField(pos,1) = realOut(posVec(1), posVec(2), posVec(3))
-!        end do
-!
         deallocate(gammak)
         deallocate(phik)
-        deallocate(Dk)
+        !deallocate(Dk)
         deallocate(Dk_base)
-        !deallocate(realOut)
+        deallocate(realOut)
 
     end subroutine gen_Std_Gauss_FFT
 

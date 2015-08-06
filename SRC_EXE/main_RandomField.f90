@@ -32,7 +32,7 @@ program main_RandomField
     logical :: writeFiles = .true.
     logical :: sameFolder = .true.
     logical :: explodedView = .false.
-    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
+    integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
 
     double precision, dimension(:), allocatable :: step_mult, step_add, step_initial
     double precision, dimension(:), allocatable :: corrL_mult, corrL_add, corrL_initial
@@ -297,7 +297,7 @@ program main_RandomField
                 MSH%independent = .false.
             end if
 
-            if(RDF%nb_procs == 1) then
+            if(RDF%nb_procs == 1 .and. independent == 1) then
                 write(get_fileId(),*) "WARNING!! Independent generation in a single processor."
                 write(get_fileId(),*) " "
                 write(get_fileId(),*) "--OLD values--"
@@ -379,9 +379,9 @@ program main_RandomField
             write(get_fileId(),*) "      minval(RDF%xPoints,2) = "
             write(get_fileId(),*) "       ",  minval(RDF%xPoints,2)
 
-            i = size(RDF%xPoints,2)
-            if(i>50) i = 50
-            call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = get_fileId())
+            !i = size(RDF%xPoints,2)
+            !if(i>50) i = 50
+            !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = get_fileId())
 
             call allocate_randField(RDF, RDF%randField_Local)
 
