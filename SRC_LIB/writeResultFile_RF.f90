@@ -8,6 +8,7 @@ module writeResultFile_RF
     use write_Log_File
     use type_RF
     use type_MESH
+    use hdf5_RF
 
 contains
 
@@ -56,6 +57,7 @@ contains
                                                folderPath=trim(adjustL(folderPath))//"/h5", &
                                                communicator=communicator, &
                                                HDF5Name=HDF5Names(1), xSz=xSz(1), ySz=ySz(1), transp = .true.)
+                        HDF5Name = HDF5Names(1)
                         fileName2 = "nodes"
                         call write_pHDF5_Unstr(double_Data=RDF%xPoints, &
                                                fileName=fileName2, &
@@ -70,6 +72,7 @@ contains
                                                folderPath=trim(adjustL(folderPath))//"/h5", &
                                                communicator=communicator, &
                                                HDF5Name=HDF5Names(3), xSz=xSz(3), ySz=ySz(3), transp = .false.)
+
                     case("automatic")
                         fileName2 = "samples"                     
                         call write_pHDF5_Str(  MSH=MSH, &
@@ -89,6 +92,7 @@ contains
                 stop("hdf5 writing style not implemented")
         end select
 
+        call write_HDF5_attributes(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
 
         !!!!!!!!!!!!XMF
         write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";
@@ -703,10 +707,12 @@ contains
 
         !HDF5 VARIABLES
         character(len=110)             :: fileHDF5Name, fullPath !File name
-        character(len=30)              :: eventName, coordName;        !Dataset names
+        character(len=30)              :: eventName, coordName, attr_name;        !Dataset names
         integer(HID_T)                 :: file_id       !File identifier
         integer(HID_T)                 :: dset_id       !Dataset identifier
         integer(HID_T)                 :: dspace_id     !Dataspace identifier
+        integer(HID_T)                 :: attr_id       !Attribute identifier
+        integer(HID_T)                 :: attrspace_id  !Attribute Space identifier
         integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
         integer(HID_T)                 :: plist_id      ! Property list identifier
         integer(HID_T)                 :: filespace     ! Dataspace identifier in file
@@ -716,13 +722,16 @@ contains
         integer                        :: info, code
         integer(HSIZE_T) , dimension(MSH%nDim) :: count
         integer(HSSIZE_T), dimension(MSH%nDim) :: offset
+        integer(HSIZE_T), dimension(1) :: attr_dim
 
         !LOCAL VARIABLES
         integer :: yDim, xDim, i
         integer :: nb_procs
         character (len=12) :: numberStr, rangStr;
-        integer, dimension(MSH%nDim) :: total_xNStep
+        integer(kind=8), dimension(MSH%nDim) :: total_xNStep
         character(LEN=8) :: dsetname
+        logical :: bool !for tests
+        integer :: tmp_val
 
 
 
@@ -737,7 +746,7 @@ contains
         !Discovering needed global information
         write(get_fileId(),*) "RDF%xNStep = ", RDF%xNStep
         write(get_fileId(),*) "MSH%nDim   = ", MSH%nDim
-        total_xNStep = nint((MSH%xMaxGlob - MSH%xMinGlob)/MSH%xStep) + 1
+        total_xNStep = nint((MSH%xMaxGlob - MSH%xMinGlob)/MSH%xStep, 8) + 1
         !call MPI_ALLREDUCE (RDF%xNStep, total_xNStep, MSH%nDim, MPI_INTEGER, MPI_SUM, communicator, code)
 
 
@@ -750,7 +759,7 @@ contains
         !PREPARING ENVIROMENT
         dims = total_xNStep
         !dims = dims(size(dims):1:-1) !transpose
-        !write(get_fileId(),*) "dims = ", dims
+        write(get_fileId(),*) "dims = ", dims
 
         !if(transp) dims = [xDim, sum(all_n_Dim)]
         call h5open_f(error) ! Initialize FORTRAN interface.
@@ -775,7 +784,6 @@ contains
         ! Select hyperslab in the file.
         offset = RDF%origin - 1!Lines Offset to start writing
         write(get_fileId(),*) "offset = ", offset
-        !offset = [0, sum(all_n_Dim(1:rang))] !Lines Offset to start writing
         call h5dget_space_f(dset_id, filespace, error)
         call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, error)
 
@@ -874,10 +882,16 @@ contains
             write (file,'(A)'      )'  <Grid GridType="Collection" CollectionType="Spatial">' !Opens the Collection
 
             write (file,'(A)'     )'   <Grid Name="Group1">'
-            write (file,'(3A)'    )'     <Topology TopologyType="3DCoRectMesh" Dimensions="',trim(dimText),'"/>'
-            if(nDim == 1) write (file,'(A)'      )'     <Geometry GeometryType="ORIGIN_DX">'
-            if(nDim == 2) write (file,'(A)'      )'     <Geometry GeometryType="ORIGIN_DXDY">'
-            if(nDim == 3) write (file,'(A)'      )'     <Geometry GeometryType="ORIGIN_DXDYDZ">'
+            if(nDim == 1) then
+                write (file,'(3A)'    )'     <Topology TopologyType="1DCoRectMesh" Dimensions="',trim(dimText),'"/>'
+                write (file,'(A)'      )'     <Geometry GeometryType="ORIGIN_DX">'
+            else if(nDim == 2) then
+                write (file,'(3A)'    )'     <Topology TopologyType="2DCoRectMesh" Dimensions="',trim(dimText),'"/>'
+                write (file,'(A)'      )'     <Geometry GeometryType="ORIGIN_DXDY">'
+            else if(nDim == 3) then
+                write (file,'(3A)'    )'     <Topology TopologyType="3DCoRectMesh" Dimensions="',trim(dimText),'"/>'
+                write (file,'(A)'      )'     <Geometry GeometryType="ORIGIN_DXDYDZ">'
+            end if
             write (file,'(3A)'     )'   <DataItem Name="origin" Format="XML" DataType="Float" Precision="8" Dimensions="',trim(numb2String(nDim)),'">'
             if(nDim == 1) write (file,'(A,F25.10)'      )'    ', MSH%xMinGlob(1)
             if(nDim == 2) write (file,'(A,F25.10)'      )'    ', MSH%xMinGlob(2), ' ', MSH%xMinGlob(1)
@@ -890,7 +904,7 @@ contains
             write (file,'(A)'      )'   </DataItem>'
             write (file,'(A)'     )'     </Geometry>'
 
-            !TODO
+            !TODO, DEAL WITH SEVERAL SAMPLES
             do i = 1, 1
                 write (file,'(3A)'     )'     <Attribute Name="RF1" Center="Node" AttributeType="Scalar">'
                 write (file,'(A)'     )'       <DataItem Reference="XML">'
@@ -982,9 +996,10 @@ contains
             write(fileId,*) "--Nmc-----------------------"
             write(fileId,fmt = "(I20)") RDF%Nmc
             write(fileId,*) "--method-----------------------"
-            if(RDF%method == ISOTROPIC) write(fileId,*) "ISOTROPIC"
-            if(RDF%method == SHINOZUKA) write(fileId,*) "SHINOZUKA"
-            if(RDF%method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
+            write(fileId,*) RDF%method
+            !if(RDF%method == ISOTROPIC) write(fileId,*) "ISOTROPIC"
+            !if(RDF%method == SHINOZUKA) write(fileId,*) "SHINOZUKA"
+            !if(RDF%method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
             write(fileId,*) "--independent-----------------------"
             if(MSH%overlap(1) == -2.0D0) then
                 write(fileId,*) .true. !Exception for monoproc cases
@@ -995,6 +1010,8 @@ contains
             write(fileId,*) MSH%overlap
             write(fileId,*) "--Seed-----------------------"
             write(fileId,fmt = "(I20)") RDF%seed
+            write(fileId,*) "--SeedStart-----------------------"
+            write(fileId,fmt = "(I20)") RDF%seedStart
             if(present(timeVec)) then
                 write(fileId,*) "--timeVec-----------------------"
                 write(fileId,fmt = "(F30.15)") timeVec
@@ -1006,5 +1023,90 @@ contains
 
 
     end subroutine write_generation_spec
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine write_HDF5_attributes(RDF, MSH, HDF5Path)
+        implicit none
+        !INPUTS
+        type(RF), intent(in)   :: RDF
+        type(MESH), intent(in) :: MSH
+        character (len=*), intent(in) :: HDF5Path
+
+        !LOCAL
+        character(len=50) :: attr_name
+        integer(HID_T)  :: file_id       !File identifier
+        integer :: error, code
+        !integer(kind=8) :: sum_xNTotal, sum_kNTotal
+        logical :: indep
+
+        !call MPI_REDUCE (RDF%xNTotal,sum_xNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
+        !call MPI_REDUCE (RDF%kNTotal,sum_kNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
+
+        !write(*,*) "HDF5Path = ", HDF5Path
+
+        call h5open_f(error) ! Initialize FORTRAN interface.
+        call h5fopen_f(trim(HDF5Path), H5F_ACC_RDWR_F, file_id, error) !Open File
+
+        !BOOL
+        indep = RDF%independent
+        if(MSH%overlap(1) == -2.0D0) indep = .true. !Exception for monoproc cases
+        attr_name = "independent"
+        call write_h5attr_bool(file_id, trim(adjustL(attr_name)), indep)
+
+        !INTEGERS
+        attr_name = "nb_procs"
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%nb_procs)
+        attr_name = "nDim"
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%nDim)
+        attr_name = "Nmc"
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%Nmc)
+        attr_name = "method"
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%method)
+        attr_name = "seedStart"
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%seedStart)
+        attr_name = "corrMod"
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%corrMod)
+        attr_name = "margiFirst"
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%margiFirst)
+        !attr_name = "sum_xNTotal"
+        !call write_h5attr_int_long(file_id, trim(adjustL(attr_name)), sum_xNTotal)
+        !attr_name = "sum_kNTotal"
+        !call write_h5attr_int(file_id, trim(adjustL(attr_name)), sum_kNTotal)
+
+
+
+        !DOUBLE
+        attr_name = "gen_CPU_Time"
+        call write_h5attr_real(file_id, trim(adjustL(attr_name)), RDF%gen_CPU_Time)
+        attr_name = "gen_WALL_Time"
+        call write_h5attr_real(file_id, trim(adjustL(attr_name)), RDF%gen_CPU_Time/dble(RDF%nb_procs))
+
+        !INTEGER VEC
+        attr_name = "seed"
+        call write_h5attr_int_vec(file_id, trim(adjustL(attr_name)), RDF%seed)
+        !attr_name = "sum_xNStep"
+        !call write_h5attr_int(file_id, trim(adjustL(attr_name)), sum_xNStep)
+        !attr_name = "sum_kNStep"
+        !call write_h5attr_int(file_id, trim(adjustL(attr_name)), sum_kNStep)
+
+        !DOUBLE VEC
+        attr_name = "xMinGlob"
+        call write_h5attr_real_vec(file_id, attr_name, MSH%xMinGlob)
+        attr_name = "xMaxGlob"
+        call write_h5attr_real_vec(file_id, attr_name, MSH%xMaxGlob)
+        attr_name = "xStep"
+        call write_h5attr_real_vec(file_id, attr_name, MSH%xStep)
+        attr_name = "corrL"
+        call write_h5attr_real_vec(file_id, attr_name, RDF%corrL)
+        attr_name = "overlap"
+        call write_h5attr_real_vec(file_id, attr_name, MSH%overlap)
+
+        call h5fclose_f(file_id, error)! Close the file.
+        call h5close_f(error) ! Close FORTRAN interface
+
+    end subroutine write_HDF5_attributes
 
 end module writeResultFile_RF

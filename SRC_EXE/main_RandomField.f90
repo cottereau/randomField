@@ -19,11 +19,7 @@ program main_RandomField
     implicit none
 
     !INPUTS
-    integer                       :: nDim, Nmc;
-    character (len=30), parameter :: mesh_input = "mesh_input"
-    character (len=30), parameter :: gen_input  = "gen_input"
-    character (len=30), parameter :: test_input = "test_input"
-    character (len=30), parameter :: unv_input = "unv_files/Maroua1.unv "!"unv_files/Luciano_Cube.unv"
+    integer :: nDim, Nmc;
     logical :: step_variate, nmc_variate, corrL_variate
     logical :: step_speedUp, nmc_speedUp, corrL_fix_pointsPerCorrL
     integer :: step_nIter, nmc_nIter, corrL_nIter
@@ -32,7 +28,7 @@ program main_RandomField
     logical :: writeFiles = .true.
     logical :: sameFolder = .true.
     logical :: explodedView = .false.
-    integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
+    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
 
     double precision, dimension(:), allocatable :: step_mult, step_add, step_initial
     double precision, dimension(:), allocatable :: corrL_mult, corrL_add, corrL_initial
@@ -414,9 +410,11 @@ program main_RandomField
             if(i>50) i = 50
             call dispCarvalhol(RDF%randField(1:i,:), "RDF%randField", "(F20.5)",unit_in = get_fileId())
 
+            !call multiVariateTransformation (RDF%margiFirst, RDF%fieldAvg, RDF%fieldVar, RDF%randField)
 
             t2 = MPI_Wtime();
             call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
+            RDF%gen_CPU_Time = all_t2 - all_t1
             if(RDF%rang == 0) write(*,*) "Generation Time = ", all_t2 - all_t1
             all_t3 = -1.0D0
 

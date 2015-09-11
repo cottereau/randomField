@@ -73,6 +73,54 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    subroutine set_procPerDim (nb_procs, nDim, procPerDim)
+        implicit none
+
+        !INPUT
+        integer, intent(in) :: nb_procs, nDim
+
+        !OUTPUT
+        integer, dimension(:) :: procPerDim
+
+        !LOCAL VARIABLES
+        integer :: i, j;
+        double  precision :: procRootDim, logProc2;
+
+        if(size(procPerDim)/=nDim) then
+            write(*,*) "Error inside 'set_procPerDim', dimensions are not compatible"
+            write(*,*) "size(procPerDim) = ", size(procPerDim)
+            write(*,*) "nDim             = ", nDim
+            stop(" ")
+        end if
+
+        procRootDim = dble(nb_procs)**(1/dble(nDim))
+        logProc2   = log(dble(nb_procs))/log(2.0D0)
+
+        if (areEqual(procRootDim, dble(nint(procRootDim)))) then
+            !write(get_fileId(),*) "    Exact Division"
+            !write(*,*) "Exact Division"
+            procPerDim(:) = nint(dble(nb_procs)**(1.0d0/nDim))
+        else if(areEqual(logProc2, dble(nint(logProc2)))) then
+            !write(get_fileId(),*) "    Power of two"
+            !write(*,*) "Power of two"
+
+            procPerDim(:) = 1
+            if(nb_procs /= 1) then
+                do j = 1, nint(logProc2)
+                    i = cyclicMod(j, nDim)
+                    procPerDim(i) = procPerDim(i)*2
+                end do
+            end if
+        else
+            stop "ERROR, no mesh division algorithm for this number of procs"
+        end if
+
+    end subroutine set_procPerDim
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
 
     subroutine find_Permutation(pos, nStep, posVec)
 

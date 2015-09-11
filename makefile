@@ -13,13 +13,16 @@ INCLUDEHDF5 = -I/opt/san/bibliotheques/phdf5/1.8.15/include
 LIBMPI      = -L/opt/san/intel15/impi/5.0.2.044/lib64/ -lmpi -lmpi_dbg -lmpi_mt -lmpigf -lmpi_ilp64 
 INCLUDEMPI  = -I/opt/san/intel15/impi/5.0.2.044/include64
 
-
+# FFT externe
 LIBFFTW     = -L/opt/san/bibliotheques/fftw/3.2.2/lib -lfftw3 -lfftw3_threads
 INCLUDEFFTW = -I/opt/san/bibliotheques/fftw/3.2.2/include
 
+## mkl, to use FFTW from mkl
+#LIBFFTW     = -L${MKLROOT}/lib/intel64 -lmkl_intel_lp64 -lmkl_core -lmkl_sequential
+#INCLUDEFFTW = -I${MKLROOT}/include/fftw
+
 EXEC  = randomField.exe
-#EXEC  = statistics.exe
-#EXEC2 = statistics.exe
+EXEC2 = statistics.exe
 FC   = mpiifort
 FFLAGS = -O2
 
@@ -32,41 +35,48 @@ SRCS = $(wildcard *.f90 *.f)
 #Create a ".f90" for each source
 #OBJS = $(SRCS:.f90=.o) #SYNTAX NOT WORKING
 
-OBJS += ./displayCarvalhol.o \
-./main_RandomField.o \
-./math_RF.o \
-./constants_RF.o \
+RF_OBJ += ./main_RandomField.o \
 ./randomFieldND.o \
-./readFile_RF.o \
 ./spectra_RF.o \
 ./writeResultFile_RF.o \
-./lsame.o \
-./charFunctions.o \
-./xerbla.o \
-./dger.o \
 ./mesh_RF.o \
-./write_Log_File.o \
-./systemUt_RF.o \
-./common_variables_RF.o \
-./type_RF.o \
 ./type_MESH.o \
+./type_RF.o \
+./readUNV_RF.o \
+./localization_RF.o \
+./calls_RF.o \
 ./ranlib.o \
 ./rnglib.o \
-./dgemm.o \
 ./ipmpar.o \
 ./spmpar.o \
 ./cumnor.o \
 ./devlpl.o \
 ./stvaln.o \
 ./dinvnr.o \
-./cdfnor.o \
-./readUNV_RF.o \
-./localization_RF.o \
-./calls_RF.o
+./cdfnor.o
+
+STAT_OBJ += ./main_Stat.o \
+./statistics_RF.o \
+./type_STAT.o
+
+COMM_OBJ += ./charFunctions.o \
+./constants_RF.o \
+./common_variables_RF.o \
+./displayCarvalhol.o \
+./hdf5_RF.o \
+./write_Log_File.o \
+./readFile_RF.o \
+./math_RF.o \
+./dgemm.o \
+./lsame.o \
+./xerbla.o \
+./dger.o \
+./systemUt_RF.o
+
+
 
 #./type_TEST.o \
 #./test_func_RF.o \
-#./statistics_RF.o \
 
 LIBS = $(LIBHDF5) $(LIBMPI) $(LIBFFTW)
 INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI) $(INCLUDEFFTW)
@@ -86,7 +96,18 @@ main_RandomField.o   : calls_RF.o \
 			           type_MESH.o \
 			           type_RF.o \
 			           write_Log_File.o \
-			           writeResultFile_RF.o					  
+			           writeResultFile_RF.o
+main_Stat.o          : charFunctions.o \
+                       common_variables_RF.o \
+				       constants_RF.o \
+					   displayCarvalhol.o \
+					   hdf5_RF.o \
+					   math_RF.o \
+                       write_Log_File.o \
+                       readFile_RF.o \
+                       systemUt_RF.o \
+					   statistics_RF.o \
+					   type_STAT.o	           				  
 calls_RF.o           : constants_RF.o \
 			           common_variables_RF.o \
 			           displayCarvalhol.o \
@@ -130,10 +151,15 @@ writeResultFile_RF.o : displayCarvalhol.o \
 			           write_Log_File.o \
 			           constants_RF.o \
 					   type_RF.o \
-			           type_MESH.o
+			           type_MESH.o \
+			           hdf5_RF.o
+hdf5_RF.o            : displayCarvalhol.o \
+                       math_RF.o \
+                       write_Log_File.o
 statistics_RF.o      : displayCarvalhol.o \
 			           math_RF.o \
-			           write_Log_File.o
+			           write_Log_File.o \
+			           type_STAT.o
 spectra_RF.o         : displayCarvalhol.o \
 			           math_RF.o \
 			           write_Log_File.o \
@@ -197,24 +223,29 @@ cdfnor.o             : dinvnr.o \
 	$(FC) $(FFLAGS) -o "$@" $(INCLUDE) -c "$<"
 	@echo 'Finished building: $<'
 	@echo ' '	
-
-
 	
 # All Target
-all: randomField
+all: randomField statistics
 
 # Tool invocations
-randomField: $(OBJS)
+randomField: $(RF_OBJ) $(COMM_OBJ)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Fortran Linker'
-	$(FC) -o $(EXEC) $(FFLAGS) $(OBJS) $(INCLUDE) $(LIBS)
+	$(FC) -o $(EXEC) $(FFLAGS) $(RF_OBJ) $(COMM_OBJ) $(INCLUDE) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '	
+	
+statistics: $(STAT_OBJ) $(COMM_OBJ)
+	@echo 'Building target: $@'
+	@echo 'Invoking: Fortran Linker'
+	$(FC) -o $(EXEC2) $(FFLAGS) $(STAT_OBJ) $(COMM_OBJ) $(INCLUDE) $(LIBS)
+	@echo 'Finished building target: $@'
+	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXECUTABLE) $(OBJS) *.mod
-	-@echo ' '
+	-$(RM) $(EXEC) $(EXEC2) $(RF_OBJ) $(STAT_OBJ) $(COMM_OBJ) *.mod
+	-@echo 'Finished excluding'
 
 .PHONY: all clean dependents
 .SECONDARY:

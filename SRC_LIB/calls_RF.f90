@@ -13,8 +13,6 @@ module calls_RF
     use randomFieldND
     use mesh_RF
 
-    !use spectra_RF
-
     implicit none
 
     interface createRandomField
@@ -35,11 +33,11 @@ contains
         !INPUT
         double precision, dimension(1:, 1:), intent(in), target :: xPoints;
         double precision, dimension(1:)    , intent(in) :: corrL;
-        character (len=*)                  , intent(in) :: corrMod;
+        integer                            , intent(in) :: corrMod;
         integer                            , intent(in) :: Nmc;
         integer                            , intent(in) :: method
         integer                            , intent(in) :: seedStart
-        character (len=*)                  , intent(in) :: margiFirst;
+        integer                            , intent(in) :: margiFirst;
         double precision                   , intent(in) :: fieldAvg
         double precision                   , intent(in) :: fieldVar;
         integer                            , intent(in) :: comm, rang, nb_procs
@@ -116,6 +114,9 @@ contains
         integer :: i;
         integer :: minIndexNeigh, maxIndexNeigh
         logical, dimension(size(MSH%neigh)) :: considerNeighbour
+        integer, dimension(16) :: testVec
+
+        testVec = [(i, i = 1, 16)]
 
         !Normalization
         do i = 1, RDF%nDim
@@ -176,6 +177,8 @@ contains
             MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)*RDF%corrL(i)
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
         end do
+
+        !RDF%randField = RDF%rang ! For Tests
 
     end subroutine gen_Std_Gauss
 

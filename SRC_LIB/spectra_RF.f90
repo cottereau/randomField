@@ -15,7 +15,7 @@ contains
     subroutine set_kMaxND(corrMod, kMax);
         implicit none
         !INPUT
-        character (len=*),                intent(in) :: corrMod;
+        integer, intent(in) :: corrMod;
         !double precision,   dimension(:),  intent(in), optional :: corrL;
 
         !OUTPUT
@@ -27,8 +27,8 @@ contains
 
         nDim = size(kMax)
 
-        select case(trim(adjustL(corrMod)))
-            case("gaussian")
+        select case(corrMod)
+            case(cm_GAUSSIAN)
                 select case(nDim)
                     case(1)
                         kMax(:) = 6.457D0; !Value to cover 99% Spectra area
@@ -101,9 +101,19 @@ contains
                 end do
 
             case(FFT)
-                RDF%kNStep(:) = 2*RDF%xNStep(:); !Number of points in k
+                RDF%kNStep(:) = RDF%xNStep(:); !Number of points in k
+                RDF%kDelta(:) = RDF%kDelta(:)
                 RDF%kNTotal   = product(RDF%kNStep);
-                RDF%kMax(:)   = dble(RDF%kNStep(:) - 1) * RDF%kDelta(:)
+                RDF%kMax(:)   = dble(RDF%kNStep(:) - 1) * RDF%kDelta(:) !Redefinition of kMax
+
+                allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
+                do i = 1, RDF%kNTotal
+                    call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
+                end do
+
+                do i = 1, RDF%nDim
+                    RDF%kPoints(i, :) = RDF%kPoints(i, :)/RDF%corrL(i)
+                end do
 
         end select
 
@@ -121,57 +131,14 @@ contains
         !INPUT OUTPUT
         type(RF) :: RDF
 
-        !LOCAL
-        integer :: i, j, k
-        logical :: cycleX, cycleY, cycleZ
-
-
         if(allocated(RDF%SkVec)) deallocate(RDF%SkVec)
-        if(RDF%method /= FFT ) allocate(RDF%SkVec(RDF%kNTotal))
+        allocate(RDF%SkVec(RDF%kNTotal))
 
         select case(RDF%corrMod)
 
-            case("gaussian")
-                select case (RDF%method)
-                    case(FFT)
-                        if(RDF%nDim == 3 ) then
+            case(cm_GAUSSIAN)
+                RDF%SkVec = exp(-sum(RDF%kPoints**(2.0D0), 1)/(4.0d0*pi))
 
-                            allocate(RDF%Sk3D(RDF%kNStep(1), RDF%kNStep(2), RDF%kNStep(3)))
-                            RDF%Sk3D(:,:,:) = 0.0D0;
-
-                            write(get_fileId(),*) " INSIDE set_SkVec"
-
-                            do k = 1, RDF%kNStep(3)
-                                do j = 1, RDF%kNStep(2)
-                                    do i = 1, RDF%kNStep(1)
-
-                                        RDF%Sk3D(i,j,k) = exp(                &
-                                            -(((i-1)*RDF%kDelta(1))**(2.0D0)  &
-                                            + ((j-1)*RDF%kDelta(2))**(2.0D0)  &
-                                            + ((k-1)*RDF%kDelta(3))**(2.0D0)) &
-                                            /(4.0d0*pi))
-
-                                        !TODO: Optimize to cycle when reaching Sk3D < TOLERANCE)
-
-!                                        if(i==1) write(*,*) "RDF%Sk3D(i,j,k) = ",  RDF%Sk3D(i,j,k);
-!                                        if(i==1) write(*,*) "sum k**2 = ",  ((i-1)*RDF%kDelta(1))**(2.0D0)  &
-!                                                                          + ((j-1)*RDF%kDelta(2))**(2.0D0)  &
-!                                                                          + ((k-1)*RDF%kDelta(3))**(2.0D0)
-                                    end do
-
-                                end do
-                            end do
-                            RDF%Sk3D(:,:,:) = RDF%Sk3D(:,:,:) * product(RDF%kDelta)
-
-                        else
-                            write(*,*) "ERROR!, FFT only is implemented in 3D)"
-                            stop
-                        end if
-
-                    case default
-                        RDF%SkVec = exp(-sum(RDF%kPoints**(2.0D0), 1)/(4.0d0*pi))
-
-                end select
         end select
 
     end subroutine set_SkVec
@@ -183,7 +150,7 @@ contains
     subroutine set_rMax(corrMod, rMax, corrL);
         implicit none
         !INPUT
-        character (len=*),                intent(in) :: corrMod;
+        integer,                intent(in) :: corrMod;
         double precision,   dimension(:),  intent(in), optional :: corrL;
 
         !OUTPUT
@@ -206,8 +173,8 @@ contains
         !            call DispCarvalhol (get_SpectrumND(kMax, corrMod, corrL), "Spectrum")
         !        end do
 
-        select case(trim(adjustL(corrMod)))
-        case("gaussian")
+        select case(corrMod)
+        case(cm_GAUSSIAN)
             rMax(:) = 2*pi*corrL_effec(:); !CRITERIA STILL TO BE TESTED
         end select
 
@@ -247,7 +214,7 @@ contains
     subroutine set_kArray_rand(corrMod, kArray_rand, kMaxScal, nDim);
         implicit none
         !INPUT
-        character (len=*), intent(in) :: corrMod;
+        integer, intent(in) :: corrMod;
         double precision, optional :: kMaxScal
         integer :: nDim
 
@@ -276,8 +243,8 @@ contains
 
         !write(*,*) "corrMod = ", corrMod
 
-        select case(trim(adjustL(corrMod)))
-            case("gaussian")
+        select case(corrMod)
+            case(cm_GAUSSIAN)
                 !write(*,*) "Gaussian kArray"
                 mean = 0.0D0
                 sd = SQRT_2PI
@@ -368,7 +335,7 @@ contains
 
         !INPUT
         double precision, dimension(:), intent(in) :: kVector;
-        character (len=*),              intent(in) :: corrMod
+        integer                       , intent(in) :: corrMod
         double precision, dimension(:), intent(in), optional :: corrL;
 
         !OUTPUT
@@ -389,7 +356,7 @@ contains
         nDim = size(kVector)
 
         select case(corrMod)
-        case("gaussian")
+        case(cm_GAUSSIAN)
 
             !REGIS
             !Sk  = exp(-dot_product((kVector**2),(corrL_effec**2))/(4.0d0)); !Amplitude part "product(corrL)" is external to the function

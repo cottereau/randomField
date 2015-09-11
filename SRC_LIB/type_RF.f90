@@ -17,16 +17,17 @@ module type_RF
         integer(kind=8) :: xNTotal = -1, kNTotal = -1;
         integer, dimension(:)  , allocatable :: seed
         integer :: seedStart = -1
-        character (len=15) :: corrMod = "Not", margiFirst = "Not";
         double precision   :: fieldAvg = -1, fieldVar = -1;
-        integer            :: method = -1!1 for Isotropic, 2 for Shinozuka, 3 for Randomization
-        integer            :: Nmc = -1
+        double precision   :: gen_CPU_Time
+        integer :: corrMod = -1 !1 for Gaussian
+        integer :: margiFirst = -1 !1 for Gaussian, 2 for Lognormal
+        integer :: method = -1 !1 for Isotropic, 2 for Shinozuka, 3 for Randomization, 4 for FFT
+        integer :: Nmc = -1
         logical :: init = .false.
         logical :: independent
             !nDim dependent
         double precision, dimension(:)   , allocatable :: corrL, kMax, kDelta;
         double precision, dimension(:, :), allocatable :: kPoints;
-        double precision, dimension(:, :, :), allocatable :: Sk3D;
         double precision, dimension(:)   , allocatable :: SkVec;
         double precision, dimension(:, :), allocatable :: xPoints_Local
         double precision, dimension(:, :), allocatable :: randField_Local
@@ -82,6 +83,7 @@ module type_RF
             RF_a%xMaxBound = -1
             RF_a%kNStep = -1
             RF_a%xNStep = -1
+            RF_a%gen_CPU_Time = -1
             RF_a%calculate(:) = .true.
             RF_a%init  = .true.
             RF_a%neighSeed(:,:) = -1
@@ -220,9 +222,9 @@ module type_RF
             RF_a%fieldAvg  = -1
             RF_a%fieldVar  = -1
             RF_a%Nmc       = -1
-            RF_a%corrMod    = "Not"
-            RF_a%margiFirst = "Not"
-            RF_a%method     = "Not"
+            RF_a%corrMod    = -1
+            RF_a%margiFirst = -1
+            RF_a%method     = -1
             if(allocated(RF_a%corrL))     deallocate(RF_a%corrL)
             if(allocated(RF_a%randField_Local)) deallocate(RF_a%randField_Local)
             if(allocated(RF_a%xPoints_Local))   deallocate(RF_a%xPoints_Local)
@@ -237,7 +239,6 @@ module type_RF
             if(allocated(RF_a%xMinBound)) deallocate(RF_a%xMinBound)
             if(allocated(RF_a%neighSeed)) deallocate(RF_a%neighSeed)
             if(allocated(RF_a%neighRange)) deallocate(RF_a%neighRange)
-            if(allocated(RF_a%Sk3D))       deallocate(RF_a%Sk3D)
             if(allocated(RF_a%kNStep))     deallocate(RF_a%kNStep)
             if(allocated(RF_a%xNStep))     deallocate(RF_a%xNStep)
             if(allocated(RF_a%kDelta))     deallocate(RF_a%kDelta)
@@ -274,6 +275,7 @@ module type_RF
         destRDF%corrL       = orRDF%corrL
         destRDF%kMax        = orRDF%kMax
         destRDF%independent =  orRDF%independent
+        destRDF%margiFirst  =  orRDF%margiFirst
 
     end subroutine copy_RF_properties
 

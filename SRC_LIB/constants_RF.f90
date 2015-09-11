@@ -8,12 +8,21 @@ module constants_RF
 	double precision, parameter :: TOLERANCE = 0.0000000000001
 	double precision, parameter :: MIN_DOUBLE = -2.0D+307
 	double precision, parameter :: MAX_DOUBLE = 2.0D+307
+	!METHOD
 	integer, parameter :: ISOTROPIC = 1, &
 	                      SHINOZUKA = 2, &
 	                      RANDOMIZATION = 3, &
 	                      FFT = 4
+    !Correlation Model
+    integer, parameter :: cm_GAUSSIAN = 1
+    !First-order Marginal Density
+    integer, parameter :: fom_GAUSSIAN = 1, &
+                          fom_LOGNORMAL = 2
 
 	integer :: TESTRANK = 0 !ONLY FOR TESTS
-
+	character (len=30), parameter :: mesh_input = "mesh_input"
+    character (len=30), parameter :: gen_input  = "gen_input"
+    character (len=30), parameter :: test_input = "test_input"
+    character (len=30), parameter :: unv_input = "unv_files/Maroua1.unv "!"unv_files/Luciano_Cube.unv"
 
 end module constants_RF
