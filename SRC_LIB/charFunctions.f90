@@ -32,6 +32,61 @@ contains
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    function string_join_many(string1, string2, string3, string4, string5&
+                              , string6, string7, string8, string9&
+                              , string10, string11, string12, string13&
+                              , string14, string15) result(stringTot)
+
+        implicit none
+
+        !INPUT
+        character (len=*), intent(in) :: string1;
+        character (len=*), intent(in), optional  :: string2;
+        character (len=*), intent(in), optional  :: string3;
+        character (len=*), intent(in), optional  :: string4;
+        character (len=*), intent(in), optional  :: string5;
+        character (len=*), intent(in), optional  :: string6;
+        character (len=*), intent(in), optional  :: string7;
+        character (len=*), intent(in), optional  :: string8;
+        character (len=*), intent(in), optional  :: string9;
+        character (len=*), intent(in), optional  :: string10;
+        character (len=*), intent(in), optional  :: string11;
+        character (len=*), intent(in), optional  :: string12;
+        character (len=*), intent(in), optional  :: string13;
+        character (len=*), intent(in), optional  :: string14;
+        character (len=*), intent(in), optional  :: string15;
+
+        !OUTPUT
+        character (len=200) :: stringTot;
+
+        !LOCAL
+        integer :: i
+
+        !write(*,*) "WRITE Flag string_join"
+        stringTot = ""
+        stringTot = trim(adjustL(string1))
+
+        if(present(string2)) stringTot = string_join(stringTot, string2)
+        if(present(string3)) stringTot = string_join(stringTot, string3)
+        if(present(string4)) stringTot = string_join(stringTot, string4)
+        if(present(string5)) stringTot = string_join(stringTot, string5)
+        if(present(string6)) stringTot = string_join(stringTot, string6)
+        if(present(string7)) stringTot = string_join(stringTot, string7)
+        if(present(string8)) stringTot = string_join(stringTot, string8)
+        if(present(string9)) stringTot = string_join(stringTot, string9)
+        if(present(string10)) stringTot = string_join(stringTot, string10)
+        if(present(string11)) stringTot = string_join(stringTot, string11)
+        if(present(string12)) stringTot = string_join(stringTot, string12)
+        if(present(string13)) stringTot = string_join(stringTot, string13)
+        if(present(string14)) stringTot = string_join(stringTot, string14)
+        if(present(string15)) stringTot = string_join(stringTot, string15)
+
+        stringTot = adjustL(stringTot)
+
+    end function string_join_many
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     function string_join(string1, string2) result(stringTot)
 
         implicit none

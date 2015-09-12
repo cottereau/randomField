@@ -40,9 +40,9 @@ program main_RandomField
     integer            :: i, baseStep, nIter, all_xNTotal
     integer            :: comm, code, rang, error, nb_procs;
     character(len=30)  :: rangChar;
-    character(len=200) :: path
+    character(len=200) :: path, logFilePath
     character(len=110), dimension(:)  , allocatable :: HDF5Name
-    character(len=30) , dimension(:,:), allocatable :: dataTable;
+    character(len=50) , dimension(:,:), allocatable :: dataTable;
     integer, dimension(:), allocatable :: seed
     double precision, dimension(:,:), allocatable, target :: coordList
     integer         , dimension(:,:), allocatable :: connectList
@@ -64,17 +64,6 @@ program main_RandomField
     !Initializing MPI
     call init_communication(MPI_COMM_WORLD)
 
-    if(rang == 0) write(*,*) "-> MPI_communications started"
-    if(rang == 0) write(*,*) "         nb_procs = ", nb_procs
-
-    !Initializing folders
-    if(rang == 0) write(*,*)  "-> Initialize Folders"
-    call init_basic_folders()
-
-    !Initializing logFiles
-    if(rang == 0) write(*,*)  "-> Initialize logFiles"
-    call init_log_file(stringNumb_join(string_vec_join([results_path,"/",log_folder_name,"/",log_filename]), rang), rang)
-
     if(rang == 0)then
         write(*,*)
         write(*,*) "****************************************************************************"
@@ -89,27 +78,49 @@ program main_RandomField
         write(*,*)
     end if
 
+    !write(get_fileId(),*) "-> Reading inputs"
+
+    if(rang == 0) write(*,*) "-> MPI_communications started"
+    if(rang == 0) write(*,*) "         nb_procs = ", nb_procs
+
+    !Initializing folders
+    if(rang == 0) write(*,*)  "-> Initialize Folders"
+    call init_basic_folders()
+
+#ifdef MAKELOG
+    if(rang == 0) write(*,*) "IFDEF MAKELOG DEFINED"
+
+    !Initializing logFiles
+    if(rang == 0) write(*,*)  "-> Initialize logFiles"
+    logFilePath = stringNumb_join(&
+                      trim(adjustL(&
+                      string_join_many(results_path,"/",log_folder_name,"/",log_filename)))&
+                      , rang)
+    write(*,*)  " rang        = ", rang
+    write(*,*)  " logFilePath = ", logFilePath
+    call init_log_file(trim(adjustL(logFilePath)), rang)
+    RDF%log_ID = log_file_RF_ID
+    MSH%log_ID = log_file_RF_ID
+#else
+    if(rang == 0) write(*,*) "IFDEF MAKELOG NOT DEFINED"
+#endif
+
+
 	if(rang == 0) write(*,*) "  Number of procs = ", nb_procs
 	if(rang == 0) write(*,*) ""
 
     !Reading Inputs
     if(rang == 0) write(*,*)  "-> Reading inputs"
-    write(get_fileId(),*) "-> Reading inputs"
+    call wLog("-> Reading inputs")
     call read_input()
 
     !Initial allocation
     call allocate_init()
 
-    !Generating random fields
-    if(rang == 0) write(*,*)  "-> Generating random fields"
-    write(get_fileId(),*) "-> Generating random fields"
-
     !SINGLE REALIZATION
-    if(.not. (step_variate.or. nmc_variate .or. corrL_variate)) then
         if(rang == 0) write(*,*)  "-> Single realization"
-        write(get_fileId(),*) "-> Single realization"
+        call wLog("-> Single realization")
         call single_realization()
-    end if
 
 	!Deallocating
 	call deallocate_all()
@@ -148,7 +159,6 @@ program main_RandomField
             call MPI_COMM_RANK(comm_local, rang, code)
             call MPI_COMM_SIZE(comm_local, nb_procs, code)
 
-            comm = get_fileId(rang)
             comm = comm_local
 
         end subroutine init_communication
@@ -218,15 +228,15 @@ program main_RandomField
             integer ::independent
 
             !Reading Mesh------------------------------------------------------------------
-            write(get_fileId(),*) "    Reading Mesh Input"
+            call wLog("    Reading Mesh Input")
             path = mesh_input
             path = adjustL(path)
-            write(get_fileId(),*) "        file: ", trim(path)
-            inquire(file=path, exist = file_exist)
-            if(.not. file_exist) then
-                write(*,*) "ERROR - The file ", path, " was not found"
-                call MPI_ABORT(MPI_COMM_WORLD, error, code)
-            end if
+            call wLog("        file: "//trim(path))
+            !inquire(file=path, exist = file_exist)
+            !if(.not. file_exist) then
+            !    write(*,*) "ERROR - The file ", path, " was not found"
+            !    call MPI_ABORT(MPI_COMM_WORLD, error, code)
+            !end if
 
             call MPI_BARRIER (comm ,code)
 
@@ -238,11 +248,14 @@ program main_RandomField
 
             select case (MSH%meshMod)
                 case("unv")
-                    write(*,*) "Read input UNV"
+                    write(*,*) "   Mesh UNV"
+                    call wLog("    Mesh UNV")
                     call readUNV(unv_input, nDim, coordList, connectList, monotype, rang, nb_procs, comm)
                     !call dispCarvalhol(coordList, "coordList", "(F20.5)",unit_in = get_fileId())
                     !call dispCarvalhol(connectList, "connectList",unit_in = get_fileId())
                 case("automatic")
+                    write(*,*) "   Mesh automatic"
+                    call wLog("    Mesh automatic")
                     baseStep = nint(dble(nb_procs)**(1.0d0/nDim))
                     call read_DataTable(dataTable, "Min", MSH%xMinGlob)
                     call read_DataTable(dataTable, "Max", MSH%xMaxGlob)
@@ -258,15 +271,15 @@ program main_RandomField
             deallocate(dataTable)
 
             !Reading Generation Input---------------------------------------------------------------
-            write(get_fileId(),*) "    Reading Generation Input"
+            call wLog("    Reading Generation Input")
             path = gen_input
             path = adjustL(path)
-            write(get_fileId(),*) "        file: ", trim(path)
-            inquire(file=path, exist = file_exist)
-            if(.not. file_exist) then
-                write(get_fileId(),*) "ERROR - The file ", path, " was not found"
-                call MPI_ABORT(MPI_COMM_WORLD, error, code)
-            end if
+            call wLog("        file: "//trim(path))
+            !inquire(file=path, exist = file_exist)
+            !if(.not. file_exist) then
+            !    !write(get_fileId(),*) "ERROR - The file ", path, " was not found"
+            !    call MPI_ABORT(MPI_COMM_WORLD, error, code)
+            !end if
 
             call MPI_BARRIER (comm ,code)
 
@@ -293,21 +306,30 @@ program main_RandomField
                 MSH%independent = .false.
             end if
 
+            write(*,*) "RDF%nb_procs = ", RDF%nb_procs
+            write(*,*) "independent  = ", independent
+
             if(RDF%nb_procs == 1 .and. independent == 1) then
-                write(get_fileId(),*) "WARNING!! Independent generation in a single processor."
-                write(get_fileId(),*) " "
-                write(get_fileId(),*) "--OLD values--"
-                write(get_fileId(),*) "RDF%independent = ", RDF%independent
-                write(get_fileId(),*) "MSH%independent = ", MSH%independent
-                write(get_fileId(),*) "MSH%overlap     = ", MSH%overlap
+                call wLog("WARNING!! Independent generation in a single processor.")
+                call wLog(" ")
+                call wLog("--OLD values--")
+                call wLog("RDF%independent = ")
+                call wLog(RDF%independent)
+                call wLog("MSH%independent = ")
+                call wLog(MSH%independent)
+                call wLog("MSH%overlap     = ")
+                call wLog(MSH%overlap)
                 if(RDF%independent) MSH%overlap(1) = -2.0D0
                 RDF%independent = .false.
                 MSH%independent = .false.
-                write(get_fileId(),*) " "
-                write(get_fileId(),*) "--NEW values (changed)--"
-                write(get_fileId(),*) "RDF%independent = ", RDF%independent
-                write(get_fileId(),*) "MSH%independent = ", MSH%independent
-                write(get_fileId(),*) "MSH%overlap     = ", MSH%overlap
+                call wLog(" ")
+                call wLog("--NEW values (changed)--")
+                call wLog("RDF%independent = ")
+                call wLog(RDF%independent)
+                call wLog("MSH%independent = ")
+                call wLog(MSH%independent)
+                call wLog("MSH%overlap     = ")
+                call wLog(MSH%overlap)
             end if
 
             deallocate(dataTable)
@@ -346,14 +368,14 @@ program main_RandomField
             double precision, dimension(:), allocatable :: seedStartVec
             double precision :: tLoc1, tLoc2
 
-            write(get_fileId(),*) "-> Defining Topography"
+            call wLog("-> Defining Topography")
             if (MSH%meshMod == "unv") then
                 call define_topography(RDF, MSH, coordList)
             else
                 call define_topography(RDF, MSH)
             end if
 
-            write(get_fileId(),*) "-> Initializing Random Seed"
+            call wLog("-> Initializing Random Seed")
             if(MSH%independent) then
                 !Define independent seed in each proc
                 call calculate_random_seed(RDF%seed, RDF%seedStart+RDF%rang)
@@ -363,17 +385,18 @@ program main_RandomField
                 call calculate_random_seed(RDF%seed, RDF%seedStart)
                 call init_random_seed(RDF%seed)
             end if
-            write(get_fileId(),*) "      RDF%seed = ", RDF%seed
-            write(get_fileId(),*) " "
+            call wLog("      RDF%seed = ")
+            call wLog(RDF%seed)
+            call wLog(" ")
 
-            write(get_fileId(),*) "-> Setting xPoints"
+            call wLog("-> Setting xPoints")
             call set_XPoints(MSH, RDF, RDF%xPoints_Local)
-            write(get_fileId(),*) "      shape(RDF%xPoints)    "
-            write(get_fileId(),*) "       ", shape(RDF%xPoints)
-            write(get_fileId(),*) "      maxval(RDF%xPoints,2) = "
-            write(get_fileId(),*) "       ",  maxval(RDF%xPoints,2)
-            write(get_fileId(),*) "      minval(RDF%xPoints,2) = "
-            write(get_fileId(),*) "       ",  minval(RDF%xPoints,2)
+            call wLog("      shape(RDF%xPoints)    ")
+            call wLog(shape(RDF%xPoints))
+            call wLog("      maxval(RDF%xPoints,2) = ")
+            call wLog(maxval(RDF%xPoints,2))
+            call wLog( "      minval(RDF%xPoints,2) = ")
+            call wLog(minval(RDF%xPoints,2))
 
             !i = size(RDF%xPoints,2)
             !if(i>50) i = 50
@@ -381,9 +404,9 @@ program main_RandomField
 
             call allocate_randField(RDF, RDF%randField_Local)
 
-            write(get_fileId(),*) "-> Setting folder path"
+            call wLog("-> Setting folder path")
             single_path = string_vec_join([results_path,"/",results_folder_name])
-            write(get_fileId(),*) "     single_path = ", trim(single_path)
+            call wLog("     single_path = "//trim(single_path))
 
             !Discovering the total number of points in all procs
             call MPI_ALLREDUCE (RDF%xNTotal, all_xNTotal,1,MPI_INTEGER, &
@@ -393,29 +416,32 @@ program main_RandomField
             call MPI_ALLREDUCE (t1, all_t1, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
             !if(RDF%rang == 0) write(*,*) "Time Zero = ", all_t1
 
-            write(get_fileId(),*) "Generating Random Field"
+            call wLog("-> Generating Random Field")
             call create_RF_Unstruct_Init (RDF, MSH)
 
 
             if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
-                write(get_fileId(),*) " "
-                write(get_fileId(),*) "Reordering Random Field"
+                call wLog(" ")
+                call wLog("-> Reordering Random Field")
                 tLoc1 = MPI_Wtime()
                 call reorderRandomFieldStruct(RDF, MSH)
                 tLoc2 = MPI_Wtime()
-                write(get_fileId(),*) "   ", tLoc2 - tLoc1  ," s"
+                call wLog("       time (s)")
+                call wLog(tLoc2 - tLoc1)
             end if
 
             i = size(RDF%xPoints,2)
             if(i>50) i = 50
-            call dispCarvalhol(RDF%randField(1:i,:), "RDF%randField", "(F20.5)",unit_in = get_fileId())
+            call dispCarvalhol(RDF%randField(1:i,:), "RDF%randField", "(F20.5)",unit_in = RDF%log_ID)
 
             !call multiVariateTransformation (RDF%margiFirst, RDF%fieldAvg, RDF%fieldVar, RDF%randField)
 
             t2 = MPI_Wtime();
             call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
             RDF%gen_CPU_Time = all_t2 - all_t1
-            if(RDF%rang == 0) write(*,*) "Generation Time = ", all_t2 - all_t1
+            if(RDF%rang == 0) write(*,*) "Generation CPU Time = ", all_t2 - all_t1
+            call wLog ("    Generation CPU Time (s)")
+            call wLog (RDF%gen_CPU_Time)
             all_t3 = -1.0D0
 
             if(explodedView .and. RDF%independent) then
@@ -425,20 +451,22 @@ program main_RandomField
             end if
 
             if(writeFiles) then
-                write(get_fileId(),*) "-> Writing XMF and hdf5 files";
+                call wLog("-> Writing XMF and hdf5 files");
 
                 if(outputStyle==1) then
-                    write(get_fileId(),*) "   (Parallel)";
+                    call wLog("   (Parallel)");
                     call write_Mono_XMF_h5(RDF, MSH, connectList, monotype, "trans_", RDF%rang, single_path, &
                                                     MPI_COMM_WORLD, ["_All"], [0], 0, style=outputStyle)
                 else
-                    write(get_fileId(),*) "   (Per Proc)";
+                    call wLog("   (Per Proc)");
                     call write_Mono_XMF_h5(RDF, MSH, connectList, monotype, "trans_", RDF%rang, single_path, &
                                                     MPI_COMM_WORLD, ["_All"], [RDF%rang], 0, style=outputStyle)
                 end if
                 t3 = MPI_Wtime();
                 call MPI_ALLREDUCE (t3, all_t3, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
                 if(RDF%rang == 0) write(*,*) "Writing Files Time = ", all_t3 - all_t2
+                call wLog ("    Writing Files CPU Time (s)")
+                call wLog (all_t3 - all_t2)
             end if
 
             call write_generation_spec(MSH, RDF, single_path, "singleGen", &

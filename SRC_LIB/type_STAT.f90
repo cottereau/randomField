@@ -9,6 +9,7 @@ module type_STAT
         integer :: comm = -1
         integer :: rang = -1
         integer :: nb_procs = -1
+        integer :: log_ID = -1
 
         !GENERATION VARIABLES
             !nDim independent

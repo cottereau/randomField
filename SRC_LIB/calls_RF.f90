@@ -133,10 +133,10 @@ contains
 
         !Generating Standard Gaussian Field
 
-        write(get_fileId(),*) ""
-        write(get_fileId(),*) "GENERATING INTERNAL RANDOM FIELD"
-        write(get_fileId(),*) "-------------------------------"
-        write(get_fileId(),*) ""
+        !write(get_fileId(),*) ""
+        !write(get_fileId(),*) "GENERATING INTERNAL RANDOM FIELD"
+        !write(get_fileId(),*) "-------------------------------"
+        !write(get_fileId(),*) ""
 
         select case (RDF%method)
             case(ISOTROPIC)
@@ -151,13 +151,13 @@ contains
 
         if(RDF%independent) then
             !Communicating borders to neighbours
-            write(get_fileId(),*) ""
-            write(get_fileId(),*) "GENERATING BORDER RANDOM FIELDS"
-            write(get_fileId(),*) "-------------------------------"
-            write(get_fileId(),*) ""
-            write(get_fileId(),*) "->Discovering neighbours seed"
+            !write(get_fileId(),*) ""
+            !write(get_fileId(),*) "GENERATING BORDER RANDOM FIELDS"
+            !write(get_fileId(),*) "-------------------------------"
+            !write(get_fileId(),*) ""
+            !write(get_fileId(),*) "->Discovering neighbours seed"
             call get_neighbours_info(RDF, MSH)
-            write(get_fileId(),*) "Creating Overlaps"
+            !write(get_fileId(),*) "Creating Overlaps"
             call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
             call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
             call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
@@ -166,8 +166,8 @@ contains
         end if
 
         !Reverting Normalization
-        write(get_fileId(),*) " "
-        write(get_fileId(),*) "->Reverting Normalization"
+        !write(get_fileId(),*) " "
+        !write(get_fileId(),*) "->Reverting Normalization"
         do i = 1, RDF%nDim
             RDF%xPoints(i,:) = RDF%xPoints(i,:)*RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)*RDF%corrL(i)

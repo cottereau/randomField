@@ -97,11 +97,11 @@ contains
         logProc2   = log(dble(nb_procs))/log(2.0D0)
 
         if (areEqual(procRootDim, dble(nint(procRootDim)))) then
-            !write(get_fileId(),*) "    Exact Division"
+            !!write(get_fileId(),*) "    Exact Division"
             !write(*,*) "Exact Division"
             procPerDim(:) = nint(dble(nb_procs)**(1.0d0/nDim))
         else if(areEqual(logProc2, dble(nint(logProc2)))) then
-            !write(get_fileId(),*) "    Power of two"
+            !!write(get_fileId(),*) "    Power of two"
             !write(*,*) "Power of two"
 
             procPerDim(:) = 1

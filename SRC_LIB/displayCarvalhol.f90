@@ -1,11 +1,12 @@
 module displayCarvalhol
 
     use mpi
+    use constants_RF
+    use write_Log_File
     !All display routines
     interface DispCarvalhol
        module procedure Disp1Ddble,   &
            Disp2Ddble,   &
-           Disp3Ddble,   &
            DispScalDble, &
            Disp1Dint,    &
            Disp2Dint,    &
@@ -149,7 +150,7 @@ contains
         integer :: effectComm
         integer :: unit = 6
 
-        unit = 6 !Screen
+        unit = SCREEN !Screen
         if(present(unit_in)) unit = unit_in
 
         if(present(comm))       effectComm = comm
@@ -189,7 +190,7 @@ contains
         integer :: effectComm
         integer :: unit
 
-        unit = 6 !Screen
+        unit = SCREEN !Screen
         if(present(unit_in)) unit = unit_in
 
         if(present(comm))       effectComm = comm
@@ -229,7 +230,7 @@ contains
         integer :: effectComm
         integer :: unit
 
-        unit = 6 !Screen
+        unit = SCREEN !Screen
         if(present(unit_in)) unit = unit_in
 
         if(present(comm))       effectComm = comm
@@ -270,7 +271,7 @@ contains
         integer :: effectComm
         integer :: unit
 
-        unit = 6 !Screen
+        unit = SCREEN !Screen
         if(present(unit_in)) unit = unit_in
 
         if(present(comm))       effectComm = comm
@@ -313,54 +314,56 @@ contains
         integer            :: effectComm
         integer :: unit
 
-        unit = 6 !Screen
+        unit = SCREEN !Screen
         if(present(unit_in)) unit = unit_in
 
-        if(present(comm))       effectComm = comm
-        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+        if(unit == log_file_RF_ID .or. unit == SCREEN) then
+
+            if(present(comm))       effectComm = comm
+            if(.not. present(comm)) effectComm = MPI_COMM_WORLD
 
 
-        if(present(mpi)) then
-            if(mpi) call Ordering_MPI_Start(effectComm)
-        end if
+            if(present(mpi)) then
+                if(mpi) call Ordering_MPI_Start(effectComm)
+            end if
 
-        !write(*,*) "Inside Disp2Ddble"
+            !write(*,*) "Inside Disp2Ddble"
 
-        if(present(format))                     tempFmt = format;
-        if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
-        if(.not.present(format))    tempFmt = "F10.5";
-        if(.not.present(nColumns))  div = 15;
-        write(doubleFmt, fmt="(I3, A)") div, tempFmt;
+            if(present(format))                     tempFmt = format;
+            if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
+            if(.not.present(format))    tempFmt = "F10.5";
+            if(.not.present(nColumns))  div = 15;
+            write(doubleFmt, fmt="(I3, A)") div, tempFmt;
 
-        write(unit,*) ""
-        if(present(title)) write(unit,*) "/////// ", title, " ///////";
+            write(unit,*) ""
+            if(present(title)) write(unit,*) "/////// ", title, " ///////";
 
-        tol = 1E-10;
+            tol = 1E-10;
 
-        write(unit,*) ""
-        do k=1, size(matrix2D,2)/div
-            write(unit,*)
-            write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
-            write(unit,*)
-            do j= lbound(matrix2D,1), ubound(matrix2D,1)
-                write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
+            write(unit,*) ""
+            do k=1, size(matrix2D,2)/div
+                write(unit,*)
+                write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
+                write(unit,*)
+                do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                    write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
+                enddo
             enddo
-        enddo
 
-        if ((DBLE(size(matrix2D,2))/DBLE(div))-size(matrix2D,2)/div > tol) then
-            write(unit,*)
-            write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", ubound(matrix2D,2);
-            write(unit,*)
+            if ((DBLE(size(matrix2D,2))/DBLE(div))-size(matrix2D,2)/div > tol) then
+                write(unit,*)
+                write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", ubound(matrix2D,2);
+                write(unit,*)
 
-            do j= lbound(matrix2D,1), ubound(matrix2D,1)
-                write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:)
-            enddo
-        end if
+                do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                    write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:)
+                enddo
+            end if
 
-        !write(*,*)
+            if(present(mpi)) then
+                if(mpi) call Ordering_MPI_End(effectComm)
+            end if
 
-        if(present(mpi)) then
-            if(mpi) call Ordering_MPI_End(effectComm)
         end if
 
     end subroutine Disp2Ddble
@@ -389,52 +392,56 @@ contains
         integer            :: effectComm
         integer :: unit
 
-        unit = 6 !Screen
+        unit = SCREEN !Screen
         if(present(unit_in)) unit = unit_in
 
-        if(present(comm))       effectComm = comm
-        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+        if(unit == log_file_RF_ID .or. unit == SCREEN) then
+
+            if(present(comm))       effectComm = comm
+            if(.not. present(comm)) effectComm = MPI_COMM_WORLD
 
 
-        if(present(mpi)) then
-            if(mpi) call Ordering_MPI_Start(effectComm)
-        end if
+            if(present(mpi)) then
+                if(mpi) call Ordering_MPI_Start(effectComm)
+            end if
 
-        if(present(format))                     tempFmt = format;
-        if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
-        if(.not.present(format))    tempFmt = "I6";
-        if(.not.present(nColumns))  div = 5;
-        write(doubleFmt, fmt="(I3, A)") div, tempFmt;
+            if(present(format))                     tempFmt = format;
+            if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
+            if(.not.present(format))    tempFmt = "I6";
+            if(.not.present(nColumns))  div = 5;
+            write(doubleFmt, fmt="(I3, A)") div, tempFmt;
 
-        write(unit,*) ""
-        if(present(title)) write(unit,*) "/////// ", title, " ///////";
+            write(unit,*) ""
+            if(present(title)) write(unit,*) "/////// ", title, " ///////";
 
-        tol = 1E-10;
+            tol = 1E-10;
 
-        write(unit,*) ""
-        do k=1, size(matrix2D,2)/div
-            write(unit,*)
-            write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
-            write(unit,*)
-            do j= lbound(matrix2D,1), ubound(matrix2D,1)
-                write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
+            write(unit,*) ""
+            do k=1, size(matrix2D,2)/div
+                write(unit,*)
+                write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
+                write(unit,*)
+                do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                    write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
+                enddo
             enddo
-        enddo
 
-        if ((DBLE(size(matrix2D,2))/DBLE(div))-size(matrix2D,2)/div > tol) then
-            write(unit,*)
-            write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", ubound(matrix2D,2);
-            write(unit,*)
+            if ((DBLE(size(matrix2D,2))/DBLE(div))-size(matrix2D,2)/div > tol) then
+                write(unit,*)
+                write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", ubound(matrix2D,2);
+                write(unit,*)
 
-            do j= lbound(matrix2D,1), ubound(matrix2D,1)
-                write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:)
-            enddo
-        end if
+                do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                    write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:)
+                enddo
+            end if
 
-        !write(*,*)
+            !write(*,*)
 
-        if(present(mpi)) then
-            if(mpi) call Ordering_MPI_End(effectComm)
+            if(present(mpi)) then
+                if(mpi) call Ordering_MPI_End(effectComm)
+            end if
+
         end if
 
     end subroutine Disp2Dint
@@ -463,51 +470,54 @@ contains
         integer            :: effectComm
         integer :: unit
 
-        unit = 6 !Screen
+        unit = SCREEN !Screen
         if(present(unit_in)) unit = unit_in
 
-        if(present(comm))       effectComm = comm
-        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+        if(unit == log_file_RF_ID .or. unit == SCREEN) then
 
-        if(present(mpi)) then
-            if(mpi) call Ordering_MPI_Start(effectComm)
-        end if
+            if(present(comm))       effectComm = comm
+            if(.not. present(comm)) effectComm = MPI_COMM_WORLD
 
-        if(present(format))                     tempFmt = format;
-        if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
-        if(.not.present(format))    tempFmt = "A";
-        if(.not.present(nColumns))  div = 5;
-        write(charFmt, fmt="(I3, A)") div, tempFmt;
+            if(present(mpi)) then
+                if(mpi) call Ordering_MPI_Start(effectComm)
+            end if
 
-        write(unit,*) ""
-        if(present(title)) write(unit,*) "/////// ", title, " ///////";
+            if(present(format))                     tempFmt = format;
+            if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
+            if(.not.present(format))    tempFmt = "A";
+            if(.not.present(nColumns))  div = 5;
+            write(charFmt, fmt="(I3, A)") div, tempFmt;
 
-        tol = 1E-10;
+            write(unit,*) ""
+            if(present(title)) write(unit,*) "/////// ", title, " ///////";
 
-        write(unit,*) ""
-        do k=1, size(matrix2D,2)/div
-            write(unit,*)
-            write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
-            write(unit,*)
-            do j= lbound(matrix2D,1), ubound(matrix2D,1)
-                write(unit,fmt="(I4, A, ("//charFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
+            tol = 1E-10;
+
+            write(unit,*) ""
+            do k=1, size(matrix2D,2)/div
+                write(unit,*)
+                write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
+                write(unit,*)
+                do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                    write(unit,fmt="(I4, A, ("//charFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
+                enddo
             enddo
-        enddo
 
-        if ((DBLE(size(matrix2D,2))/DBLE(div))-size(matrix2D,2)/div > tol) then
-            write(unit,*)
-            write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", ubound(matrix2D,2);
-            write(unit,*)
+            if ((DBLE(size(matrix2D,2))/DBLE(div))-size(matrix2D,2)/div > tol) then
+                write(unit,*)
+                write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", ubound(matrix2D,2);
+                write(unit,*)
 
-            do j= lbound(matrix2D,1), ubound(matrix2D,1)
-                write(unit,fmt="(I4, A, ("//charFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:)
-            enddo
-        end if
+                do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                    write(unit,fmt="(I4, A, ("//charFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:)
+                enddo
+            end if
 
-        !write(*,*)
+            !write(*,*)
 
-        if(present(mpi)) then
-            if(mpi) call Ordering_MPI_End(effectComm)
+            if(present(mpi)) then
+                if(mpi) call Ordering_MPI_End(effectComm)
+            end if
         end if
 
     end subroutine Disp2Dchar
@@ -536,96 +546,99 @@ contains
         integer            :: effectComm
         integer :: unit
 
-        unit = 6 !Screen
+        unit = SCREEN !Screen
         if(present(unit_in)) unit = unit_in
 
-        if(present(comm))       effectComm = comm
-        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+        if(unit == log_file_RF_ID .or. unit == SCREEN) then
+
+            if(present(comm))       effectComm = comm
+            if(.not. present(comm)) effectComm = MPI_COMM_WORLD
 
 
-        if(present(mpi)) then
-            if(mpi) call Ordering_MPI_Start(effectComm)
-        end if
+            if(present(mpi)) then
+                if(mpi) call Ordering_MPI_Start(effectComm)
+            end if
 
-        !write(*,*) "Inside Disp2Ddble"
+            !write(*,*) "Inside Disp2Ddble"
 
-        if(present(format))                     tempFmt = format;
-        if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
-        if(.not.present(format))    tempFmt = "L";
-        if(.not.present(nColumns))  div = 15;
-        write(doubleFmt, fmt="(I3, A)") div, tempFmt;
+            if(present(format))                     tempFmt = format;
+            if(present(nColumns).and.nColumns.gt.0)     div = nColumns;
+            if(.not.present(format))    tempFmt = "L";
+            if(.not.present(nColumns))  div = 15;
+            write(doubleFmt, fmt="(I3, A)") div, tempFmt;
 
-        write(unit,*) ""
-        if(present(title)) write(unit,*) "/////// ", title, " ///////";
+            write(unit,*) ""
+            if(present(title)) write(unit,*) "/////// ", title, " ///////";
 
-        tol = 1E-10;
+            tol = 1E-10;
 
-        write(unit,*) ""
-        do k=1, size(matrix2D,2)/div
+            write(unit,*) ""
+            do k=1, size(matrix2D,2)/div
+                !write(*,*)
+                write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
+                write(unit,*)
+                do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                    write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
+                enddo
+            enddo
+
+            if ((DBLE(size(matrix2D,2))/DBLE(div))-size(matrix2D,2)/div > tol) then
+                write(unit,*)
+                write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", ubound(matrix2D,2);
+                write(unit,*)
+
+                do j= lbound(matrix2D,1), ubound(matrix2D,1)
+                    write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:)
+                enddo
+            end if
+
             !write(*,*)
-            write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", k*div ;
-            write(unit,*)
-            do j= lbound(matrix2D,1), ubound(matrix2D,1)
-                write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:k*div)
-            enddo
-        enddo
 
-        if ((DBLE(size(matrix2D,2))/DBLE(div))-size(matrix2D,2)/div > tol) then
-            write(unit,*)
-            write(unit,fmt="(A,I3,A,I3)") "Columns", (k-1)*div+1, " to ", ubound(matrix2D,2);
-            write(unit,*)
-
-            do j= lbound(matrix2D,1), ubound(matrix2D,1)
-                write(unit,fmt="(I4, A, ("//doubleFmt//"))") j,"->",matrix2D(j,(k-1)*div+1:)
-            enddo
-        end if
-
-        !write(*,*)
-
-        if(present(mpi)) then
-            if(mpi) call Ordering_MPI_End(effectComm)
+            if(present(mpi)) then
+                if(mpi) call Ordering_MPI_End(effectComm)
+            end if
         end if
 
     end subroutine Disp2Dbool
 
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-
-    subroutine Disp3Ddble(matrix, title, format, nColumns, mpi, comm, unit_in)
-        ! Displays 1D Matrix (Vector)
-
-        implicit none
-
-        !INPUT
-        double precision , dimension(:,:,:),          intent(in) :: matrix
-        character (len=*),                  optional, intent(in) :: title, format
-        integer,                            optional, intent(in) :: nColumns
-        logical                           , optional, intent(in) :: mpi
-        integer                           , optional, intent(in) :: comm
-        integer          , optional, intent(in) :: unit_in
-
-        !LOCAL VARIABLES
-        integer :: i
-        integer :: effectComm
-        integer :: unit
-
-        unit = 6 !Screen
-        if(present(unit_in)) unit = unit_in
-
-        if(present(comm))       effectComm = comm
-        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
-
-        do i = 1, size(matrix, 3)
-            write(unit,*) "---------Slice ", i, "----------"
-            if(present(mpi)) then
-                call Disp2Ddble(matrix(:,:,i), title, format, nColumns, mpi, effectComm, unit_in = unit);
-            else
-                call Disp2Ddble(matrix(:,:,i), title, format, nColumns, unit_in = unit);
-            end if
-        end do
-
-    end subroutine Disp3Ddble
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!
+!    subroutine Disp3Ddble(matrix, title, format, nColumns, mpi, comm, unit_in)
+!        ! Displays 1D Matrix (Vector)
+!
+!        implicit none
+!
+!        !INPUT
+!        double precision , dimension(:,:,:),          intent(in) :: matrix
+!        character (len=*),                  optional, intent(in) :: title, format
+!        integer,                            optional, intent(in) :: nColumns
+!        logical                           , optional, intent(in) :: mpi
+!        integer                           , optional, intent(in) :: comm
+!        integer          , optional, intent(in) :: unit_in
+!
+!        !LOCAL VARIABLES
+!        integer :: i
+!        integer :: effectComm
+!        integer :: unit
+!
+!        unit = SCREEN !Screen
+!        if(present(unit_in)) unit = unit_in
+!
+!        if(present(comm))       effectComm = comm
+!        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+!
+!        do i = 1, size(matrix, 3)
+!            write(unit,*) "---------Slice ", i, "----------"
+!            if(present(mpi)) then
+!                call Disp2Ddble(matrix(:,:,i), title, format, nColumns, mpi, effectComm, unit_in = unit);
+!            else
+!                call Disp2Ddble(matrix(:,:,i), title, format, nColumns, unit_in = unit);
+!            end if
+!        end do
+!
+!    end subroutine Disp3Ddble
 
 end module displayCarvalhol
 !! Local Variables:

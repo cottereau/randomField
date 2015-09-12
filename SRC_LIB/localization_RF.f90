@@ -114,7 +114,7 @@ contains
             !Finding origin
             originCorner = MSH%xMinNeigh(:, direction)
             where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
-            !write(get_fileId(), *) "  originCorner = ", originCorner
+            !!write(get_fileId(), *) "  originCorner = ", originCorner
 
             !Shape Function multiplication (Obs: redefinition of power, should come after Normalization values calculation)
             powerWF(minPos:maxPos) = 0.0D0
@@ -166,7 +166,7 @@ contains
         power(:) = 0
 
         !Loop on directions
-        write(get_fileId(), *) "   Finding normalization Factors "
+        !write(get_fileId(), *) "   Finding normalization Factors "
         do direction = 1, size(MSH%neigh)
 
             if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
@@ -283,7 +283,7 @@ contains
         integer :: tag
 
         !LOCAL
-        double precision :: i
+        integer :: i
 
 
         if(MSH%neigh(neighPos) < 0 .or. MSH%neigh(direction) < 0) then
@@ -330,7 +330,7 @@ contains
 
 
         !Taking the contributions from neighbours------------------------------------------------------
-        write(get_fileId(), *) "   Taking the contributions from neighbours "
+        !write(get_fileId(), *) "   Taking the contributions from neighbours "
         call init_RF(tmpRDF, RDF%nDim, RDF%Nmc, RDF%comm, RDF%rang, RDF%nb_procs)
         call copy_RF_properties(RDF, tmpRDF)
 
@@ -338,15 +338,15 @@ contains
 
             if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
 
-            write(get_fileId(), *) " "
-            write(get_fileId(), *) "  DIRECTION      = ", direction
-            write(get_fileId(), *) "  Neighbour Rank = ", MSH%neigh(direction)
+            !write(get_fileId(), *) " "
+            !write(get_fileId(), *) "  DIRECTION      = ", direction
+            !write(get_fileId(), *) "  Neighbour Rank = ", MSH%neigh(direction)
 
             originCorner = MSH%xMinNeigh(:, direction)
             where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
 
 
-            !write(get_fileId(),*) "Direction = ", direction
+            !!write(get_fileId(),*) "Direction = ", direction
 
             !Preparing the xPoints of a given direction
             call copy_RF_xPoints(MSH, RDF, tmpRDF, tmpRDF%xPoints_Local, direction)

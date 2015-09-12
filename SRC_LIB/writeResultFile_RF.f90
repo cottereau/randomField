@@ -44,7 +44,7 @@ contains
 
 
         !!!!!!!!!!!!HDF5
-        write(get_fileId(),*) "-> Writing h5 file in", trim(adjustL(folderPath))//"/h5";
+        !write(get_fileId(),*) "-> Writing h5 file in", trim(adjustL(folderPath))//"/h5";
 
         select case (style)
             case(1)
@@ -95,7 +95,7 @@ contains
         call write_HDF5_attributes(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
 
         !!!!!!!!!!!!XMF
-        write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";
+        !write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";
         XMFName = stringNumb_join(trim(adjustL(fileName))//"it_", indexXMF)
 
         select case (style)
@@ -170,9 +170,9 @@ contains
 
 
 
-        write(get_fileId(),*) "------------START Writing result HDF5 file (MPI)-----------------------";
-        write(get_fileId(),*) "fileName         = ", fileName
-        write(get_fileId(),*) "folderPath       = ", folderPath
+        !write(get_fileId(),*) "------------START Writing result HDF5 file (MPI)-----------------------";
+        !write(get_fileId(),*) "fileName         = ", fileName
+        !write(get_fileId(),*) "folderPath       = ", folderPath
 
         if(present(double_Data) .eqv. present(integer_Data)) then
             write(*,*) "present(double_Data)  = ", present(double_Data)
@@ -210,7 +210,7 @@ contains
         dsetname = trim(adjustL(fileName)) ! Dataset name
         fileHDF5Name = trim(fileName)//"-ALLproc.h5"
         fullPath     = string_join(folderPath,"/"//fileHDF5Name)
-        write(get_fileId(),*) "' fileHDF5Name = ", fileHDF5Name
+        !write(get_fileId(),*) "' fileHDF5Name = ", fileHDF5Name
 
         !PREPARING ENVIROMENT
         dims = [yDim, sum(all_n_Dim)]
@@ -284,10 +284,10 @@ contains
         if(present(HDF5Name)) then
             HDF5Name = trim(adjustL(fileHDF5Name))
             HDF5Name = adjustL(HDF5Name)
-            write(get_fileId(),*) "'inside write HDF5' output -- HDF5Name = ", HDF5Name
+            !write(get_fileId(),*) "'inside write HDF5' output -- HDF5Name = ", HDF5Name
         end if
 
-        write(get_fileId(),*) "------------END Writing result HDF5 file (MPI)-----------------------";
+        !write(get_fileId(),*) "------------END Writing result HDF5 file (MPI)-----------------------";
 
     end subroutine write_pHDF5_Unstr
 
@@ -315,7 +315,7 @@ contains
         character (len=110) :: fileXMFName, fullPathXMF, HDF5path;
         character (len=35)  :: eventName, meshName;
 
-        write(get_fileId(),*) "------------START Writing result XMF file-----------------------";
+        !write(get_fileId(),*) "------------START Writing result XMF file-----------------------";
 
         Nmc  = ySz(1)
         nDim = ySz(2)
@@ -326,9 +326,9 @@ contains
             fileXMFName = string_join(fileName,".xmf")
             fullPathXMF = string_join(folderPath, "/"//fileXMFName)
             HDF5path = string_join(HDF5relativePath, "/")
-            write(get_fileId(),*) "fileXMFName = ", fileXMFName
-            write(get_fileId(),*) "fullPathXMF = ", fullPathXMF
-            write(get_fileId(),*) "HDF5path    = ", HDF5path
+            !write(get_fileId(),*) "fileXMFName = ", fileXMFName
+            !write(get_fileId(),*) "fullPathXMF = ", fullPathXMF
+            !write(get_fileId(),*) "HDF5path    = ", HDF5path
 
             !Building file
             file=21;
@@ -339,15 +339,18 @@ contains
             write (file,'(A)'      )'<Xdmf Version="2.0">'
             write (file,'(A)'      )' <Domain>'
             i = 1
-            write (file,'(5A)'     )'   <DataItem Name="samples" Format="HDF" DataType="Float" Precision="8" Dimensions="',trim(numb2String(xSz(i))), ' ',trim(numb2String(ySz(i)))  ,'">'
+            write (file,'(5A)'     )'   <DataItem Name="samples" Format="HDF" DataType="Float" Precision="8" Dimensions="',&
+                                        trim(numb2String(xSz(i))), ' ',trim(numb2String(ySz(i)))  ,'">'
             write (file,'(4A)'     )'        ',trim(HDF5path),trim(HDF5nameList(i)),':/samples'
             write (file,'(A)'      )'   </DataItem>'
             i = 2
-            write (file,'(5A)'     )'   <DataItem Name="nodes" Format="HDF" DataType="Float" Precision="8" Dimensions="',trim(numb2String(xSz(i))), ' ',trim(numb2String(ySz(i)))  ,'">'
+            write (file,'(5A)'     )'   <DataItem Name="nodes" Format="HDF" DataType="Float" Precision="8" Dimensions="',&
+                                        trim(numb2String(xSz(i))), ' ',trim(numb2String(ySz(i)))  ,'">'
             write (file,'(4A)'     )'        ',trim(HDF5path),trim(HDF5nameList(i)),':/nodes'
             write (file,'(A)'      )'   </DataItem>'
             i = 3
-            write (file,'(5A)'     )'   <DataItem Name="connect" Format="HDF" DataType="Int" Dimensions="',trim(numb2String(xSz(i))), ' ',trim(numb2String(ySz(i)))  ,'">'
+            write (file,'(5A)'     )'   <DataItem Name="connect" Format="HDF" DataType="Int" Dimensions="',&
+                                        trim(numb2String(xSz(i))), ' ',trim(numb2String(ySz(i)))  ,'">'
             write (file,'(4A)'     )'        ',trim(HDF5path),trim(HDF5nameList(i)),':/connect'
             write (file,'(A)'      )'   </DataItem>'
 
@@ -387,7 +390,7 @@ contains
             write(*,*) "The file won't be created"
         end if
 
-        write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
+        !write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
 
     end subroutine write_pHDF5_Unstr_XMF
 
@@ -532,7 +535,8 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_HDF5_Unstr_per_proc_XMF(nSamples, HDF5nameList, nPointList, mask, nDim, fileName, rang, folderPath, &
+    subroutine write_HDF5_Unstr_per_proc_XMF(nSamples, HDF5nameList, nPointList, &
+                                             mask, nDim, fileName, rang, folderPath, &
                                               communicator, HDF5relativePath, attName, byProc)
         implicit none
 
@@ -562,13 +566,13 @@ contains
         effectComm = communicator
 
 
-        write(get_fileId(),*) "------------START Writing result XMF file-----------------------";
+        !write(get_fileId(),*) "------------START Writing result XMF file-----------------------";
 
         call MPI_COMM_SIZE(effectComm, nb_procs, code)
 
         !Common parameters
         Nmc         = nSamples
-        write(get_fileId(),*) "HDF5nameList = ", HDF5nameList
+        !write(get_fileId(),*) "HDF5nameList = ", HDF5nameList
 
         if(rang == 0) then
             allocate(all_nPointList(nb_procs*size(HDF5nameList)))
@@ -642,20 +646,26 @@ contains
                         !write(*,*) "trim(all_HDF5nameList(j)) = ", trim(all_HDF5nameList(j))
                         !write(*,*) "'           ',trim(effecHDF5path),trim(all_HDF5nameList(j)),':/XYZ'= ", '           ',trim(effecHDF5path),trim(all_HDF5nameList(j)),':/XYZ'
                     write (file,'(3A)'     )'   <Grid Name="',trim(meshName),'" GridType="Uniform">' !START Writing the data of one subdomain
-                    write (file,'(3A)'     )'    <Topology Type="Polyvertex" NodesPerElements="1" NumberOfElements="',trim(numb2String(all_nPointList(j))),'">'
+                    write (file,'(3A)'     )'    <Topology Type="Polyvertex" NodesPerElements="1" &
+                                                 &NumberOfElements="',trim(numb2String(all_nPointList(j))),'">'
                     write (file,'(A)'      )'    </Topology>'
                     if(nDim == 1) write (file,'(A)'      )'     <Geometry GeometryType="X">'
                     if(nDim == 2) write (file,'(A)'      )'     <Geometry GeometryType="XY">'
                     if(nDim == 3) write (file,'(A)'      )'     <Geometry GeometryType="XYZ">'
-                    write (file,'(5A)'     )'      <DataItem Name="Coordinates" Format="HDF" DataType="Float" Precision="8" Dimensions="',trim(numb2String(all_nPointList(j))), ' ',trim(numb2String(nDim))  ,'">'
+                    write (file,'(5A)'     )'      <DataItem Name="Coordinates" Format="HDF" DataType="Float" &
+                                            &Precision="8" Dimensions="',trim(numb2String(all_nPointList(j))), ' ',&
+                                            trim(numb2String(nDim))  ,'">'
                     write (file,'(4A)'     )'           ',trim(effecHDF5path),trim(all_HDF5nameList(j)),':/XYZ'
                     write (file,'(A)'      )'      </DataItem>'
                     write (file,'(A)'      )'    </Geometry>'
 
                     do i = 1, Nmc
-                        write (file,'(3A)'     )'     <Attribute Name="',trim(effectAttName(i)),'" Center="Node" AttributeType="Scalar">'
-                        write (file,'(3A)'     )'      <DataItem Format="HDF" DataType="Float" Precision="8" Dimensions="',trim(numb2String(all_nPointList(j))),'">'
-                        write (file,'(5A)'     )'          ',trim(effecHDF5path),trim(all_HDF5nameList(j)),":/", trim(stringNumb_join("RF_", i))
+                        write (file,'(3A)'     )'     <Attribute Name="',trim(effectAttName(i)),&
+                                                      '" Center="Node" AttributeType="Scalar">'
+                        write (file,'(3A)'     )'      <DataItem Format="HDF" DataType="Float" Precision="8" Dimensions="',&
+                                                       trim(numb2String(all_nPointList(j))),'">'
+                        write (file,'(5A)'     )'          ',trim(effecHDF5path),trim(all_HDF5nameList(j)),&
+                                                     ":/", trim(stringNumb_join("RF_", i))
                         write (file,'(A)'      )'       </DataItem>'
                         write (file,'(A)'      )'     </Attribute>'
                     end do
@@ -680,7 +690,7 @@ contains
             deallocate(all_HDF5nameList)
             deallocate(effectAttName)
 
-            write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
+            !write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
 
         end if
 
@@ -735,17 +745,17 @@ contains
 
 
 
-        write(get_fileId(),*) "------------START Writing result HDF5 file (MPI)-----------------------";
-        write(get_fileId(),*) "fileName         = ", fileName
-        write(get_fileId(),*) "folderPath       = ", folderPath
+        !write(get_fileId(),*) "------------START Writing result HDF5 file (MPI)-----------------------";
+        !write(get_fileId(),*) "fileName         = ", fileName
+        !write(get_fileId(),*) "folderPath       = ", folderPath
 
 
         info = MPI_INFO_NULL
         rank = MSH%nDim
 
         !Discovering needed global information
-        write(get_fileId(),*) "RDF%xNStep = ", RDF%xNStep
-        write(get_fileId(),*) "MSH%nDim   = ", MSH%nDim
+        !write(get_fileId(),*) "RDF%xNStep = ", RDF%xNStep
+        !write(get_fileId(),*) "MSH%nDim   = ", MSH%nDim
         total_xNStep = nint((MSH%xMaxGlob - MSH%xMinGlob)/MSH%xStep, 8) + 1
         !call MPI_ALLREDUCE (RDF%xNStep, total_xNStep, MSH%nDim, MPI_INTEGER, MPI_SUM, communicator, code)
 
@@ -754,12 +764,12 @@ contains
         dsetname = trim(adjustL(fileName)) ! Dataset name
         fileHDF5Name = trim(fileName)//"-ALLprocStruct.h5"
         fullPath     = string_join(folderPath,"/"//fileHDF5Name)
-        write(get_fileId(),*) "' fileHDF5Name = ", fileHDF5Name
+        !write(get_fileId(),*) "' fileHDF5Name = ", fileHDF5Name
 
         !PREPARING ENVIROMENT
         dims = total_xNStep
         !dims = dims(size(dims):1:-1) !transpose
-        write(get_fileId(),*) "dims = ", dims
+        !write(get_fileId(),*) "dims = ", dims
 
         !if(transp) dims = [xDim, sum(all_n_Dim)]
         call h5open_f(error) ! Initialize FORTRAN interface.
@@ -778,12 +788,12 @@ contains
         !CHOOSING SPACE IN MEMORY FOR THIS PROC
         count = RDF%xNStep
         !count = count(size(count):1:-1) !transpose
-        !write(get_fileId(),*) "count = ", count
+        !!write(get_fileId(),*) "count = ", count
         call h5screate_simple_f(rank, count, memspace, error)  !Initialize memspace
 
         ! Select hyperslab in the file.
         offset = RDF%origin - 1!Lines Offset to start writing
-        write(get_fileId(),*) "offset = ", offset
+        !write(get_fileId(),*) "offset = ", offset
         call h5dget_space_f(dset_id, filespace, error)
         call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, error)
 
@@ -813,10 +823,10 @@ contains
         if(present(HDF5Name)) then
             HDF5Name = trim(adjustL(fileHDF5Name))
             HDF5Name = adjustL(HDF5Name)
-            write(get_fileId(),*) "'inside write HDF5' output -- HDF5Name = ", HDF5Name
+            !write(get_fileId(),*) "'inside write HDF5' output -- HDF5Name = ", HDF5Name
         end if
 
-        write(get_fileId(),*) "------------END Writing result HDF5 file (MPI)-----------------------";
+        !write(get_fileId(),*) "------------END Writing result HDF5 file (MPI)-----------------------";
 
     end subroutine write_pHDF5_Str
 
@@ -846,7 +856,7 @@ contains
         integer, dimension(MSH%nDim) :: total_xNStep
 
 
-        write(get_fileId(),*) "------------START Writing result XMF file-----------------------";
+        !write(get_fileId(),*) "------------START Writing result XMF file-----------------------";
 
         nDim = MSH%nDim
 
@@ -855,9 +865,9 @@ contains
             fileXMFName = string_join(fileName,".xmf")
             fullPathXMF = string_join(folderPath, "/"//fileXMFName)
             HDF5path = string_join(HDF5relativePath, "/")
-            write(get_fileId(),*) "fileXMFName = ", fileXMFName
-            write(get_fileId(),*) "fullPathXMF = ", fullPathXMF
-            write(get_fileId(),*) "HDF5path    = ", HDF5path
+            !write(get_fileId(),*) "fileXMFName = ", fileXMFName
+            !write(get_fileId(),*) "fullPathXMF = ", fullPathXMF
+            !write(get_fileId(),*) "HDF5path    = ", HDF5path
 
             total_xNStep = nint((MSH%xMaxGlob - MSH%xMinGlob)/MSH%xStep) + 1
 
@@ -876,7 +886,8 @@ contains
             write (file,'(A)'      )'<Xdmf Version="2.0">'
             write (file,'(A)'      )' <Domain>'
             i = 1
-            write (file,'(3A)'     )'   <DataItem Name="samples" Format="HDF" DataType="Float" Precision="8" Dimensions="',trim(dimText),'">'
+            write (file,'(3A)'     )'   <DataItem Name="samples" Format="HDF" DataType="Float" Precision="8" &
+                                     &Dimensions="',trim(dimText),'">'
             write (file,'(4A)'     )'        ',trim(HDF5path),trim(HDF5nameList),':/samples'
             write (file,'(A)'      )'   </DataItem>'
             write (file,'(A)'      )'  <Grid GridType="Collection" CollectionType="Spatial">' !Opens the Collection
@@ -892,12 +903,14 @@ contains
                 write (file,'(3A)'    )'     <Topology TopologyType="3DCoRectMesh" Dimensions="',trim(dimText),'"/>'
                 write (file,'(A)'      )'     <Geometry GeometryType="ORIGIN_DXDYDZ">'
             end if
-            write (file,'(3A)'     )'   <DataItem Name="origin" Format="XML" DataType="Float" Precision="8" Dimensions="',trim(numb2String(nDim)),'">'
+            write (file,'(3A)'     )'   <DataItem Name="origin" Format="XML" DataType="Float" &
+                                        &Precision="8" Dimensions="',trim(numb2String(nDim)),'">'
             if(nDim == 1) write (file,'(A,F25.10)'      )'    ', MSH%xMinGlob(1)
             if(nDim == 2) write (file,'(A,F25.10)'      )'    ', MSH%xMinGlob(2), ' ', MSH%xMinGlob(1)
             if(nDim == 3) write (file,'(A,F25.10)'      )'    ', MSH%xMinGlob(3), ' ', MSH%xMinGlob(2), ' ', MSH%xMinGlob(1)
             write (file,'(A)'      )'   </DataItem>'
-            write (file,'(3A)'     )'   <DataItem Name="step" Format="XML" DataType="Float" Precision="8" Dimensions="',trim(numb2String(nDim)),'">'
+            write (file,'(3A)'     )'   <DataItem Name="step" Format="XML" DataType="Float" &
+                                        &Precision="8" Dimensions="',trim(numb2String(nDim)),'">'
             if(nDim == 1) write (file,'(A,F25.10)'      )'    ', MSH%xStep(1)
             if(nDim == 2) write (file,'(A,F25.10)'      )'    ', MSH%xStep(2), ' ', MSH%xStep(1)
             if(nDim == 3) write (file,'(A,F25.10)'      )'    ', MSH%xStep(3), ' ', MSH%xStep(2), ' ', MSH%xStep(1)
@@ -925,7 +938,7 @@ contains
             write(*,*) "The file won't be created"
         end if
 
-        write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
+        !write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
 
     end subroutine write_pHDF5_Str_XMF
 

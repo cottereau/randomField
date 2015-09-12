@@ -52,10 +52,13 @@ contains
         if(.not.present(wordsMax))      wdMax     = 1000
 
         !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Putting all the data in a vector (for accessibility)
-        fileID      = 2;
+        fileID      = 11;
         stat        = 0;
 
+        !write(*,*) "FIRST LOOP"
+        !write(*,*) "path = ", path
         open (unit = fileID , file = path, action = 'read')
+        !write(*,*) "AFTER OPEN"
         contentSize = 0
         allocate (contentVector(wdMax)) !Limitation about the number of words the file can have
         contentVector = "notUsed"
@@ -164,6 +167,7 @@ contains
             call dispCarvalhol(contentVector, "contentVector")
         endif
 
+        !write(*,*) "SECOND LOOP"
         !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Second loop: filling data table
 
         !Initializing

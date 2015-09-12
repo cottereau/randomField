@@ -173,6 +173,8 @@ readUNV_RF.o         : displayCarvalhol.o \
 			           write_Log_File.o
 systemUt_RF.o        : write_Log_File.o
 write_Log_File.o     : charFunctions.o
+displayCarvalhol.o   : constants_RF.o \
+                       write_Log_File.o
 type_RF.o            : charFunctions.o
 type_MESH.o          : charFunctions.o
 dgemm.o              : lsame.o xerbla.o
@@ -186,7 +188,6 @@ dinvnr.o             : stvaln.o \
 cdfnor.o             : dinvnr.o \
 			           spmpar.o \
 			           cumnor.o
-
 
 # Making all the ".o" from the ".f90"
 %.o: ../randomField/SRC_EXE/%.f90

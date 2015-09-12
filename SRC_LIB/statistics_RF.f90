@@ -102,11 +102,11 @@ contains
 !                            MPI_SUM,comm,code)
 !
 
-!        write(get_fileId(),*) "totalSumRF(1) = ", totalSumRF(1)
-!        write(get_fileId(),*) "totalSumRFsquare(1) = ", totalSumRFsquare(1)
-!        write(get_fileId(),*) "totalSumRF_point(1) = ", totalSumRF_point(1)
-!        write(get_fileId(),*) "totalSumRFsquare_point(1) = ", totalSumRFsquare_point(1)
-!        write(get_fileId(),*) "all_xNTotal = ", all_xNTotal
+!        !write(get_fileId(),*) "totalSumRF(1) = ", totalSumRF(1)
+!        !write(get_fileId(),*) "totalSumRFsquare(1) = ", totalSumRFsquare(1)
+!        !write(get_fileId(),*) "totalSumRF_point(1) = ", totalSumRF_point(1)
+!        !write(get_fileId(),*) "totalSumRFsquare_point(1) = ", totalSumRFsquare_point(1)
+!        !write(get_fileId(),*) "all_xNTotal = ", all_xNTotal
 !
 !        !by Event
 !        if(present(evntAvg))    evntAvg      = totalSumRF/dble(all_xNTotal);
@@ -208,10 +208,10 @@ contains
             Sk_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => SkVec
         end if
 
-        call dfftw_plan_dft_2d(plan, size(SkSym_2D,1), size(SkSym_2D,2), SkSym_2D, SkSym_2D, &
-                               FFTW_FORWARD, FFTW_ESTIMATE)
-        call dfftw_execute_dft(plan, SkSym_2D, SkSym_2D)
-        call dfftw_destroy_plan(plan)
+        !call dfftw_plan_dft_2d(plan, size(SkSym_2D,1), size(SkSym_2D,2), SkSym_2D, SkSym_2D, &
+        !                       FFTW_FORWARD, FFTW_ESTIMATE)
+        !call dfftw_execute_dft(plan, SkSym_2D, SkSym_2D)
+        !call dfftw_destroy_plan(plan)
 
 
 

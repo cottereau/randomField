@@ -11,6 +11,7 @@ module type_MESH
         integer :: rang = -1
         integer :: nb_procs = -1
         integer :: topComm = -1
+        integer :: log_ID = -1
 
         !MESH VARIABLES
             !nDim independent
@@ -191,7 +192,8 @@ module type_MESH
 
                 do i = 1, size(MESH_a%neigh)
                     if(onlyExisting .and. MESH_a%neigh(i)<0) cycle
-                    write(unit,fmtNum) MESH_a%neigh(i), "|", MESH_a%neighShift(:,i), "|", MESH_a%xMinNeigh(:,i), "|", MESH_a%xMaxNeigh(:,i)
+                    write(unit,fmtNum) MESH_a%neigh(i), "|", MESH_a%neighShift(:,i), "|", &
+                                       MESH_a%xMinNeigh(:,i), "|", MESH_a%xMaxNeigh(:,i)
                 end do
 
             else

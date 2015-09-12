@@ -20,12 +20,15 @@ contains
         integer :: code
         logical :: dirExists
 
+        write(*,*) "creating Folder"
+
         if(.not. folderExist (folder, path, compiler)) then
             fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
             !write(*,*) "fullName = ", fullName
             !write(*,*) "Directory is being created: ", fullName
             command = 'mkdir -pv '// trim(adjustL(fullName))
-            call system(command)
+            write(*,*) "command = ", command
+            if(rang == 0) call system(command)
         end if
 
         call MPI_BARRIER (comm ,code)
@@ -103,8 +106,8 @@ contains
         fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
 
         if(compiler == 1) inquire( file=trim(fullName)//'/.', exist=dirExists )  ! Works with gfortran, but not ifort
-        if(compiler == 2) inquire( directory=fullName, exist=dirExists )         ! Works with ifort, but not gfortran
-
+        !if(compiler == 2) inquire( directory=fullName, exist=dirExists )         ! Works with ifort, but not gfortran
+        dirExists=.false.
     end function folderExist
 
 end module systemUt_RF
