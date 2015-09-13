@@ -24,7 +24,7 @@ INCLUDEFFTW = -I/opt/san/bibliotheques/fftw/3.2.2/include
 EXEC  = randomField.exe
 EXEC2 = statistics.exe
 FC   = mpiifort
-FFLAGS = -O2
+FFLAGS = -O2 -cpp #-DCMAKELOG
 
 #### FROM THIS POINT ON THE USER SHOULD NOT MODIFY
 RM := rm -rf
