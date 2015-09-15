@@ -115,6 +115,7 @@ contains
         integer :: minIndexNeigh, maxIndexNeigh
         logical, dimension(size(MSH%neigh)) :: considerNeighbour
         integer, dimension(16) :: testVec
+        integer :: partitionType = 1
 
         testVec = [(i, i = 1, 16)]
 
@@ -133,10 +134,10 @@ contains
 
         !Generating Standard Gaussian Field
 
-        !write(get_fileId(),*) ""
-        !write(get_fileId(),*) "GENERATING INTERNAL RANDOM FIELD"
-        !write(get_fileId(),*) "-------------------------------"
-        !write(get_fileId(),*) ""
+        call wLog("")
+        call wLog("GENERATING INTERNAL RANDOM FIELD")
+        call wLog("-------------------------------")
+        call wLog("")
 
         select case (RDF%method)
             case(ISOTROPIC)
@@ -149,22 +150,20 @@ contains
                 call gen_Std_Gauss_FFT(RDF)
         end select
 
-        RDF%randField = 1 + RDF%rang/10.0 ! For Tests
+        !RDF%randField = 0.0 ! For Tests
 
         if(RDF%independent) then
             !Communicating borders to neighbours
-            !write(get_fileId(),*) ""
-            !write(get_fileId(),*) "GENERATING BORDER RANDOM FIELDS"
-            !write(get_fileId(),*) "-------------------------------"
-            !write(get_fileId(),*) ""
-            !write(get_fileId(),*) "->Discovering neighbours seed"
+            call wLog("")
+            call wLog("GENERATING BORDER RANDOM FIELDS")
+            call wLog("-------------------------------")
+            call wLog("")
+            call wLog("    ->Discovering neighbours seed")
             call get_neighbours_info(RDF, MSH)
-            !write(get_fileId(),*) "Creating Overlaps"
+            call wLog("    ->Creating Overlaps")
             call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
-            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
-            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
-            call normalizeOverlap(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
-
+            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
         end if
 
         !Reverting Normalization

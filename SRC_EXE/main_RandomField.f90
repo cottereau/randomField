@@ -93,7 +93,7 @@ program main_RandomField
     !Initializing logFiles
     if(rang == 0) write(*,*)  "-> Initialize logFiles"
     logFilePath = trim(adjustL(&
-                       string_join_many(results_path,"/",log_folder_name,"/",log_filename)))
+                      string_join_many(results_path,"/",log_folder_name,"/",log_filename)))
     write(*,*)  " rang        = ", rang
     write(*,*)  " logFilePath = ", logFilePath
     call init_log_file(trim(adjustL(logFilePath)), rang)
