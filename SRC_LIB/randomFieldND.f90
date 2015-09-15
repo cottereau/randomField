@@ -605,6 +605,7 @@ contains
 
         !VISUALIZATION of SkVec_2D BEFORE
         !RF_2D = SkVec_2D
+        call wLog("Creating Field by FFT")
 
         call random_number(gammaK(:))
         call random_number(phiK(:))

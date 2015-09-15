@@ -34,11 +34,14 @@ contains
         !LOCAL
         integer :: fileId
         integer :: cte = 1001
+        character(len=300) :: fullName
+
+        fullName = stringNumb_join(filename, rang)
 
         fileId = cte+rang
         log_file_RF_ID = fileId
 
-        open (unit = fileId , file = filename, action = 'write')
+        open (unit=fileId , file=fullName, action='write')
 
     end subroutine init_log_file
 

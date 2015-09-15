@@ -149,6 +149,8 @@ contains
                 call gen_Std_Gauss_FFT(RDF)
         end select
 
+        RDF%randField = 1 + RDF%rang/10.0 ! For Tests
+
         if(RDF%independent) then
             !Communicating borders to neighbours
             !write(get_fileId(),*) ""

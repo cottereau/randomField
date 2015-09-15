@@ -114,7 +114,6 @@ contains
             !Finding origin
             originCorner = MSH%xMinNeigh(:, direction)
             where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
-            !!write(get_fileId(), *) "  originCorner = ", originCorner
 
             !Shape Function multiplication (Obs: redefinition of power, should come after Normalization values calculation)
             powerWF(minPos:maxPos) = 0.0D0
