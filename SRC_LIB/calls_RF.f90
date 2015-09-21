@@ -114,10 +114,10 @@ contains
         integer :: i;
         integer :: minIndexNeigh, maxIndexNeigh
         logical, dimension(size(MSH%neigh)) :: considerNeighbour
-        integer, dimension(16) :: testVec
+        !integer, dimension(16) :: testVec
         integer :: partitionType = 1
 
-        testVec = [(i, i = 1, 16)]
+        !testVec = [(i, i = 1, 16)]
 
         !Normalization
         do i = 1, RDF%nDim
@@ -162,7 +162,9 @@ contains
             call get_neighbours_info(RDF, MSH)
             call wLog("    ->Creating Overlaps")
             call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
+            call wLog("    ->Applying Weighting Functions")
             call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+            call wLog("    ->Adding neighbours contribution")
             call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
         end if
 

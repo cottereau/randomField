@@ -92,7 +92,9 @@ contains
                 stop("hdf5 writing style not implemented")
         end select
 
-        call write_HDF5_attributes(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
+        if(RDF%rang == 0) then
+            call write_HDF5_attributes(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
+        end if
 
         !!!!!!!!!!!!XMF
         !write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";

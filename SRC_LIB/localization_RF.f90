@@ -229,22 +229,6 @@ contains
                                         unityPartition(minPos:maxPos))
 
 
-!                    !TEST
-!                    power(minPos:maxPos) = 0
-!                    do i = 1, MSH%nDim
-!                        if(MSH%neighShift(i, direction) == 0) cycle
-!
-!                        power(minPos:maxPos) = ((tmpRDF%xPoints(i, :) - neighOrCorner(i))/MSH%overlap(i))**2 &
-!                                                   + power(minPos:maxPos)
-!                    end do
-!
-!                    power(minPos:maxPos) = sqrt(power(minPos:maxPos))
-!                    where (power > 1.0D0) power = 1.0
-!
-!
-!                    !END TEST
-
-
                     !Sum of the contribution
                     RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
                                                      (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))

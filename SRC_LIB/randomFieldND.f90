@@ -11,7 +11,6 @@ module randomFieldND
     use type_MESH
     use common_variables_RF
     use writeResultFile_RF
-
     implicit none
     include 'fftw3.f'
     !WARNING before this line we have include 'fftw3.f'
@@ -344,15 +343,33 @@ contains
         call set_SkVec(RDF)
 
         !write(get_fileId(),*) "Step 2"
-        call gen_Std_Gauss_FFT_step2(RDF, RDF%SkVec, RDF%randField(:,1))
-
+        if(RDF%independent) then
+            call gen_Std_Gauss_FFT_step2_indep(RDF, RDF%SkVec, RDF%randField(:,1))
+        else
+            call gen_Std_Gauss_FFT_step2_glob(RDF, RDF%SkVec, RDF%randField(:,1))
+        end if
     end subroutine gen_Std_Gauss_FFT
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine gen_Std_Gauss_FFT_step2(RDF, SkVec, randFieldVec)
+    subroutine gen_Std_Gauss_FFT_step2_glob(RDF, SkVec, randFieldVec)
+
+        implicit none
+
+        !INPUT OUTPUT
+        type(RF), intent(inout) :: RDF
+        double precision, dimension(:), target :: SkVec
+        double precision, dimension(:), target :: randFieldVec
+
+    end subroutine gen_Std_Gauss_FFT_step2_glob
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine gen_Std_Gauss_FFT_step2_indep(RDF, SkVec, randFieldVec)
 
         implicit none
 
@@ -985,7 +1002,7 @@ contains
         if(associated(SkSym_2D)) nullify(SkSym_2D)
         if(associated(SkSym_3D)) nullify(SkSym_3D)
 
-    end subroutine gen_Std_Gauss_FFT_step2
+    end subroutine gen_Std_Gauss_FFT_step2_indep
 
 end module randomFieldND
 !! Local Variables:
