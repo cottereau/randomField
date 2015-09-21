@@ -246,13 +246,13 @@ program main_RandomField
 
             select case (MSH%meshMod)
                 case("unv")
-                    write(*,*) "   Mesh UNV"
+                    if(rang==0) write(*,*) "   Mesh UNV"
                     call wLog("    Mesh UNV")
                     call readUNV(unv_input, nDim, coordList, connectList, monotype, rang, nb_procs, comm)
                     !call dispCarvalhol(coordList, "coordList", "(F20.5)",unit_in = get_fileId())
                     !call dispCarvalhol(connectList, "connectList",unit_in = get_fileId())
                 case("automatic")
-                    write(*,*) "   Mesh automatic"
+                    if(rang==0) write(*,*) "   Mesh automatic"
                     call wLog("    Mesh automatic")
                     baseStep = nint(dble(nb_procs)**(1.0d0/nDim))
                     call read_DataTable(dataTable, "Min", MSH%xMinGlob)
@@ -304,8 +304,8 @@ program main_RandomField
                 MSH%independent = .false.
             end if
 
-            write(*,*) "RDF%nb_procs = ", RDF%nb_procs
-            write(*,*) "independent  = ", independent
+            !write(*,*) "RDF%nb_procs = ", RDF%nb_procs
+            !write(*,*) "independent  = ", independent
 
             if(RDF%nb_procs == 1 .and. independent == 1) then
                 call wLog("WARNING!! Independent generation in a single processor.")

@@ -316,6 +316,8 @@ contains
         RDF%randField(:,:) = sqrt((1.0d0)/((2.0d0*pi)**(RDF%nDim)))&
                              * RDF%randField(:,:)
 
+        !RDF%randField = 1.0 ! For Tests
+
         if(allocated(dgemm_mult))   deallocate(dgemm_mult)
         if(allocated(phiN))         deallocate(phiN);
         if(allocated(psiN))         deallocate(psiN);

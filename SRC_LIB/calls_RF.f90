@@ -160,12 +160,12 @@ contains
             call wLog("")
             call wLog("    ->Discovering neighbours seed")
             call get_neighbours_info(RDF, MSH)
-            call wLog("    ->Creating Overlaps")
+            call wLog("    ->Discovering neighbours index")
             call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
-            call wLog("    ->Applying Weighting Functions")
-            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
-            call wLog("    ->Adding neighbours contribution")
-            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+!            call wLog("    ->Applying Weighting Functions")
+!            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+!            call wLog("    ->Adding neighbours contribution")
+!            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
         end if
 
         !Reverting Normalization

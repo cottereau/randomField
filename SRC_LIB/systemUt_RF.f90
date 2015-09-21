@@ -20,15 +20,17 @@ contains
         integer :: code
         logical :: dirExists
 
-        write(*,*) "creating Folder"
+        if(rang==0) write(*,*) "creating Folder"
 
         if(.not. folderExist (folder, path, compiler)) then
             fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
             !write(*,*) "fullName = ", fullName
             !write(*,*) "Directory is being created: ", fullName
-            command = 'mkdir -pv '// trim(adjustL(fullName))
-            write(*,*) "command = ", command
-            if(rang == 0) call system(command)
+            if(rang==0) then
+                command = 'mkdir -pv '// trim(adjustL(fullName))
+                write(*,*) "command = ", command
+                call system(command)
+            end if
         end if
 
         call MPI_BARRIER (comm ,code)
