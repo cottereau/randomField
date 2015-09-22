@@ -601,28 +601,59 @@ contains
         !!write(get_fileId(), *) " localSpace AFTER = ", localSpace
 
         !Redefining global extremes
-        !write(get_fileId(), *) "        IN  MSH%xMinGlob = ", MSH%xMinGlob
-        !write(get_fileId(), *) "        IN  MSH%xMaxGlob = ", MSH%xMaxGlob
-        !write(get_fileId(), *) "        IN  delta        = ", MSH%xMaxGlob - MSH%xMinGlob
+        call wLog("  MSH%procPerDim= ")
+        call wLog(MSH%procPerDim)
+        call wLog("  RDF%corrL= ")
+        call wLog(RDF%corrL)
+        call wLog("  MSH%pointsPerCorrL= ")
+        call wLog(MSH%pointsPerCorrL)
+        call wLog("  MSH%xStep= ")
+        call wLog(MSH%xStep)
+        call wLog("  MSH%independent= ")
+        call wLog(MSH%independent)
+        call wLog("  MSH%overlap= ")
+        call wLog(MSH%overlap)
+        call wLog("  procPerDim= ")
+        call wLog(MSH%procPerDim)
+        call wLog(" ")
+        call wLog("        IN  MSH%xMinGlob = ")
+        call wLog(MSH%xMinGlob)
+        call wLog("        IN  MSH%xMaxGlob = ")
+        call wLog(MSH%xMaxGlob)
+        call wLog("        IN  delta        = ")
+        call wLog(MSH%xMaxGlob - MSH%xMinGlob)
 
         half  = (MSH%xMaxGlob + MSH%xMinGlob)/2.0D0
         delta = localSpace + MSH%overlap*RDF%corrL*dble(MSH%procPerDim-1)
         MSH%xMinGlob = half - delta/2.0D0
         MSH%xMaxGlob = half + delta/2.0D0
 
-        !write(get_fileId(), *) "        OUT MSH%xMinGlob = ", MSH%xMinGlob
-        !write(get_fileId(), *) "        OUT MSH%xMaxGlob = ", MSH%xMaxGlob
-        !write(get_fileId(), *) "        OUT delta        = ", MSH%xMaxGlob - MSH%xMinGlob
-        !write(get_fileId(), *) " "
+        call wLog("        OUT MSH%xMinGlob = ")
+        call wLog(MSH%xMinGlob)
+        call wLog("        OUT MSH%xMaxGlob = ")
+        call wLog(MSH%xMaxGlob)
+        call wLog("        OUT delta        = ")
+        call wLog(MSH%xMaxGlob - MSH%xMinGlob)
+        call wLog(" ")
 
         !Setting Local Extremes
         locO =  MSH%overlap*RDF%corrL/2.0D0
         locA =  (delta - (MSH%overlap * RDF%corrL * dble(MSH%procPerDim-1)))/dble(MSH%procPerDim)
 
-        delta = locA + locO
+        call wLog(" locO = ")
+        call wLog(locO)
+        call wLog(" locA = ")
+        call wLog(locA)
+
+        delta = locA
+
+        where(MSH%procPerDim /= 1) delta = delta + locO
         where(MSH%coords /= 0 .and. MSH%coords /= MSH%procPerDim-1)
             delta = delta + locO
         end where
+
+        call wLog(" delta = ")
+        call wLog(delta)
 
         MSH%xMin = MSH%xMinGlob
         where(MSH%coords > 0) MSH%xMin = MSH%xMin + (locA + locO) + (locA + 2.0D0*locO)*(dble(MSH%coords-1))
@@ -636,10 +667,14 @@ contains
         MSH%xMinLoc = MSH%xMin
         MSH%xMaxLoc = MSH%xMax
 
-        !write(get_fileId(), *) "        OUT MSH%xMin    = ", MSH%xMin
-        !write(get_fileId(), *) "        OUT MSH%xMax    = ", MSH%xMax
-        !write(get_fileId(), *) "        OUT MSH%xMinLoc = ", MSH%xMinLoc
-        !write(get_fileId(), *) "        OUT MSH%xMaxLoc = ", MSH%xMaxLoc
+        call wLog("        OUT MSH%xMin    = ")
+        call wLog(MSH%xMin)
+        call wLog("        OUT MSH%xMax    = ")
+        call wLog(MSH%xMax)
+        call wLog("        OUT MSH%xMinLoc = ")
+        call wLog(MSH%xMinLoc)
+        call wLog("        OUT MSH%xMaxLoc = ")
+        call wLog(MSH%xMaxLoc)
 
     end subroutine define_generation_geometry
 

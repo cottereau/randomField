@@ -428,8 +428,10 @@ program main_RandomField
             end if
 
             i = size(RDF%xPoints,2)
-            if(i>50) i = 50
-            call dispCarvalhol(RDF%randField(1:i,:), "RDF%randField", "(F20.5)",unit_in = RDF%log_ID)
+            !if(i>50) i = 50
+            !call dispCarvalhol(RDF%randField(1:i,:), "RDF%randField", "(F20.5)",unit_in = RDF%log_ID)
+
+            call show_RF(RDF, forLog_in = .true.)
 
             !call multiVariateTransformation (RDF%margiFirst, RDF%fieldAvg, RDF%fieldVar, RDF%randField)
 
@@ -441,11 +443,11 @@ program main_RandomField
             call wLog (RDF%gen_CPU_Time)
             all_t3 = -1.0D0
 
-            if(explodedView .and. RDF%independent) then
-                do i = 1, RDF%nDim
-                    RDF%xPoints(i,:) = RDF%xPoints(i,:) + 1.5*MSH%coords(i)*RDF%corrL(i)*MSH%overlap(i)
-                end do
-            end if
+!            if(explodedView .and. RDF%independent) then
+!                do i = 1, RDF%nDim
+!                    RDF%xPoints(i,:) = RDF%xPoints(i,:) + 1.5*MSH%coords(i)*RDF%corrL(i)*MSH%overlap(i)
+!                end do
+!            end if
 
             if(writeFiles) then
                 call wLog("-> Writing XMF and hdf5 files");
