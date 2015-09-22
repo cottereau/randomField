@@ -747,7 +747,7 @@ contains
 
 
 
-        !write(get_fileId(),*) "------------START Writing result HDF5 file (MPI)-----------------------";
+        call wLog("------------START Writing result HDF5 file (MPI)-----------------------")
         !write(get_fileId(),*) "fileName         = ", fileName
         !write(get_fileId(),*) "folderPath       = ", folderPath
 
@@ -771,7 +771,8 @@ contains
         !PREPARING ENVIROMENT
         dims = total_xNStep
         !dims = dims(size(dims):1:-1) !transpose
-        !write(get_fileId(),*) "dims = ", dims
+        call wLog("dims = ")
+        call wLog(int(dims))
 
         !if(transp) dims = [xDim, sum(all_n_Dim)]
         call h5open_f(error) ! Initialize FORTRAN interface.
@@ -790,12 +791,16 @@ contains
         !CHOOSING SPACE IN MEMORY FOR THIS PROC
         count = RDF%xNStep
         !count = count(size(count):1:-1) !transpose
-        !!write(get_fileId(),*) "count = ", count
+        call wLog("count = ")
+        call wLog(int(count))
         call h5screate_simple_f(rank, count, memspace, error)  !Initialize memspace
 
         ! Select hyperslab in the file.
         offset = RDF%origin - 1!Lines Offset to start writing
-        !write(get_fileId(),*) "offset = ", offset
+
+        call wLog("offset = ")
+        call wLog(int(offset))
+
         call h5dget_space_f(dset_id, filespace, error)
         call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, error)
 

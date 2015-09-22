@@ -95,91 +95,116 @@ module type_RF
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine show_RF(RF_a, name, fmt, unit_in)
+        subroutine show_RF(RF_a, name, fmt, forLog_in, unit_in)
             !INPUT
             type(RF), intent(in) :: RF_a
             character(len=*), intent(in), optional :: name
             character(len = 20), intent(in), optional :: fmt
+            logical, intent(in), optional :: forLog_in
             integer, intent(in), optional :: unit_in
             !LOCAL
             character(len = 20) :: dblFmt
             integer :: unit
+            logical :: active
 
-            dblFmt = "T25,F15.5"
-            if(present(fmt)) dblFmt = fmt
             unit = 6 !Screen
+            active = .true.
             if(present(unit_in)) unit = unit_in
 
-            write(unit,*) "RF--------------------------------------------------------------"
-            if(present(name)) write(unit,*) "|  ", name
-
-            if(RF_a%init) then
-                write(unit,*) "|  init       = ", RF_a%init
-                write(unit,*) "|"
-                write(unit,*) "|  MPI---"
-                write(unit,*) "|  |rang       = ", RF_a%rang
-                write(unit,*) "|  |nb_procs   = ", RF_a%nb_procs
-                write(unit,*) "|  |comm       = ", RF_a%comm
-                write(unit,*) "|"
-                write(unit,*) "|  Generation---"
-                write(unit,*) "|  |nDim       = ", RF_a%nDim
-                write(unit,*) "|  |independent= ", RF_a%independent
-                write(unit,*) "|  |corrMod    = ", RF_a%corrMod
-                write(unit,*) "|  |margiFirst = ", RF_a%margiFirst
-                write(unit,*) "|  |method     = ", RF_a%method
-                write(unit,*) "|  |Nmc        = ", RF_a%Nmc
-                write(unit,"(A,("//dblFmt//"))") " |  |corrL      = ", RF_a%corrL
-                write(unit,"(A,("//dblFmt//"))") " |  |fieldAvg   = ", RF_a%fieldAvg
-                write(unit,"(A,("//dblFmt//"))") " |  |fieldVar   = ", RF_a%fieldVar
-                write(unit,*) "|  |seedStart  = ", RF_a%seedStart
-                write(unit,*) "|  |calculate  = ", RF_a%calculate
-                write(unit,*) "|"
-                write(unit,*) "|  Process--"
-                write(unit,*) "|  |"
-                write(unit,*) "|  |xPOINTS"
-                write(unit,"(A,("//dblFmt//"))") " |  |  |xMinGlob   = ", RF_a%xMinGlob
-                write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxGlob   = ", RF_a%xMaxGlob
-                write(unit,"(A,("//dblFmt//"))") " |  |  |xMinBound  = ", RF_a%xMinBound
-                write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxBound  = ", RF_a%xMaxBound
-                write(unit,*) "|  |  |xNTotal                    = ", RF_a%xNTotal
-                write(unit,*) "|  |  |xNStep                     = ", RF_a%xNStep
-                write(unit,*) "|  |  |associated(xPoints)        = ", associated(RF_a%xPoints)
-                if(associated(RF_a%xPoints)) &
-                write(unit,*) "|  |  |shape(xPoints)             = ", shape(RF_a%xPoints)
-                write(unit,*) "|  |  |allocated(xPoints_Local)   = ", allocated(RF_a%xPoints_Local)
-                if(allocated(RF_a%xPoints_Local)) &
-                write(unit,*) "|  |  |shape(xPoints_Local)       = ", shape(RF_a%xPoints_Local)
-                write(unit,*) "|  |"
-                write(unit,*) "|  |kPOINTS"
-                write(unit,"(A,("//dblFmt//"))") " |  |  |kMax       = ", RF_a%kMax
-                write(unit,*) "|  |  |kNTotal                    = ", RF_a%kNTotal
-                write(unit,*) "|  |  |kNStep                     = ", RF_a%kNStep
-                write(unit,*) "|  |  |allocated(kPoints)         = ", allocated(RF_a%kPoints)
-                if(allocated(RF_a%kPoints)) &
-                write(unit,*) "|  |  |shape(kPoints)             = ", shape(RF_a%kPoints)
-                write(unit,*) "|  |  |allocated(SkVec)           = ", allocated(RF_a%SkVec)
-                if(allocated(RF_a%SkVec)) &
-                write(unit,*) "|  |  |shape(SkVec)               = ", shape(RF_a%SkVec)
-                write(unit,*) "|  |"
-                write(unit,*) "|  |RANDOM FIELD"
-                write(unit,*) "|  |  |associated(randField)      = ", associated(RF_a%randField)
-                if(associated(RF_a%randField)) &
-                write(unit,*) "|  |  |shape(randField)           = ", shape(RF_a%randField)
-                write(unit,*) "|  |  |allocated(randField_Local) = ", allocated(RF_a%randField_Local)
-                if(allocated(RF_a%randField_Local)) &
-                write(unit,*) "|  |  |shape(randField_Local)     = ", shape(RF_a%randField_Local)
-                write(unit,*) "|  |"
-                write(unit,*) "|  |SEED"
-                write(unit,*) "|  |  |allocated(seed)            = ", allocated(RF_a%seed)
-                if(allocated(RF_a%seed)) &
-                write(unit,*) "|  |  |seed                       = ", RF_a%seed
-                write(unit,*) "|"
-            else
-                write(unit,*) "|    init     = ", RF_a%init
-                write(unit,*) "|RF has not been initialized----"
+            if(present(forLog_in)) then
+#ifdef MAKELOG
+                if(forLog_in) unit = RF_a%log_ID
+#else
+                !if(forLog_in) write(*,*) "WARNING!!! Inside show_RF, forLog_in = .true. but MAKELOG was not defined"
+                if(forLog_in) active = .false.
+#endif
             end if
-            write(unit,*) "|---------------------------------------------------------------"
-            write(unit,*) ""
+
+            if(active) then
+
+                if(unit <= 0) then
+                    write(*,*) "ERROR!!! Inside show_RF unit = ", unit
+                    stop("")
+                end if
+
+
+                dblFmt = "T25,F15.5"
+                if(present(fmt)) dblFmt = fmt
+
+
+
+                write(unit,*) "RF--------------------------------------------------------------"
+                if(present(name)) write(unit,*) "|  ", name
+
+                if(RF_a%init) then
+                    write(unit,*) "|  init       = ", RF_a%init
+                    write(unit,*) "|"
+                    write(unit,*) "|  MPI---"
+                    write(unit,*) "|  |rang       = ", RF_a%rang
+                    write(unit,*) "|  |nb_procs   = ", RF_a%nb_procs
+                    write(unit,*) "|  |comm       = ", RF_a%comm
+                    write(unit,*) "|"
+                    write(unit,*) "|  Generation---"
+                    write(unit,*) "|  |nDim       = ", RF_a%nDim
+                    write(unit,*) "|  |independent= ", RF_a%independent
+                    write(unit,*) "|  |corrMod    = ", RF_a%corrMod
+                    write(unit,*) "|  |margiFirst = ", RF_a%margiFirst
+                    write(unit,*) "|  |method     = ", RF_a%method
+                    write(unit,*) "|  |Nmc        = ", RF_a%Nmc
+                    write(unit,"(A,("//dblFmt//"))") " |  |corrL      = ", RF_a%corrL
+                    write(unit,"(A,("//dblFmt//"))") " |  |fieldAvg   = ", RF_a%fieldAvg
+                    write(unit,"(A,("//dblFmt//"))") " |  |fieldVar   = ", RF_a%fieldVar
+                    write(unit,*) "|  |seedStart  = ", RF_a%seedStart
+                    write(unit,*) "|  |calculate  = ", RF_a%calculate
+                    write(unit,*) "|"
+                    write(unit,*) "|  Process--"
+                    write(unit,*) "|  |"
+                    write(unit,*) "|  |xPOINTS"
+                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMinGlob   = ", RF_a%xMinGlob
+                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxGlob   = ", RF_a%xMaxGlob
+                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMinBound  = ", RF_a%xMinBound
+                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxBound  = ", RF_a%xMaxBound
+                    write(unit,*) "|  |  |xNTotal                    = ", RF_a%xNTotal
+                    write(unit,*) "|  |  |xNStep                     = ", RF_a%xNStep
+                    write(unit,*) "|  |  |associated(xPoints)        = ", associated(RF_a%xPoints)
+                    if(associated(RF_a%xPoints)) &
+                        write(unit,*) "|  |  |shape(xPoints)             = ", shape(RF_a%xPoints)
+                    write(unit,*) "|  |  |allocated(xPoints_Local)   = ", allocated(RF_a%xPoints_Local)
+                    if(allocated(RF_a%xPoints_Local)) &
+                        write(unit,*) "|  |  |shape(xPoints_Local)       = ", shape(RF_a%xPoints_Local)
+                    write(unit,*) "|  |"
+                    write(unit,*) "|  |kPOINTS"
+                    write(unit,"(A,("//dblFmt//"))") " |  |  |kMax       = ", RF_a%kMax
+                    write(unit,*) "|  |  |kNTotal                    = ", RF_a%kNTotal
+                    write(unit,*) "|  |  |kNStep                     = ", RF_a%kNStep
+                    write(unit,*) "|  |  |allocated(kPoints)         = ", allocated(RF_a%kPoints)
+                    if(allocated(RF_a%kPoints)) &
+                        write(unit,*) "|  |  |shape(kPoints)             = ", shape(RF_a%kPoints)
+                    write(unit,*) "|  |  |allocated(SkVec)           = ", allocated(RF_a%SkVec)
+                    if(allocated(RF_a%SkVec)) &
+                        write(unit,*) "|  |  |shape(SkVec)               = ", shape(RF_a%SkVec)
+                    write(unit,*) "|  |"
+                    write(unit,*) "|  |RANDOM FIELD"
+                    write(unit,*) "|  |  |associated(randField)      = ", associated(RF_a%randField)
+                    if(associated(RF_a%randField)) &
+                        write(unit,*) "|  |  |shape(randField)           = ", shape(RF_a%randField)
+                    write(unit,*) "|  |  |allocated(randField_Local) = ", allocated(RF_a%randField_Local)
+                    if(allocated(RF_a%randField_Local)) &
+                        write(unit,*) "|  |  |shape(randField_Local)     = ", shape(RF_a%randField_Local)
+                    write(unit,*) "|  |"
+                    write(unit,*) "|  |SEED"
+                    write(unit,*) "|  |  |allocated(seed)            = ", allocated(RF_a%seed)
+                    if(allocated(RF_a%seed)) &
+                        write(unit,*) "|  |  |seed                       = ", RF_a%seed
+                    write(unit,*) "|"
+                else
+                    write(unit,*) "|    init     = ", RF_a%init
+                    write(unit,*) "|RF has not been initialized----"
+                end if
+                write(unit,*) "|---------------------------------------------------------------"
+                write(unit,*) ""
+
+            end if
 
         end subroutine show_RF
 

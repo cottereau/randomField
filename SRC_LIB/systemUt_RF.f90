@@ -20,7 +20,7 @@ contains
         integer :: code
         logical :: dirExists
 
-        if(rang==0) write(*,*) "creating Folder"
+        !if(rang==0) write(*,*) "creating Folder"
 
         if(.not. folderExist (folder, path, compiler)) then
             fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
@@ -28,7 +28,7 @@ contains
             !write(*,*) "Directory is being created: ", fullName
             if(rang==0) then
                 command = 'mkdir -pv '// trim(adjustL(fullName))
-                write(*,*) "command = ", command
+                !write(*,*) "command = ", command
                 call system(command)
             end if
         end if
@@ -105,9 +105,9 @@ contains
         !LOCAL
         character(len = 200) fullName
 
-        fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
+        !fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
 
-        if(compiler == 1) inquire( file=trim(fullName)//'/.', exist=dirExists )  ! Works with gfortran, but not ifort
+        !if(compiler == 1) inquire( file=trim(fullName)//'/.', exist=dirExists )  ! Works with gfortran, but not ifort
         !if(compiler == 2) inquire( directory=fullName, exist=dirExists )         ! Works with ifort, but not gfortran
         dirExists=.false.
     end function folderExist

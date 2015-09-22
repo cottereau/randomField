@@ -505,7 +505,7 @@ contains
 
         if (MSH%meshMod == "unv") then
             RDF%xPoints => coordList
-            !write(get_fileId(),*) "-> defining_UNV_extremes"
+            call wLog("-> defining_UNV_extremes")
             call get_Global_Extremes_Mesh(RDF%xPoints, MSH%xMinGlob, MSH%xMaxGlob, RDF%comm)
             RDF%xNTotal = MSH%xNTotal
             RDF%xMinBound = MSH%xMinGlob
@@ -518,59 +518,21 @@ contains
             RDF%xNTotal = MSH%xNTotal
 
         else
-            !write(get_fileId(),*) "-> set_procPerDim"
-
+            call wLog("-> set_procPerDim")
             call set_procPerDim (MSH%nb_procs, MSH%nDim, MSH%procPerDim)
-            !write(get_fileId(),*) "-> MPI_CART_CREATE"
+            call wLog("-> MPI_CART_CREATE")
             call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
-            !write(get_fileId(),*) "-> MPI_CART_COORDS"
+            call wLog("-> MPI_CART_COORDS")
             call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
-            !write(get_fileId(),*) "-> define_generation_geometry"
-            !write(get_fileId(),*) " "
-            !write(get_fileId(),*) "     BEFORE:"
-            !write(get_fileId(),*) "         MSH%overlap "
-            !write(get_fileId(),*) "     ", MSH%overlap
-            !write(get_fileId(),*) "         MSH%xMinGlob "
-            !write(get_fileId(),*) "     ", MSH%xMinGlob
-            !write(get_fileId(),*) "         MSH%xMaxGlob "
-            !write(get_fileId(),*) "     ", MSH%xMaxGlob
-            !write(get_fileId(),*) " "
+            call wLog("-> define_generation_geometry")
             call define_generation_geometry (MSH, RDF)
-!            !write(get_fileId(),*) " "
-!            !write(get_fileId(),*) "     AFTER:"
-!            !write(get_fileId(),*) "         MSH%overlap "
-!            !write(get_fileId(),*) "     ", MSH%overlap
-!            !write(get_fileId(),*) "         MSH%xMinGlob "
-!            !write(get_fileId(),*) "     ", MSH%xMinGlob
-!            !write(get_fileId(),*) "         MSH%xMaxGlob "
-!            !write(get_fileId(),*) "     ", MSH%xMaxGlob
-!            !write(get_fileId(),*) "         MSH%xStep "
-!            !write(get_fileId(),*) "     ", MSH%xStep
-!            !write(get_fileId(),*) " "
-!            !write(get_fileId(),*) "-> set_Local_Extremes_From_Coords"
-!            call set_Local_Extremes_From_Coords (MSH)
-!            !write(get_fileId(),*) "         MSH%xMin "
-!            !write(get_fileId(),*) "     ", MSH%xMinLoc
-!            !write(get_fileId(),*) "         MSH%xMax "
-!            !write(get_fileId(),*) "     ", MSH%xMaxLoc
-!            !write(get_fileId(),*) "         MSH%xMinLoc "
-!            !write(get_fileId(),*) "     ", MSH%xMinLoc
-!            !write(get_fileId(),*) "         MSH%xMaxLoc "
-!            !write(get_fileId(),*) "     ", MSH%xMaxLoc
-            !write(get_fileId(),*) " "
 
             if(RDF%independent) then
-                !write(get_fileId(),*) "-> set_neighbours"
+                call wLog("-> set_neighbours")
                 call set_neighbours (MSH)
-                !write(get_fileId(),*) "-> get_overlap_geometry"
+                call wLog("-> get_overlap_geometry")
                 call get_overlap_geometry (MSH, RDF%corrL)
-                !write(get_fileId(),*) "  Neighbours rank = ", MSH%rang
-                !write(get_fileId(),*) "       (coords = ", MSH%coords, ")"
-                !write(get_fileId(),*) "         MSH%xMinLoc "
-                !write(get_fileId(),*) "     ", MSH%xMinLoc
-                !write(get_fileId(),*) "         MSH%xMaxLoc "
-                !write(get_fileId(),*) "     ", MSH%xMaxLoc
-                !call show_MESHneigh(MSH, " ", onlyExisting = .true., unit_in = get_fileId())
+                call show_MESHneigh(MSH, " ", onlyExisting = .true., forLog = .true.)
             end if
 
             !write(get_fileId(),*) "-> Getting Global Matrix Reference"

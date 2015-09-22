@@ -181,7 +181,7 @@ contains
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
         end do
 
-        RDF%randField = RDF%rang ! For Tests
+        !RDF%randField = RDF%rang ! For Tests
 
     end subroutine gen_Std_Gauss
 

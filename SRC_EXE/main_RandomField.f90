@@ -94,8 +94,7 @@ program main_RandomField
     if(rang == 0) write(*,*)  "-> Initialize logFiles"
     logFilePath = trim(adjustL(&
                       string_join_many(results_path,"/",log_folder_name,"/",log_filename)))
-    write(*,*)  " rang        = ", rang
-    write(*,*)  " logFilePath = ", logFilePath
+    if(rang == 0) write(*,*)  " logFilePath = ", trim(adjustL(logFilePath)), "<RANK>"
     call init_log_file(trim(adjustL(logFilePath)), rang)
     RDF%log_ID = log_file_RF_ID
     MSH%log_ID = log_file_RF_ID
@@ -181,7 +180,7 @@ program main_RandomField
             call MPI_BARRIER (comm ,code) !Necessary because each proc can have a different time
             call MPI_BCAST (results_folder_name, 100, MPI_CHARACTER, 0, comm, code)
 
-            if(rang == 0) write(*,*) "results_folder_name = ", trim(results_folder_name)
+            !if(rang == 0) write(*,*) "results_folder_name = ", trim(results_folder_name)
 
             log_folder_name     = trim(adjustL(results_folder_name))//"/log"
             if(sameFolder) log_folder_name     = ".." !ONLY FOR TESTS
