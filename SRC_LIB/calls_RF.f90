@@ -162,10 +162,10 @@ contains
             call get_neighbours_info(RDF, MSH)
             call wLog("    ->Discovering neighbours index")
             call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
-!            call wLog("    ->Applying Weighting Functions")
-!            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
-!            call wLog("    ->Adding neighbours contribution")
-!            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+            call wLog("    ->Applying Weighting Functions")
+            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+            call wLog("    ->Adding neighbours contribution")
+            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
         end if
 
         !Reverting Normalization
@@ -181,7 +181,7 @@ contains
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
         end do
 
-        !RDF%randField = RDF%rang ! For Tests
+        RDF%randField = RDF%rang ! For Tests
 
     end subroutine gen_Std_Gauss
 

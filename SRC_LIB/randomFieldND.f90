@@ -221,11 +221,6 @@ contains
         rDelta  = maxval(RDF%kDelta(:))/5.0D0 !Delta min in between two wave numbers to avoid periodicity
         rNTotal = ceiling(rMax/rDelta) + 1;
 
-        !!write(get_fileId(),*) "rMax = ", rMax
-        !!write(get_fileId(),*) "rDelta = ", rDelta
-        !!write(get_fileId(),*) "rNTotal = ", rNTotal
-        !!write(get_fileId(),*) "RDF%calculate = ", RDF%calculate
-
         !Generating random field samples
         step      = rMax/dble(rNTotal)
         RDF%randField(:,:) = 0.0D0;
@@ -317,6 +312,7 @@ contains
                              * RDF%randField(:,:)
 
         !RDF%randField = 1.0 ! For Tests
+        !RDF%randField = RDF%rang ! For Tests
 
         if(allocated(dgemm_mult))   deallocate(dgemm_mult)
         if(allocated(phiN))         deallocate(phiN);
