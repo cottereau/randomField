@@ -47,7 +47,7 @@ contains
 
                 if(stage == 1) then
                     tag = findTag(MSH, neighPos, neighPos, send = .true.)
-                    call MPI_ISEND (RDF%xMaxBound(:)-RDF%xMinBound(:), RDF%nDim, MPI_DOUBLE_PRECISION, &
+                    call MPI_ISEND (RDF%xMaxExt(:)-RDF%xMinExt(:), RDF%nDim, MPI_DOUBLE_PRECISION, &
                         MSH%neigh(neighPos), tag, RDF%comm, request, code)
                 else if(stage == 2) then
                     tag = findTag(MSH, neighPos, neighPos, send = .false.)
@@ -124,10 +124,10 @@ contains
 
         end do !Direction
 
-        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
-                                                       * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
+        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
+        !                                               * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
 
-        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
+        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
 
     end subroutine applyWeightingFunctions
 
@@ -161,17 +161,8 @@ contains
 
             if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
 
-            call wLog(" ")
-            call wLog("  DIRECTION      = ")
-            call wLog(direction)
-            call wLog("  Neighbour Rank = ")
-            call wLog(MSH%neigh(direction))
-
-            originCorner = MSH%xMinNeigh(:, direction)
-            where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
-
-
-            call wLog("Direction = ")
+            call wLog(" ------------------------------------------- ")
+            call wLog("   DIRECTION      = ")
             call wLog(direction)
 
             !Preparing the xPoints of a given direction
@@ -179,6 +170,18 @@ contains
             call allocate_randField(tmpRDF, tmpRDF%randField_Local)
             minPos = MSH%indexNeigh(1,direction)
             maxPos = MSH%indexNeigh(2,direction)
+            originCorner = MSH%xMinNeigh(:, direction)
+
+            call wLog("   Neighbour Rank = ")
+            call wLog(MSH%neigh(direction))
+            call wLog("   MSH%neighShift(:, direction) = ")
+            call wLog(MSH%neighShift(:, direction))
+            where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
+            call wLog("   originCorner = ")
+            call wLog(originCorner)
+            MSH%xMaxExt
+            MSH%xMinExt
+
 
             do neighPos = 1, size(MSH%neigh)
 
@@ -195,16 +198,22 @@ contains
                     end if
                 end do
 
-                call wLog("neighPos = ")
+                call wLog("    neighPos = ")
                 call wLog(neighPos)
-                call wLog("sndRcv = ")
+                call wLog("    MSH%neighShift(:, neighPos) = ")
+                call wLog(MSH%neighShift(:, neighPos))
+                call wLog("    sndRcv = ")
                 call wLog(sndRcv)
+
+                !if(neighPos /= 2) cycle
 
                 !From this point we know that we want the contribution of this neighbour in this direction
                 if (sndRcv) then
 
-                    tmpRDF%xMinBound = 0.0D0
-                    tmpRDF%xMaxBound = RDF%neighRange(:,neighPos)
+                    call wLog("    CONTRIBUTION ACCEPTED ")
+
+                    tmpRDF%xMinExt = 0.0D0
+                    tmpRDF%xMaxExt = RDF%neighRange(:,neighPos)
                     tmpRDF%seed      = RDF%neighSeed(:,neighPos)
 
                     !Generating Standard Gaussian Field
@@ -220,7 +229,7 @@ contains
                     !Finding origin for Shape Function
                     neighOrCorner = originCorner + MSH%overlap*MSH%neighShift(:, neighPos)
 
-                    call wLog("neighOrCorner = ")
+                    call wLog("    neighOrCorner = ")
                     call wLog(neighOrCorner)
 
                     !Shape Function Generation
@@ -231,10 +240,12 @@ contains
 
                     !Sum of the contribution
 
-                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
-                                                     (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
+                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
+                    !                                 (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
 
-                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
+                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
+                else
+                    call wLog("    CONTRIBUTION NOT ACCEPTED ")
                 end if
             end do !Neighbours
         end do !Directions

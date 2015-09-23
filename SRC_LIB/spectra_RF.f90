@@ -66,7 +66,7 @@ contains
         !write(get_fileId(),*) " RDF%kMax1 = ", RDF%kMax
 
         if(RDF%independent) then
-            RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxBound - RDF%xMinBound)) !Delta max in between two wave numbers to avoid periodicity
+            RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxExt - RDF%xMinExt)) !Delta max in between two wave numbers to avoid periodicity
         else
             RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
         end if

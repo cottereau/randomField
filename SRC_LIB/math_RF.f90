@@ -99,6 +99,7 @@ contains
         if (areEqual(procRootDim, dble(nint(procRootDim)))) then
             call wLog("    Exact Division")
             procPerDim(:) = nint(dble(nb_procs)**(1.0d0/nDim))
+
         else if(areEqual(logProc2, dble(nint(logProc2)))) then
             call wLog("    Power of two")
 
@@ -113,7 +114,8 @@ contains
             stop "ERROR, no mesh division algorithm for this number of procs"
         end if
 
-        call wLog("    Power of two")
+        call wLog("    procPerDim = ")
+        call wLog(procPerDim)
 
     end subroutine set_procPerDim
 

@@ -826,7 +826,7 @@ contains
 !
 !        !Dk_base = product(xMaxGlob - xMinGlob) * gammak*sqrt(RDF%Sk3D)*exp(2*pi*phik);
 !        if(RDF%independent) then
-!            sizesProd = product(RDF%xMaxBound - RDF%xMinBound)
+!            sizesProd = product(RDF%xMaxExt - RDF%xMinExt)
 !        else
 !            sizesProd = product(RDF%xMaxGlob - RDF%xMinGlob)
 !        end if

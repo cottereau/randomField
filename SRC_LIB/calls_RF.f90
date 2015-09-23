@@ -88,8 +88,8 @@ contains
         !Discovering Global Extremes
         RDF%xMinGlob  = MSH%xMinGlob
         RDF%xMaxGlob  = MSH%xMaxGlob
-        RDF%xMinBound = MSH%xMinBound
-        RDF%xMaxBound = MSH%xMaxBound
+        RDF%xMinExt = MSH%xMinExt
+        RDF%xMaxExt = MSH%xMaxExt
 
         !Getting Mesh Information
         RDF%xNStep = MSH%xNStep
@@ -124,8 +124,8 @@ contains
             RDF%xPoints(i,:) = RDF%xPoints(i,:)/RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
             RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)/RDF%corrL(i)
-            RDF%xMinBound(i) = RDF%xMinBound(i)/RDF%corrL(i)
-            RDF%xMaxBound(i) = RDF%xMaxBound(i)/RDF%corrL(i)
+            RDF%xMinExt(i) = RDF%xMinExt(i)/RDF%corrL(i)
+            RDF%xMaxExt(i) = RDF%xMaxExt(i)/RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
             RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)/RDF%corrL(i)
             MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)/RDF%corrL(i)
@@ -150,7 +150,7 @@ contains
                 call gen_Std_Gauss_FFT(RDF)
         end select
 
-        !RDF%randField = 0.0 ! For Tests
+        RDF%randField = 0.0 ! For Tests
 
         if(RDF%independent) then
             !Communicating borders to neighbours
@@ -162,8 +162,8 @@ contains
             call get_neighbours_info(RDF, MSH)
             call wLog("    ->Discovering neighbours index")
             call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
-            call wLog("    ->Applying Weighting Functions")
-            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+            !call wLog("    ->Applying Weighting Functions")
+            !call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
             call wLog("    ->Adding neighbours contribution")
             call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
         end if
@@ -175,8 +175,8 @@ contains
             RDF%xPoints(i,:) = RDF%xPoints(i,:)*RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)*RDF%corrL(i)
             RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)*RDF%corrL(i)
-            RDF%xMinBound(i) = RDF%xMinBound(i)*RDF%corrL(i)
-            RDF%xMaxBound(i) = RDF%xMaxBound(i)*RDF%corrL(i)
+            RDF%xMinExt(i) = RDF%xMinExt(i)*RDF%corrL(i)
+            RDF%xMaxExt(i) = RDF%xMaxExt(i)*RDF%corrL(i)
             MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)*RDF%corrL(i)
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
         end do

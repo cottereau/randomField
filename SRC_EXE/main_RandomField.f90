@@ -296,7 +296,6 @@ program main_RandomField
             if(independent == 1) then
                 RDF%independent = .true.
                 MSH%independent = .true.
-
                 call read_DataTable(dataTable, "overlap", MSH%overlap)
             else
                 RDF%independent = .false.

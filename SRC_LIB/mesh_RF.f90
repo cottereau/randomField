@@ -24,35 +24,35 @@ contains
         !LOCAL
         integer :: i, j, counterXPoints
         integer, dimension(MSH%nDim) :: tempXNStep
-        double precision, dimension(MSH%nDim) :: xMinForStep, xMaxForStep
+!        double precision, dimension(MSH%nDim) :: xMinForStep, xMaxForStep
 
-        !Snaping points to the grid and discover the bounding box
-        call snap_to_grid(MSH, MSH%xMinLoc, MSH%xMaxLoc)
-        MSH%xMaxBound = MSH%xMaxLoc;
-        MSH%xMinBound = MSH%xMinLoc;
-        xMinForStep = MSH%xMinLoc
-        xMaxForStep = MSH%xMaxLoc
 
-        if(MSH%independent) then
-            do i = 1, size(MSH%xMaxNeigh, 2)
 
-                if(MSH%neigh(i)<0) cycle
+!        xMinForStep = MSH%xMinLoc
+!        xMaxForStep = MSH%xMaxLoc
+!
+!        if(MSH%independent) then
+!            do i = 1, size(MSH%xMaxNeigh, 2)
+!
+!                if(MSH%neigh(i)<0) cycle
+!
+!                call snap_to_grid(MSH, MSH%xMinNeigh(:,i), MSH%xMaxNeigh(:,i))
+!                do j = 1, MSH%nDim
+!                    if (MSH%xMinNeigh(j,i) < MSH%xMinExt(j)) MSH%xMinExt(j) = MSH%xMinNeigh(j,i)
+!                    if (MSH%xMaxNeigh(j,i) > MSH%xMaxExt(j)) MSH%xMaxExt(j) = MSH%xMaxNeigh(j,i)
+!
+!                    if (MSH%neighShift(j,i) == 1) then
+!                        if (MSH%xMinNeigh(j,i) < xMinForStep(j)) xMinForStep(j) = MSH%xMinNeigh(j,i)
+!                        if (MSH%xMaxNeigh(j,i) > xMaxForStep(j)) xMaxForStep(j) = MSH%xMaxNeigh(j,i)
+!                    end if
+!
+!                end do
+!            end do
+!        end if
+!
+!        MSH%xNStep = find_xNStep(xMinForStep, xMaxForStep, MSH%xStep)
 
-                call snap_to_grid(MSH, MSH%xMinNeigh(:,i), MSH%xMaxNeigh(:,i))
-                do j = 1, MSH%nDim
-                    if (MSH%xMinNeigh(j,i) < MSH%xMinBound(j)) MSH%xMinBound(j) = MSH%xMinNeigh(j,i)
-                    if (MSH%xMaxNeigh(j,i) > MSH%xMaxBound(j)) MSH%xMaxBound(j) = MSH%xMaxNeigh(j,i)
-
-                    if (MSH%neighShift(j,i) == 1) then
-                        if (MSH%xMinNeigh(j,i) < xMinForStep(j)) xMinForStep(j) = MSH%xMinNeigh(j,i)
-                        if (MSH%xMaxNeigh(j,i) > xMaxForStep(j)) xMaxForStep(j) = MSH%xMaxNeigh(j,i)
-                    end if
-
-                end do
-            end do
-        end if
-
-        MSH%xNStep = find_xNStep(xMinForStep, xMaxForStep, MSH%xStep)
+        MSH%xNStep  = find_xNStep(MSH%xMinExt, MSH%xMaxExt, MSH%xStep)
         MSH%xNTotal = product(MSH%xNStep)
         RDF%xNTotal = MSH%xNTotal
 
@@ -373,6 +373,8 @@ contains
         double precision, parameter :: notPresent = -1.0D0
         double precision, dimension(MSH%nDim) :: tempExtreme
 
+        call wLog("-> Redimensioning for Overlap")
+
         !Redimensioning the internal part
         do neighPos = 1, 2*MSH%nDim
 
@@ -385,6 +387,11 @@ contains
             end where
 
         end do
+
+        call wLog("MSH%xMinLoc")
+        call wLog(MSH%xMinLoc)
+        call wLog("MSH%xMaxLoc")
+        call wLog(MSH%xMaxLoc)
 
         !Dimensioning overlapping area
         do neighPos = 1, size(MSH%neigh)
@@ -403,7 +410,12 @@ contains
                 MSH%xMinNeigh(:,neighPos) = MSH%xMinLoc
             end where
 
+            !Redimensioning Bounding Box
+            where(MSH%xMaxNeigh(:,neighPos) > MSH%xMaxExt(:)) MSH%xMaxExt(:) = MSH%xMaxNeigh(:,neighPos)
+            where(MSH%xMinNeigh(:,neighPos) > MSH%xMinExt(:)) MSH%xMinExt(:) = MSH%xMinNeigh(:,neighPos)
         end do
+
+        call show_MESHneigh(MSH, " ", onlyExisting = .false., forLog = .true.)
 
     end subroutine get_overlap_geometry
 
@@ -508,10 +520,10 @@ contains
             call wLog("-> defining_UNV_extremes")
             call get_Global_Extremes_Mesh(RDF%xPoints, MSH%xMinGlob, MSH%xMaxGlob, RDF%comm)
             RDF%xNTotal = MSH%xNTotal
-            RDF%xMinBound = MSH%xMinGlob
-            MSH%xMinBound = MSH%xMinGlob
-            RDF%xMaxBound = MSH%xMaxGlob
-            MSH%xMaxBound = MSH%xMaxGlob
+            RDF%xMinExt = MSH%xMinGlob
+            MSH%xMinExt = MSH%xMinGlob
+            RDF%xMaxExt = MSH%xMaxGlob
+            MSH%xMaxExt = MSH%xMaxGlob
             MSH%xMin    = minval(RDF%xPoints, 2)
             MSH%xMax    = maxval(RDF%xPoints, 2)
             MSH%xNTotal = size(RDF%xPoints, 2)
@@ -532,7 +544,6 @@ contains
                 call set_neighbours (MSH)
                 call wLog("-> get_overlap_geometry")
                 call get_overlap_geometry (MSH, RDF%corrL)
-                call show_MESHneigh(MSH, " ", onlyExisting = .true., forLog = .true.)
             end if
 
             !write(get_fileId(),*) "-> Getting Global Matrix Reference"
@@ -601,20 +612,20 @@ contains
         !!write(get_fileId(), *) " localSpace AFTER = ", localSpace
 
         !Redefining global extremes
-        call wLog("  MSH%procPerDim= ")
-        call wLog(MSH%procPerDim)
-        call wLog("  RDF%corrL= ")
-        call wLog(RDF%corrL)
-        call wLog("  MSH%pointsPerCorrL= ")
-        call wLog(MSH%pointsPerCorrL)
-        call wLog("  MSH%xStep= ")
-        call wLog(MSH%xStep)
-        call wLog("  MSH%independent= ")
-        call wLog(MSH%independent)
-        call wLog("  MSH%overlap= ")
-        call wLog(MSH%overlap)
-        call wLog("  procPerDim= ")
-        call wLog(MSH%procPerDim)
+!        call wLog("  MSH%procPerDim= ")
+!        call wLog(MSH%procPerDim)
+!        call wLog("  RDF%corrL= ")
+!        call wLog(RDF%corrL)
+!        call wLog("  MSH%pointsPerCorrL= ")
+!        call wLog(MSH%pointsPerCorrL)
+!        call wLog("  MSH%xStep= ")
+!        call wLog(MSH%xStep)
+!        call wLog("  MSH%independent= ")
+!        call wLog(MSH%independent)
+!        call wLog("  MSH%overlap= ")
+!        call wLog(MSH%overlap)
+!        call wLog("  procPerDim= ")
+!        call wLog(MSH%procPerDim)
         call wLog(" ")
         call wLog("        IN  MSH%xMinGlob = ")
         call wLog(MSH%xMinGlob)
@@ -640,10 +651,10 @@ contains
         locO =  MSH%overlap*RDF%corrL/2.0D0
         locA =  (delta - (MSH%overlap * RDF%corrL * dble(MSH%procPerDim-1)))/dble(MSH%procPerDim)
 
-        call wLog(" locO = ")
-        call wLog(locO)
-        call wLog(" locA = ")
-        call wLog(locA)
+!        call wLog(" locO = ")
+!        call wLog(locO)
+!        call wLog(" locA = ")
+!        call wLog(locA)
 
         delta = locA
 
@@ -652,8 +663,8 @@ contains
             delta = delta + locO
         end where
 
-        call wLog(" delta = ")
-        call wLog(delta)
+!        call wLog(" delta = ")
+!        call wLog(delta)
 
         MSH%xMin = MSH%xMinGlob
         where(MSH%coords > 0) MSH%xMin = MSH%xMin + (locA + locO) + (locA + 2.0D0*locO)*(dble(MSH%coords-1))
@@ -664,13 +675,20 @@ contains
             where(MSH%coords /= MSH%procPerDim-1) MSH%xMax = MSH%xMax-MSH%xStep
         end if
 
-        MSH%xMinLoc = MSH%xMin
-        MSH%xMaxLoc = MSH%xMax
+        MSH%xMinLoc   = MSH%xMin
+        MSH%xMaxLoc   = MSH%xMax
 
-        call wLog("        OUT MSH%xMin    = ")
-        call wLog(MSH%xMin)
-        call wLog("        OUT MSH%xMax    = ")
-        call wLog(MSH%xMax)
+        !Snaping points to the grid
+        call snap_to_grid(MSH, MSH%xMinLoc, MSH%xMaxLoc)
+
+        !Bounding Box
+        MSH%xMaxExt = MSH%xMaxLoc
+        MSH%xMinExt = MSH%xMinLoc
+
+!        call wLog("        OUT MSH%xMin    = ")
+!        call wLog(MSH%xMin)
+!        call wLog("        OUT MSH%xMax    = ")
+!        call wLog(MSH%xMax)
         call wLog("        OUT MSH%xMinLoc = ")
         call wLog(MSH%xMinLoc)
         call wLog("        OUT MSH%xMaxLoc = ")

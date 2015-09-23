@@ -26,7 +26,7 @@ module type_MESH
         double precision, dimension(:), allocatable :: xStep;
         integer         , dimension(:), allocatable :: pointsPerCorrL;
         double precision, dimension(:), allocatable :: xMaxLoc, xMinLoc; !Rounded Values of the non-overlapping area
-        double precision, dimension(:), allocatable :: xMaxBound, xMinBound; !Bounding box of the domain in this proc
+        double precision, dimension(:), allocatable :: xMaxExt, xMinExt; !Bounding box of the domain in this proc
         double precision, dimension(:,:), allocatable :: xMaxNeigh, xMinNeigh; !Rounded Values of the overlapping area
         integer         , dimension(2,1) :: indexLocal
         integer         , dimension(:,:), allocatable :: indexNeigh, neighShift
@@ -58,8 +58,8 @@ module type_MESH
             allocate(MESH_a%xMinLoc(nDim))
             allocate(MESH_a%procPerDim(nDim))
             allocate(MESH_a%coords(nDim))
-            allocate(MESH_a%xMaxBound(nDim))
-            allocate(MESH_a%xMinBound(nDim))
+            allocate(MESH_a%xMaxExt(nDim))
+            allocate(MESH_a%xMinExt(nDim))
             allocate(MESH_a%neigh((3**nDim)-1))
             allocate(MESH_a%xMaxNeigh(nDim,(3**nDim)-1))
             allocate(MESH_a%xMinNeigh(nDim,(3**nDim)-1))
@@ -165,8 +165,8 @@ module type_MESH
                     write(unit,*) "|  |coords     = ", MESH_a%coords
                     write(unit,"(A,("//dblFmt//"))") " |  |xMinLoc    = ", MESH_a%xMinLoc
                     write(unit,"(A,("//dblFmt//"))") " |  |xMaxLoc    = ", MESH_a%xMaxLoc
-                    write(unit,"(A,("//dblFmt//"))") " |  |xMinBound  = ", MESH_a%xMinBound
-                    write(unit,"(A,("//dblFmt//"))") " |  |xMaxBound  = ", MESH_a%xMaxBound
+                    write(unit,"(A,("//dblFmt//"))") " |  |xMinExt  = ", MESH_a%xMinExt
+                    write(unit,"(A,("//dblFmt//"))") " |  |xMaxExt  = ", MESH_a%xMaxExt
                     call show_MESHneigh(MESH_a, onlyExisting = .false., forLog = forLog, unit_in = unit)
 
                 else
@@ -270,8 +270,8 @@ module type_MESH
             if (allocated(MESH_a%xMaxLoc))    deallocate(MESH_a%xMaxLoc)
             if (allocated(MESH_a%xMinLoc))    deallocate(MESH_a%xMinLoc)
             if (allocated(MESH_a%indexNeigh)) deallocate(MESH_a%indexNeigh)
-            if (allocated(MESH_a%xMaxBound))  deallocate(MESH_a%xMaxBound)
-            if (allocated(MESH_a%xMinBound))  deallocate(MESH_a%xMinBound)
+            if (allocated(MESH_a%xMaxExt))  deallocate(MESH_a%xMaxExt)
+            if (allocated(MESH_a%xMinExt))  deallocate(MESH_a%xMinExt)
             if (allocated(MESH_a%neighShift)) deallocate(MESH_a%neighShift)
             if (allocated(MESH_a%overlap))    deallocate(MESH_a%overlap)
             if (allocated(MESH_a%pointsPerCorrL)) deallocate(MESH_a%pointsPerCorrL)

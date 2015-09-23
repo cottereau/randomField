@@ -37,7 +37,7 @@ module type_RF
         integer, dimension(:,:), allocatable :: neighSeed
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:,:), allocatable :: neighRange;
-        double precision, dimension(:), allocatable :: xMaxBound, xMinBound;
+        double precision, dimension(:), allocatable :: xMaxExt, xMinExt;
         double precision, pointer :: xPoints(:,:)
         double precision, pointer :: randField(:,:)
         logical, dimension(:), allocatable :: calculate
@@ -67,8 +67,8 @@ module type_RF
             allocate(RF_a%xMinGlob(nDim))
             allocate(RF_a%xMaxGlob(nDim))
             allocate(RF_a%calculate(Nmc))
-            allocate(RF_a%xMaxBound(nDim))
-            allocate(RF_a%xMinBound(nDim))
+            allocate(RF_a%xMaxExt(nDim))
+            allocate(RF_a%xMinExt(nDim))
             allocate(RF_a%origin(nDim))
             call random_seed(size = n)
             allocate(RF_a%seed(n))
@@ -80,8 +80,8 @@ module type_RF
             RF_a%seed   = -1
             RF_a%xMinGlob = -1
             RF_a%xMaxGlob = -1
-            RF_a%xMinBound = -1
-            RF_a%xMaxBound = -1
+            RF_a%xMinExt = -1
+            RF_a%xMaxExt = -1
             RF_a%kNStep = -1
             RF_a%xNStep = -1
             RF_a%gen_CPU_Time = -1
@@ -162,8 +162,8 @@ module type_RF
                     write(unit,*) "|  |xPOINTS"
                     write(unit,"(A,("//dblFmt//"))") " |  |  |xMinGlob   = ", RF_a%xMinGlob
                     write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxGlob   = ", RF_a%xMaxGlob
-                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMinBound  = ", RF_a%xMinBound
-                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxBound  = ", RF_a%xMaxBound
+                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMinExt  = ", RF_a%xMinExt
+                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxExt  = ", RF_a%xMaxExt
                     write(unit,*) "|  |  |xNTotal                    = ", RF_a%xNTotal
                     write(unit,*) "|  |  |xNStep                     = ", RF_a%xNStep
                     write(unit,*) "|  |  |associated(xPoints)        = ", associated(RF_a%xPoints)
@@ -261,8 +261,8 @@ module type_RF
             if(allocated(RF_a%xMinGlob))  deallocate(RF_a%xMinGlob)
             if(allocated(RF_a%xMaxGlob))  deallocate(RF_a%xMaxGlob)
             if(allocated(RF_a%calculate)) deallocate(RF_a%calculate)
-            if(allocated(RF_a%xMaxBound)) deallocate(RF_a%xMaxBound)
-            if(allocated(RF_a%xMinBound)) deallocate(RF_a%xMinBound)
+            if(allocated(RF_a%xMaxExt)) deallocate(RF_a%xMaxExt)
+            if(allocated(RF_a%xMinExt)) deallocate(RF_a%xMinExt)
             if(allocated(RF_a%neighSeed)) deallocate(RF_a%neighSeed)
             if(allocated(RF_a%neighRange)) deallocate(RF_a%neighRange)
             if(allocated(RF_a%kNStep))     deallocate(RF_a%kNStep)
