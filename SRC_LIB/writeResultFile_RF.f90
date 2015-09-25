@@ -988,9 +988,9 @@ contains
             write(fileId,*) "--xMaxGlob-----------------------"
             write(fileId,fmt = doubleFmt) MSH%xMaxGlob
             write(fileId,*) "--xMin_Loc-----------------------"
-            write(fileId,fmt = doubleFmt) MSH%xMin
+            write(fileId,fmt = doubleFmt) MSH%xMinExt
             write(fileId,*) "--xMax_Loc-----------------------"
-            write(fileId,fmt = doubleFmt) MSH%xMax
+            write(fileId,fmt = doubleFmt) MSH%xMaxExt
             write(fileId,*) "--kMax_Loc-----------------------"
             write(fileId,fmt = doubleFmt) RDF%kMax
             write(fileId,*) "--xNTotal_Loc-----------------------"

@@ -179,8 +179,6 @@ contains
             where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
             call wLog("   originCorner = ")
             call wLog(originCorner)
-            MSH%xMaxExt
-            MSH%xMinExt
 
 
             do neighPos = 1, size(MSH%neigh)

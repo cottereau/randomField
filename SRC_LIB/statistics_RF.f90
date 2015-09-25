@@ -371,14 +371,14 @@ contains
 !    !-----------------------------------------------------------------------------------------------
 !    !-----------------------------------------------------------------------------------------------
 !    !-----------------------------------------------------------------------------------------------
-!    subroutine set_StatisticsStructured_MPI(randField, xMin, xMax, xNStep, rang, &
+!    subroutine set_StatisticsStructured_MPI(randField, xMinExt, xMax, xNStep, rang, &
 !        evntAvg, evntStdDev, procCorrL,      &
 !        globalAvg, globalStdDev, globalCorrL)
 !        implicit none
 !
 !        !INPUT
 !        double precision, dimension(:, :), intent(in) :: randField;
-!        double precision, dimension(:)   , intent(in) :: xMin,xMax;
+!        double precision, dimension(:)   , intent(in) :: xMinExt,xMax;
 !        integer         , dimension(:)   , intent(in) :: xNStep;
 !        integer                          , intent(in) :: rang;
 !
@@ -417,7 +417,7 @@ contains
 !        end if
 !
 !        !Calculating Correlation Length (should be reformulated to take advantage of matrix symmetry)
-!        call set_CorrelationLengthStructured(randField, xMin, xMax, xNStep, procCorrL)
+!        call set_CorrelationLengthStructured(randField, xMinExt, xMax, xNStep, procCorrL)
 !
 !        !Setting variables to calculate Average and Standard Deviation (by event and global)
 !        sumRF(:)       = sum( randField    , dim = 1)
@@ -457,11 +457,11 @@ contains
 !
 !    !-----------------------------------------------------------------------------------------------
 !    !-----------------------------------------------------------------------------------------------
-!    subroutine set_CorrelationLengthStructured(randField, xMin, xMax, xNStep, procCorrL)
+!    subroutine set_CorrelationLengthStructured(randField, xMinExt, xMax, xNStep, procCorrL)
 !        implicit none
 !        !INPUT
 !        double precision, dimension(:, :), intent(in) :: randField;
-!        double precision, dimension(:)   , intent(in) :: xMin,xMax;
+!        double precision, dimension(:)   , intent(in) :: xMinExt,xMax;
 !        integer         , dimension(:)   , intent(in) :: xNStep;
 !        !OUTPUT
 !        double precision, dimension(:), intent(out) :: procCorrL;
@@ -504,7 +504,7 @@ contains
 !                !if (rang == 0) write(*,*) "radius ", radius, "Doubles from = ", rStart, "    to ", rEnd
 !
 !            end do
-!            procCorrL(i) = ((xMax(i)-xMin(i))/xNStep(i))*procCorrL(i)/xNTotal
+!            procCorrL(i) = ((xMax(i)-xMinExt(i))/xNStep(i))*procCorrL(i)/xNTotal
 !        end do
 !
 !    end subroutine set_CorrelationLengthStructured

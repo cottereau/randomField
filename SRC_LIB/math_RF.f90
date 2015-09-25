@@ -320,7 +320,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    function areEqual(nmb1, nmb2, tol) result(ans)
+    pure function areEqual(nmb1, nmb2, tol) result(ans)
 
         implicit none
         !INPUT
@@ -342,30 +342,39 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    function intDivisor(nmb, divisor, up) result(intDiv)
+    elemental subroutine roundToMultiple(nmb, divisor, up)
+        !nmb - Is the number to be rounded
+        !divisor - is the snapping step (Always positive)
+        !up - .true. means round up end .false. means round down
 
         implicit none
         !INPUT
-        double precision, intent(in) :: nmb, divisor
+        double precision, intent(in) :: divisor
         logical, intent(in) :: up
         !OUTPUT
-        double precision :: intDiv
+        double precision, intent(inout) :: nmb
         !LOCAL
-        double precision :: div
+        !double precision :: div
 
-        div = nmb/divisor
+        if(divisor /= 0.0D0) then
 
-        if(areEqual(div, dble(nint(div)))) then
-            intDiv = dble(nint(div))
-        else
-            if(up) then
-                intDiv = dble(ceiling(div))
+            nmb = nmb/abs(divisor)
+
+            if(areEqual(nmb, dble(nint(nmb)))) then
+                nmb = dble(nint(nmb))
             else
-                intDiv = dble(floor(div))
+                if(up) then
+                    nmb = dble(ceiling(nmb))
+                else
+                    nmb = dble(floor(nmb))
+                end if
             end if
+
+            nmb = nmb * abs(divisor)
+
         end if
 
-    end function intDivisor
+    end subroutine roundToMultiple
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -634,171 +643,6 @@ contains
         distMatrix(:, :, :) = abs(distMatrix(:, :, :))
 
     end subroutine set_DistMatrix
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine reorderToGlobal(all_RandField, all_xPoints, mapping)
-
-        implicit none
-
-        !INPUT
-
-        !OUTPUT
-        double precision, dimension(:, :), intent(inout) :: all_RandField;
-        double precision, dimension(:, :), intent(inout) :: all_xPoints;
-        integer         , dimension(:)   , intent(out), allocatable, optional :: mapping;
-
-        !LOCAL VARIABLES
-        integer          :: i, j, nPoints, nDim, Nmc, coefStart, pos;
-        double precision :: delta, tol = 1d-10, minStep;
-        integer , dimension(:), allocatable :: globIndex;
-        logical , dimension(:), allocatable :: minMask;
-        double precision, dimension(:, :), allocatable :: tempRandField;
-        double precision, dimension(:, :), allocatable :: tempXPoints;
-
-        nPoints  = size(all_xPoints, 1)
-        nDim     = size(all_xPoints, 2)
-        Nmc      = size(all_RandField , 2)
-
-        allocate(globIndex(nPoints))
-        allocate(minMask(nPoints))
-        allocate(tempRandField(size(all_RandField,1), size(all_RandField,2)))
-        allocate(tempXPoints(size(all_xPoints,1), size(all_xPoints,2)))
-
-        minStep = 1000;
-        coefStart = 1
-        globIndex = 0
-
-        do i = nDim, 1, -1
-            minStep = 1000;
-            do j = 1, nPoints-1
-                delta = all_xPoints(j + 1, i) - all_xPoints(j, i)
-                if ((abs(delta) < minStep) .and. (abs(delta) > tol)) minStep =  abs(delta)
-            end do
-            if (i == nDim) then
-                globIndex(:) = nint((all_xPoints(:, i) - minval(all_xPoints(:,i)))/minStep) + 1
-                coefStart    = maxval(globIndex(:))
-            else
-                globIndex(:) = coefStart &
-                    * (nint((all_xPoints(:, i) - minval(all_xPoints(:,i)))/minStep)) &
-                    + globIndex(:)
-                coefStart    = coefStart * maxval(nint(all_xPoints(:, i)/minStep))
-            end if
-        end do
-
-
-        !Compacting globIndex and reordering
-        tempRandField = all_RandField
-        tempXPoints   = all_xPoints
-
-        if(present(mapping)) allocate(mapping(nPoints))
-        minMask = .true.
-        do i = 1, nPoints
-            pos = minloc(globIndex, 1, minMask)
-            minMask(pos)   = .false.
-            globIndex(pos) = i
-            if(present(mapping)) mapping(i) = pos
-            all_RandField(i,:) = tempRandField(pos,:)
-            all_xPoints(i,:)   = tempXPoints(pos,:)
-        end do
-
-        deallocate(globIndex)
-        deallocate(minMask)
-        deallocate(tempRandField)
-        deallocate(tempXPoints)
-
-    end subroutine reorderToGlobal
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine calculateAverageCorrL(randField, xRange, xNStep, averageCorrL)
-        implicit none
-        !INPUT
-        double precision, dimension(:, :), intent(in) :: randField;
-        double precision, dimension(:),    intent(in) :: xRange;
-        integer,          dimension(:),    intent(in) :: xNStep;
-        !OUTPUT
-        double precision, dimension(:),    intent(out) :: averageCorrL;
-        !LOCAL VARIABLES
-        double precision, dimension(:),    allocatable :: ptAvg, ptStdDev;
-        integer :: i, j, k, Nmc, beg, step, end;
-        integer :: nPoints, nPlanes, nDim;
-        double precision :: corrL
-        !double precision, dimension(:), allocatable :: Ra, Rb, Rc, R
-
-        write(*,*) ">>>> Calculating comparation corrL (global)"
-
-        !        call DispCarvalhol(randField, "randField")
-        !call DispCarvalhol(xRange, "xRange")
-        !call DispCarvalhol(xNStep, "xNStep")
-
-        nPoints      = size(randField, 1);
-        Nmc          = size(randField, 2);
-        nDim         = size(xNStep);
-        averageCorrL = 0;
-
-        !        write(*,*) "nPoints = ", nPoints
-        !        write(*,*) "Nmc = ", Nmc
-        !        write(*,*) "nDim = ", nDim
-        !        write(*,*) "averageCorrL = ", averageCorrL
-
-        !        write(*,*) "Before Allocation"
-        allocate(ptAvg(nPoints))
-        allocate(ptStdDev(nPoints))
-
-        ptAvg    = sum(randField, 2)/Nmc
-        ptStdDev = sqrt(sum(randField**2, 2)/Nmc - (ptAvg)**2)
-
-        do i = 1, nDim
-            nPlanes = nPoints/xNStep(i)
-            do j = 1, nPlanes
-                call get_SequenceParam(i, j, xNStep, beg, step, end)
-                !
-                if(end > nPoints) end = nPoints
-
-                averageCorrL(i) = sum(((1d0/dble(Nmc) * matmul(randField(beg:end:step, :),randField(beg,:))) &
-                    - (ptAvg(beg:end:step)    * ptAvg(beg)))                               &
-                    / (ptStdDev(beg:end:step) * ptStdDev(beg)))                            &
-                    + averageCorrL(i)
-
-                !                averageCorrL(i) = sum(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) &
-                !                                      - (ptAvg(beg+step:end:step)    * ptAvg(beg)))                               &
-                !                                      / (ptStdDev(beg+step:end:step) * ptStdDev(beg)))                            &
-                !                                       + averageCorrL(i)
-
-                !Ra = 1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),&
-                !                            randField(beg,:))
-                !Rb = average(beg+step:end:step)*average(beg)
-                !Rc = stdDeviation(beg+step:end:step)*stdDeviation(beg)
-                !R = (Ra - Rb) / Rc
-                !averageCorrL(i) = sum(R) * xMax(i,1)/xNStep(i,1) + averageCorrL(i)
-
-                !call dispCarvalhol(1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),&
-                !                            randField(beg,:)),"Ra")
-                !call dispCarvalhol(average(beg+step:end:step)*average(beg),"Rb")
-                !call dispCarvalhol(stdDeviation(beg+step:end:step)*stdDeviation(beg),"Rc")
-                !call dispCarvalhol(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) - &
-                !                      (average(beg+step:end:step)*average(beg))) / &
-                !                      (stdDeviation(beg+step:end:step)*stdDeviation(beg)),"R")
-                !write(*,*) "R"
-                !write(*,*)(((1d0/dble(Nmc) * matmul(randField(beg+step:end:step, :),randField(beg,:))) - &
-                !                      (average(beg+step:end:step)*average(beg))) / &
-                !                      (stdDeviation(beg+step:end:step)*stdDeviation(beg)))
-                !write(*,*) "averageCorrL(",i,") = ", averageCorrL(i)
-
-            end do
-            averageCorrL(i) = (xRange(i)/xNStep(i))*averageCorrL(i) / dble(nPlanes)
-        end do
-        averageCorrL = 2*averageCorrL !Symmetry
-
-        if(allocated(ptAvg)) deallocate(ptAvg)
-        if(allocated(ptStdDev)) deallocate(ptStdDev)
-
-    end subroutine calculateAverageCorrL
 
 end module math_RF
 !! Local Variables:

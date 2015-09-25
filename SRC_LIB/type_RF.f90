@@ -26,6 +26,7 @@ module type_RF
         integer :: Nmc = -1
         logical :: init = .false.
         logical :: independent
+        logical, dimension(:), allocatable :: hasInternalPart
             !nDim dependent
         double precision, dimension(:)   , allocatable :: corrL, kMax, kDelta;
         double precision, dimension(:, :), allocatable :: kPoints;
@@ -70,6 +71,7 @@ module type_RF
             allocate(RF_a%xMaxExt(nDim))
             allocate(RF_a%xMinExt(nDim))
             allocate(RF_a%origin(nDim))
+            allocate(RF_a%hasInternalPart(nDim))
             call random_seed(size = n)
             allocate(RF_a%seed(n))
             allocate(RF_a%neighSeed(n,(3**nDim)-1))
@@ -86,6 +88,7 @@ module type_RF
             RF_a%xNStep = -1
             RF_a%gen_CPU_Time = -1
             RF_a%calculate(:) = .true.
+            RF_a%hasInternalPart = .true.
             RF_a%init  = .true.
             RF_a%neighSeed(:,:) = -1
 
@@ -269,6 +272,7 @@ module type_RF
             if(allocated(RF_a%xNStep))     deallocate(RF_a%xNStep)
             if(allocated(RF_a%kDelta))     deallocate(RF_a%kDelta)
             if(allocated(RF_a%origin))     deallocate(RF_a%origin)
+            if(allocated(RF_a%hasInternalPart)) deallocate(RF_a%hasInternalPart)
             if(associated(RF_a%xPoints))   nullify(RF_a%xPoints)
             if(associated(RF_a%randField)) nullify(RF_a%randField)
             RF_a%init = .false.

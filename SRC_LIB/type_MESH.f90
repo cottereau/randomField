@@ -18,14 +18,15 @@ module type_MESH
         character (len=15) :: meshType, meshMod;
         integer :: nDim = -1, xNTotal = -1;
         logical :: independent
+        logical, dimension(:), allocatable :: hasInternalPart
             !nDim dependent
         integer         , dimension(:), allocatable :: xNStep, procPerDim;
         integer         , dimension(:), allocatable :: neigh, coords;
-        double precision, dimension(:), allocatable :: xMax, xMin; !Exact Values of the division
+        !double precision, dimension(:), allocatable :: xMaxExt, xMinExt; !Exact Values of the division
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:), allocatable :: xStep;
         integer         , dimension(:), allocatable :: pointsPerCorrL;
-        double precision, dimension(:), allocatable :: xMaxLoc, xMinLoc; !Rounded Values of the non-overlapping area
+        double precision, dimension(:), allocatable :: xMaxInt, xMinInt; !Rounded Values of the non-overlapping area
         double precision, dimension(:), allocatable :: xMaxExt, xMinExt; !Bounding box of the domain in this proc
         double precision, dimension(:,:), allocatable :: xMaxNeigh, xMinNeigh; !Rounded Values of the overlapping area
         integer         , dimension(2,1) :: indexLocal
@@ -48,14 +49,14 @@ module type_MESH
             MESH_a%comm     = comm
             MESH_a%rang     = rang
             MESH_a%nb_procs = nb_procs
-            allocate(MESH_a%xMax(nDim))
-            allocate(MESH_a%xMin(nDim))
+            !allocate(MESH_a%xMaxExt(nDim))
+            !allocate(MESH_a%xMinExt(nDim))
             allocate(MESH_a%xStep(nDim))
             allocate(MESH_a%xNStep(nDim))
             allocate(MESH_a%xMaxGlob(nDim))
             allocate(MESH_a%xMinGlob(nDim))
-            allocate(MESH_a%xMaxLoc(nDim))
-            allocate(MESH_a%xMinLoc(nDim))
+            allocate(MESH_a%xMaxInt(nDim))
+            allocate(MESH_a%xMinInt(nDim))
             allocate(MESH_a%procPerDim(nDim))
             allocate(MESH_a%coords(nDim))
             allocate(MESH_a%xMaxExt(nDim))
@@ -67,15 +68,16 @@ module type_MESH
             allocate(MESH_a%neighShift(nDim,(3**nDim)-1))
             allocate(MESH_a%overLap(nDim))
             allocate(MESH_a%pointsPerCorrL(nDim))
+            allocate(MESH_a%hasInternalPart(nDim))
 
-            MESH_a%xMax     = -1
-            MESH_a%xMin     = -1
+            MESH_a%xMaxExt     = -1
+            MESH_a%xMinExt     = -1
             MESH_a%xStep    = -1
             MESH_a%xNStep   = -1
             MESH_a%xMaxGlob = -1
             MESH_a%xMinGlob = -1
-            MESH_a%xMaxLoc  = -1
-            MESH_a%xMinLoc  = -1
+            MESH_a%xMaxInt  = -1
+            MESH_a%xMinInt  = -1
             MESH_a%procPerDim = -1
             MESH_a%coords(:)  = -1
             MESH_a%xMaxNeigh(:,:) = 0
@@ -84,7 +86,7 @@ module type_MESH
             MESH_a%overlap(:) = -1.0D0
             MESH_a%neigh(:) = -2 !-1 is already the default when the proc is in the topology border
             MESH_a%neighShift(:,:) = 0
-
+            MESH_a%hasInternalPart = .true.
             MESH_a%init = .true.
 
         end subroutine init_MESH
@@ -158,13 +160,13 @@ module type_MESH
                     write(unit,*) "|"
                     write(unit,*) "|  |Process--"
                     write(unit,*) "|  |xNStep     = ", MESH_a%xNStep
-                    write(unit,"(A,("//dblFmt//"))") " |  |xMin       = ", MESH_a%xMin
-                    write(unit,"(A,("//dblFmt//"))") " |  |xMax       = ", MESH_a%xMax
+                    !write(unit,"(A,("//dblFmt//"))") " |  |xMinExt       = ", MESH_a%xMinExt
+                    !write(unit,"(A,("//dblFmt//"))") " |  |xMaxExt       = ", MESH_a%xMaxExt
                     write(unit,*) "|  |xNTotal    = ", MESH_a%xNTotal
                     write(unit,*) "|  |procPerDim = ", MESH_a%procPerDim
                     write(unit,*) "|  |coords     = ", MESH_a%coords
-                    write(unit,"(A,("//dblFmt//"))") " |  |xMinLoc    = ", MESH_a%xMinLoc
-                    write(unit,"(A,("//dblFmt//"))") " |  |xMaxLoc    = ", MESH_a%xMaxLoc
+                    write(unit,"(A,("//dblFmt//"))") " |  |xMinInt    = ", MESH_a%xMinInt
+                    write(unit,"(A,("//dblFmt//"))") " |  |xMaxInt    = ", MESH_a%xMaxInt
                     write(unit,"(A,("//dblFmt//"))") " |  |xMinExt  = ", MESH_a%xMinExt
                     write(unit,"(A,("//dblFmt//"))") " |  |xMaxExt  = ", MESH_a%xMaxExt
                     call show_MESHneigh(MESH_a, onlyExisting = .false., forLog = forLog, unit_in = unit)
@@ -256,8 +258,8 @@ module type_MESH
         subroutine finalize_MESH(MESH_a)
             type(MESH) :: MESH_a
 
-            if (allocated(MESH_a%xMax))       deallocate(MESH_a%xMax)
-            if (allocated(MESH_a%xMin))       deallocate(MESH_a%xMin)
+            !if (allocated(MESH_a%xMaxExt))       deallocate(MESH_a%xMaxExt)
+            !if (allocated(MESH_a%xMinExt))       deallocate(MESH_a%xMinExt)
             if (allocated(MESH_a%xStep))      deallocate(MESH_a%xStep)
             if (allocated(MESH_a%xNStep))     deallocate(MESH_a%xNStep)
             if (allocated(MESH_a%xMaxGlob))   deallocate(MESH_a%xMaxGlob)
@@ -267,13 +269,14 @@ module type_MESH
             if (allocated(MESH_a%neigh))      deallocate(MESH_a%neigh)
             if (allocated(MESH_a%xMaxNeigh))  deallocate(MESH_a%xMaxNeigh)
             if (allocated(MESH_a%xMinNeigh))  deallocate(MESH_a%xMinNeigh)
-            if (allocated(MESH_a%xMaxLoc))    deallocate(MESH_a%xMaxLoc)
-            if (allocated(MESH_a%xMinLoc))    deallocate(MESH_a%xMinLoc)
+            if (allocated(MESH_a%xMaxInt))    deallocate(MESH_a%xMaxInt)
+            if (allocated(MESH_a%xMinInt))    deallocate(MESH_a%xMinInt)
             if (allocated(MESH_a%indexNeigh)) deallocate(MESH_a%indexNeigh)
             if (allocated(MESH_a%xMaxExt))  deallocate(MESH_a%xMaxExt)
             if (allocated(MESH_a%xMinExt))  deallocate(MESH_a%xMinExt)
             if (allocated(MESH_a%neighShift)) deallocate(MESH_a%neighShift)
             if (allocated(MESH_a%overlap))    deallocate(MESH_a%overlap)
+            if(allocated(MESH_a%hasInternalPart)) deallocate(MESH_a%hasInternalPart)
             if (allocated(MESH_a%pointsPerCorrL)) deallocate(MESH_a%pointsPerCorrL)
 
             MESH_a%init = .false.
