@@ -24,73 +24,75 @@ contains
         !LOCAL
         integer :: i, j, counterXPoints
         integer, dimension(MSH%nDim) :: tempXNStep
-!        double precision, dimension(MSH%nDim) :: xMinForStep, xMaxForStep
+        double precision, dimension(MSH%nDim) :: minForStep, maxForStep
 
+        !COUNTING POINTS
+        minForStep = MSH%xMinInt
+        maxForStep = MSH%xMaxInt
 
+        do j = 1, size(MSH%xMaxNeigh, 2)
 
-!        xMinForStep = MSH%xMinInt
-!        xMaxForStep = MSH%xMaxInt
-!
-!        if(MSH%independent) then
-!            do i = 1, size(MSH%xMaxNeigh, 2)
-!
-!                if(MSH%neigh(i)<0) cycle
-!
-!                call snap_to_grid(MSH, MSH%xMinNeigh(:,i), MSH%xMaxNeigh(:,i))
-!                do j = 1, MSH%nDim
-!                    if (MSH%xMinNeigh(j,i) < MSH%xMinExt(j)) MSH%xMinExt(j) = MSH%xMinNeigh(j,i)
-!                    if (MSH%xMaxNeigh(j,i) > MSH%xMaxExt(j)) MSH%xMaxExt(j) = MSH%xMaxNeigh(j,i)
-!
-!                    if (MSH%neighShift(j,i) == 1) then
-!                        if (MSH%xMinNeigh(j,i) < xMinForStep(j)) xMinForStep(j) = MSH%xMinNeigh(j,i)
-!                        if (MSH%xMaxNeigh(j,i) > xMaxForStep(j)) xMaxForStep(j) = MSH%xMaxNeigh(j,i)
-!                    end if
-!
-!                end do
-!            end do
-!        end if
-!
-!        MSH%xNStep = find_xNStep(xMinForStep, xMaxForStep, MSH%xStep)
+            if(.not. MSH%considerNeighbour(j)) cycle
 
-        MSH%xNStep  = find_xNStep(MSH%xMinExt, MSH%xMaxExt, MSH%xStep)
+            where (MSH%xMinNeigh(:,j) < minForStep) minForStep = MSH%xMinNeigh(:,j)
+            where (MSH%xMaxNeigh(:,j) > maxForStep) maxForStep = MSH%xMaxNeigh(:,j)
+        end do
+
+        !ALLOCATING (Internal + External)
+        MSH%xNStep  = find_xNStep(minForStep, maxForStep, MSH%xStep)
         MSH%xNTotal = product(MSH%xNStep)
         RDF%xNTotal = MSH%xNTotal
 
+        call wLog("TOTAL")
+        call wLog("MSH%xNStep")
+        call wLog(MSH%xNStep)
+
         allocate(xPoints(MSH%nDim, MSH%xNTotal))
 
-        !Internal Points
+        call wLog("shape(xPoints)    ")
+        call wLog(shape(xPoints))
+        call wLog(" ")
+
         counterXPoints = 0;
+
+        !Internal Points
         tempXNStep = find_xNStep(MSH%xMinInt, MSH%xMaxInt, MSH%xStep)
-
         do i = 1, product(tempXNStep)
-            call get_Permutation(i, MSH%xMaxInt, tempXNStep, xPoints(:,i), MSH%xMinInt, snapExtremes = .true.);
+            call get_Permutation(i, MSH%xMaxInt, tempXNStep, &
+                                 xPoints(:,i+counterXPoints), MSH%xMinInt,  &
+                                 snapExtremes = .true.);
         end do
-
         counterXPoints = counterXPoints + product(tempXNStep);
-        MSH%indexLocal(1,1) = 1
-        MSH%indexLocal(2,1) = counterXPoints
+
+        call wLog("INTERNAL")
+        call wLog("tempXNStep")
+        call wLog(tempXNStep)
+        call wLog(" ")
 
         !Border Points
         if(MSH%independent) then
+        call wLog("NEIGHBOURS")
             do j = 1, size(MSH%xMaxNeigh, 2)
 
-                !Check if the neighbour exist
-                if(MSH%neigh(j)<0) cycle
-
-                !Take into account only positive neighbours
-                if(minval(MSH%neighShift(:,j)) == -1) cycle
+                if(.not. MSH%considerNeighbour(j)) cycle
 
                 tempXNStep = find_xNStep(MSH%xMinNeigh(:,j), MSH%xMaxNeigh(:,j), MSH%xStep)
+
+                call wLog("tempXNStep")
+                call wLog(tempXNStep)
+
                 do i = 1, product(tempXNStep)
                      call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, &
                                           xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), &
                                           snapExtremes = .true.);
                 end do
+
                 MSH%indexNeigh(1, j) = counterXPoints + 1
                 counterXPoints = counterXPoints + product(tempXNStep);
                 MSH%indexNeigh(2,j) = counterXPoints
             end do
         end if
+        call wLog(" ")
 
         RDF%xPoints => xPoints
 
@@ -284,6 +286,24 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    subroutine get_NeighbourCriteria(MSH)
+
+        !INPUT OUTPUT
+        type(MESH), intent(inout) :: MSH
+
+        MSH%considerNeighbour = .true.
+        where(MSH%neigh < 0) MSH%considerNeighbour = .false.
+        where(minval(MSH%neighShift,1) < 0) MSH%considerNeighbour = .false.
+
+        call wLog(" MSH%considerNeighbour = ")
+        call wLog(MSH%considerNeighbour)
+
+    end subroutine get_NeighbourCriteria
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     subroutine find_rank (MSH, shift, neighPos)
 
         implicit none
@@ -378,21 +398,27 @@ contains
         call wLog(" ")
 
         !Redimensioning the internal part
-        call wLog("    Redimensioning the internal part")
+        call wLog("    Redimensioning the internal and external part")
 
         call wLog(" IN MSH%xMinInt")
         call wLog(MSH%xMinInt)
         call wLog(" IN MSH%xMaxInt")
         call wLog(MSH%xMaxInt)
+        call wLog(" IN MSH%xMinExt")
+        call wLog(MSH%xMinExt)
+        call wLog(" IN MSH%xMaxExt")
+        call wLog(MSH%xMaxExt)
 
         do neighPos = 1, 2*MSH%nDim
 
             if(MSH%neigh(neighPos) < 0) cycle
 
             where(MSH%neighShift(:,neighPos) < 0)
-                MSH%xMinInt = MSH%xMinExt + MSH%overlap*corrL/2.0D0 + MSH%xStep
+                MSH%xMinInt = MSH%xMinExt + MSH%overlap*corrL/2.0D0
+                MSH%xMinExt = MSH%xMinExt - MSH%overlap*corrL/2.0D0
             elsewhere(MSH%neighShift(:,neighPos) > 0)
-                MSH%xMaxInt = MSH%xMaxExt - MSH%overlap*corrL/2.0D0 - MSH%xStep
+                MSH%xMaxInt = MSH%xMaxExt - MSH%overlap*corrL/2.0D0
+                MSH%xMaxExt = MSH%xMaxExt + MSH%overlap*corrL/2.0D0
             end where
 
         end do
@@ -401,40 +427,33 @@ contains
         call wLog(MSH%xMinInt)
         call wLog(" OUT MSH%xMaxInt")
         call wLog(MSH%xMaxInt)
-        call wLog(" ")
-
-
-        !Dimensioning overlapping area
-        call wLog("    Redimensioning overlapping area")
-        call wLog(" IN MSH%xMinExt")
-        call wLog(MSH%xMinExt)
-        call wLog(" IN MSH%xMaxExt")
-        call wLog(MSH%xMaxExt)
-
-        do neighPos = 1, size(MSH%neigh)
-            if(MSH%neigh(neighPos) < 0) cycle
-
-            where(MSH%neighShift(:,neighPos) > 0)
-                MSH%xMaxNeigh(:,neighPos) = MSH%xMaxExt + MSH%overlap*corrL/2
-                MSH%xMinNeigh(:,neighPos) = MSH%xMaxExt - MSH%overlap*corrL/2
-            elsewhere(MSH%neighShift(:,neighPos) < 0)
-                MSH%xMaxNeigh(:,neighPos) = MSH%xMinExt + MSH%overlap*corrL/2
-                MSH%xMinNeigh(:,neighPos) = MSH%xMinExt - MSH%overlap*corrL/2
-            elsewhere
-                MSH%xMaxNeigh(:,neighPos) = MSH%xMaxInt
-                MSH%xMinNeigh(:,neighPos) = MSH%xMinInt
-            end where
-
-            !Redimensioning Bounding Box
-            where(MSH%xMaxNeigh(:,neighPos) > MSH%xMaxExt(:)) MSH%xMaxExt(:) = MSH%xMaxNeigh(:,neighPos)
-            where(MSH%xMinNeigh(:,neighPos) < MSH%xMinExt(:)) MSH%xMinExt(:) = MSH%xMinNeigh(:,neighPos)
-        end do
-
         call wLog(" OUT MSH%xMinExt")
         call wLog(MSH%xMinExt)
         call wLog(" OUT MSH%xMaxExt")
         call wLog(MSH%xMaxExt)
         call wLog(" ")
+
+        !Dimensioning overlapping area
+        call wLog("    Dimensioning neighbours limits")
+
+        do neighPos = 1, size(MSH%neigh)
+            if(MSH%neigh(neighPos) < 0) cycle
+
+            where(MSH%neighShift(:,neighPos) > 0)
+                MSH%xMaxNeigh(:,neighPos) = MSH%xMaxExt - MSH%xStep
+                MSH%xMinNeigh(:,neighPos) = MSH%xMaxInt + MSH%xStep
+                MSH%xOrNeigh(:,neighPos)  = MSH%xMaxInt
+            elsewhere(MSH%neighShift(:,neighPos) < 0)
+                MSH%xMaxNeigh(:,neighPos) = MSH%xMinInt - MSH%xStep
+                MSH%xMinNeigh(:,neighPos) = MSH%xMinExt + MSH%xStep
+                MSH%xOrNeigh(:,neighPos)  = MSH%xMinInt
+            elsewhere
+                MSH%xMaxNeigh(:,neighPos) = MSH%xMaxInt
+                MSH%xMinNeigh(:,neighPos) = MSH%xMinInt
+                MSH%xOrNeigh(:,neighPos)  = MSH%xMinInt
+            end where
+
+        end do
 
         call show_MESHneigh(MSH, " ", onlyExisting = .true., forLog = .true.)
 
@@ -572,13 +591,15 @@ contains
                 call set_neighbours (MSH)
                 call wLog("-> get_overlap_geometry")
                 call get_overlap_geometry (MSH, RDF%corrL)
+                call wLog("-> get_NeighbourCriteria")
+                call get_NeighbourCriteria (MSH)
             end if
 
-!            call wLog("-> Getting Global Matrix Reference")
-!            call get_XPoints_globCoords(RDF, MSH)
-!            call wLog("     RDF%origin = ")
-!            call wLog(RDF%origin)
-!            call wLog(" ")
+            call wLog("-> Getting Global Matrix Reference")
+            call get_XPoints_globCoords(RDF, MSH)
+            call wLog("     RDF%origin = ")
+            call wLog(RDF%origin)
+            call wLog(" ")
 
         end if
 

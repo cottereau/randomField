@@ -18,19 +18,19 @@ module type_MESH
         character (len=15) :: meshType, meshMod;
         integer :: nDim = -1, xNTotal = -1;
         logical :: independent
-        logical, dimension(:), allocatable :: hasInternalPart
             !nDim dependent
         integer         , dimension(:), allocatable :: xNStep, procPerDim;
         integer         , dimension(:), allocatable :: neigh, coords;
-        !double precision, dimension(:), allocatable :: xMaxExt, xMinExt; !Exact Values of the division
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:), allocatable :: xStep;
         integer         , dimension(:), allocatable :: pointsPerCorrL;
-        double precision, dimension(:), allocatable :: xMaxInt, xMinInt; !Rounded Values of the non-overlapping area
+        double precision, dimension(:), allocatable :: xMaxInt, xMinInt; !Non-overlapping area
         double precision, dimension(:), allocatable :: xMaxExt, xMinExt; !Bounding box of the domain in this proc
-        double precision, dimension(:,:), allocatable :: xMaxNeigh, xMinNeigh; !Rounded Values of the overlapping area
+        double precision, dimension(:,:), allocatable :: xMaxNeigh, xMinNeigh; !Overlapping area in each direction
+        double precision, dimension(:,:), allocatable :: xOrNeigh; !Origin for Shape Functions
         integer         , dimension(2,1) :: indexLocal
         integer         , dimension(:,:), allocatable :: indexNeigh, neighShift
+        logical, dimension(:), allocatable :: considerNeighbour
         double precision, dimension(:), allocatable :: overlap !Size of the overlap (in corrL)
         logical :: init = .false.
 
@@ -64,11 +64,13 @@ module type_MESH
             allocate(MESH_a%neigh((3**nDim)-1))
             allocate(MESH_a%xMaxNeigh(nDim,(3**nDim)-1))
             allocate(MESH_a%xMinNeigh(nDim,(3**nDim)-1))
+            allocate(MESH_a%xOrNeigh(nDim,(3**nDim)-1))
             allocate(MESH_a%indexNeigh(2,(3**nDim)-1))
             allocate(MESH_a%neighShift(nDim,(3**nDim)-1))
+            allocate(MESH_a%considerNeighbour((3**nDim)-1))
             allocate(MESH_a%overLap(nDim))
             allocate(MESH_a%pointsPerCorrL(nDim))
-            allocate(MESH_a%hasInternalPart(nDim))
+
 
             MESH_a%xMaxExt     = -1
             MESH_a%xMinExt     = -1
@@ -82,11 +84,12 @@ module type_MESH
             MESH_a%coords(:)  = -1
             MESH_a%xMaxNeigh(:,:) = 0
             MESH_a%xMinNeigh(:,:) = 0
+            MESH_a%xOrNeigh(:,:) = 0
             MESH_a%indexNeigh(:,:) = -1
             MESH_a%overlap(:) = -1.0D0
             MESH_a%neigh(:) = -2 !-1 is already the default when the proc is in the topology border
             MESH_a%neighShift(:,:) = 0
-            MESH_a%hasInternalPart = .true.
+            MESH_a%considerNeighbour = .true.
             MESH_a%init = .true.
 
         end subroutine init_MESH
@@ -267,6 +270,7 @@ module type_MESH
             if (allocated(MESH_a%procPerDim)) deallocate(MESH_a%procPerDim)
             if (allocated(MESH_a%coords))     deallocate(MESH_a%coords)
             if (allocated(MESH_a%neigh))      deallocate(MESH_a%neigh)
+            if (allocated(MESH_a%xOrNeigh))      deallocate(MESH_a%xOrNeigh)
             if (allocated(MESH_a%xMaxNeigh))  deallocate(MESH_a%xMaxNeigh)
             if (allocated(MESH_a%xMinNeigh))  deallocate(MESH_a%xMinNeigh)
             if (allocated(MESH_a%xMaxInt))    deallocate(MESH_a%xMaxInt)
@@ -276,8 +280,9 @@ module type_MESH
             if (allocated(MESH_a%xMinExt))  deallocate(MESH_a%xMinExt)
             if (allocated(MESH_a%neighShift)) deallocate(MESH_a%neighShift)
             if (allocated(MESH_a%overlap))    deallocate(MESH_a%overlap)
-            if(allocated(MESH_a%hasInternalPart)) deallocate(MESH_a%hasInternalPart)
             if (allocated(MESH_a%pointsPerCorrL)) deallocate(MESH_a%pointsPerCorrL)
+            if (allocated(MESH_a%considerNeighbour)) deallocate(MESH_a%considerNeighbour)
+
 
             MESH_a%init = .false.
 

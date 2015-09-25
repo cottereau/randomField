@@ -137,6 +137,8 @@ contains
         call wLog("")
         call wLog("GENERATING INTERNAL RANDOM FIELD")
         call wLog("-------------------------------")
+        if(RDF%rang == 0) write(*,*)"GENERATING INTERNAL RANDOM FIELD"
+        if(RDF%rang == 0) write(*,*) "-------------------------------"
         call wLog("")
 
         select case (RDF%method)
@@ -150,21 +152,23 @@ contains
                 call gen_Std_Gauss_FFT(RDF)
         end select
 
-        RDF%randField = 0.0 ! For Tests
+        !RDF%randField = 0.0 ! For Tests
 
         if(RDF%independent) then
             !Communicating borders to neighbours
             call wLog("")
             call wLog("GENERATING BORDER RANDOM FIELDS")
             call wLog("-------------------------------")
+            if(RDF%rang == 0) write(*,*)"GENERATING BORDER RANDOM FIELDS"
+            if(RDF%rang == 0) write(*,*) "-------------------------------"
             call wLog("")
             call wLog("    ->Discovering neighbours seed")
             call get_neighbours_info(RDF, MSH)
             call wLog("    ->Discovering neighbours index")
             call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
-            !call wLog("    ->Applying Weighting Functions")
-            !call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
-            call wLog("    ->Adding neighbours contribution")
+            call wLog("    ->Applying Weighting Functions")
+            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+            call wLog("    ->Adding Neighbours Contribution")
             call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
         end if
 

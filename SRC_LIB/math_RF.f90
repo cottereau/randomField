@@ -33,14 +33,14 @@ contains
         !LOCAL VARIABLES
         integer :: i, j;
         integer :: seedStep, nDim;
-        double precision :: contrib
+        double precision, dimension(size(nStep)) :: contrib
 
         nDim = size(nStep);
         contrib = 0.0d0
 
         if (present(snapExtremes)) then
             if(snapExtremes) then
-                contrib = 1.0d0
+                where(nStep > 1) contrib = 1.0d0
             end if
         end if
 
@@ -51,8 +51,8 @@ contains
                 seedStep = product(nStep(1:j-1));
                 if (j == 1) seedStep = 1;
                 i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
-                pVec(j) = (dble(i)-0.5d0-contrib/2.0d0)         &
-                          *(qmax(j)-qmin(j))/(nStep(j)-contrib) &
+                pVec(j) = (dble(i)-0.5d0-contrib(j)/2.0d0)         &
+                          *(qmax(j)-qmin(j))/(nStep(j)-contrib(j)) &
                           + qmin(j);
             end do
         else
@@ -62,8 +62,8 @@ contains
                 seedStep = product(nStep(1:j-1));
                 if (j == 1) seedStep = 1;
                 i = cyclicMod(int((pos-0.9)/seedStep)+1, nStep(j))
-                pVec(j) = (dble(i)-0.5d0-contrib/2.0d0) &
-                          *(qmax(j))/(nStep(j)-contrib); !qmin = 0
+                pVec(j) = (dble(i)-0.5d0-contrib(j)/2.0d0) &
+                          *(qmax(j))/(nStep(j)-contrib(j)); !qmin = 0
             end do
         end if
 

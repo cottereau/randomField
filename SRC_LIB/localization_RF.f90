@@ -113,8 +113,9 @@ contains
             maxPos = MSH%indexNeigh(2,direction)
 
             !Finding origin
-            originCorner = MSH%xMinNeigh(:, direction)
-            where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
+            originCorner = MSH%xOrNeigh(:, direction)
+            !originCorner = MSH%xMinNeigh(:, direction)
+            !where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
 
 
             !Shape Function Generation
@@ -124,10 +125,10 @@ contains
 
         end do !Direction
 
-        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
-        !                                               * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
+        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
+                                                       * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
 
-        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
+        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
 
     end subroutine applyWeightingFunctions
 
@@ -170,13 +171,14 @@ contains
             call allocate_randField(tmpRDF, tmpRDF%randField_Local)
             minPos = MSH%indexNeigh(1,direction)
             maxPos = MSH%indexNeigh(2,direction)
-            originCorner = MSH%xMinNeigh(:, direction)
+            originCorner = MSH%xOrNeigh(:, direction)
+            !originCorner = MSH%xMinNeigh(:, direction)
+            !where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
 
             call wLog("   Neighbour Rank = ")
             call wLog(MSH%neigh(direction))
             call wLog("   MSH%neighShift(:, direction) = ")
             call wLog(MSH%neighShift(:, direction))
-            where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
             call wLog("   originCorner = ")
             call wLog(originCorner)
 
@@ -212,7 +214,7 @@ contains
 
                     tmpRDF%xMinExt = 0.0D0
                     tmpRDF%xMaxExt = RDF%neighRange(:,neighPos)
-                    tmpRDF%seed      = RDF%neighSeed(:,neighPos)
+                    tmpRDF%seed    = RDF%neighSeed(:,neighPos)
 
                     !Generating Standard Gaussian Field
                     select case (tmpRDF%method)
@@ -238,10 +240,10 @@ contains
 
                     !Sum of the contribution
 
-                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
-                    !                                 (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
+                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
+                                                     (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
 
-                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
+                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
                 else
                     call wLog("    CONTRIBUTION NOT ACCEPTED ")
                 end if
@@ -388,10 +390,22 @@ contains
         orig  = (dble(RDF%origin-1)*MSH%xStep + MSH%xMinGlob)
         xStep = MSH%xStep
 
+        call wLog("xStep")
+        call wLog(xStep)
+        call wLog("orig")
+        call wLog(orig)
+        call wLog("MSH%xNStep")
+        call wLog(MSH%xNStep)
+
         offset(1) = 1
         do i = 2, MSH%nDim
           offset(i) = product(MSH%xNStep(1:i-1))
         end do
+
+        call wLog("offset")
+        call wLog(offset)
+        call wLog("shape(RDF%randField)")
+        call wLog(shape(RDF%randField))
 
         do i = 1, size(RDF%randField,1)
           coordValue = RDF%xPoints(:,i)
