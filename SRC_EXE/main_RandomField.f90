@@ -27,7 +27,7 @@ program main_RandomField
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeFiles = .true.
     logical :: sameFolder = .true.
-    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
+    integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
 
     double precision, dimension(:), allocatable :: step_mult, step_add, step_initial
     double precision, dimension(:), allocatable :: corrL_mult, corrL_add, corrL_initial
@@ -434,6 +434,7 @@ program main_RandomField
             if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
                 call wLog(" ")
                 call wLog("-> Reordering Random Field")
+                if(RDF%rang == 0) write(*,*) "-> Reordering Random Field"
                 tLoc1 = MPI_Wtime()
                 call reorderRandomFieldStruct(RDF, MSH)
                 tLoc2 = MPI_Wtime()
@@ -441,11 +442,16 @@ program main_RandomField
                 call wLog(tLoc2 - tLoc1)
             end if
 
+            i = size(RDF%xPoints,2)
+            !if(i>50) i = 50
+            call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
+
+
             !i = size(RDF%xPoints,2)
             !if(i>50) i = 50
-            !call dispCarvalhol(RDF%randField(1:i,:), "RDF%randField", "(F20.5)",unit_in = RDF%log_ID)
+            !call dispCarvalhol(RDF%xPoints(1:i,:), "xPoints", "(F20.5)",unit_in = RDF%log_ID)
 
-            call show_RF(RDF, forLog_in = .true.)
+            !call show_RF(RDF, forLog_in = .true.)
 
             !call multiVariateTransformation (RDF%margiFirst, RDF%fieldAvg, RDF%fieldVar, RDF%randField)
 

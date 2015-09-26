@@ -24,22 +24,22 @@ contains
         !LOCAL
         integer :: i, j, counterXPoints
         integer, dimension(MSH%nDim) :: tempXNStep
-        double precision, dimension(MSH%nDim) :: minForStep, maxForStep
-
-        !COUNTING POINTS
-        minForStep = MSH%xMinInt
-        maxForStep = MSH%xMaxInt
-
-        do j = 1, size(MSH%xMaxNeigh, 2)
-
-            if(.not. MSH%considerNeighbour(j)) cycle
-
-            where (MSH%xMinNeigh(:,j) < minForStep) minForStep = MSH%xMinNeigh(:,j)
-            where (MSH%xMaxNeigh(:,j) > maxForStep) maxForStep = MSH%xMaxNeigh(:,j)
-        end do
+!        double precision, dimension(MSH%nDim) :: minForStep, maxForStep
+!
+!        !COUNTING POINTS
+!        minForStep = MSH%xMinInt
+!        maxForStep = MSH%xMaxInt
+!
+!        do j = 1, size(MSH%xMaxNeigh, 2)
+!
+!            if(.not. MSH%considerNeighbour(j)) cycle
+!
+!            where (MSH%xMinNeigh(:,j) < minForStep) minForStep = MSH%xMinNeigh(:,j)
+!            where (MSH%xMaxNeigh(:,j) > maxForStep) maxForStep = MSH%xMaxNeigh(:,j)
+!        end do
 
         !ALLOCATING (Internal + External)
-        MSH%xNStep  = find_xNStep(minForStep, maxForStep, MSH%xStep)
+        MSH%xNStep  = find_xNStep(MSH%xMinBound, MSH%xMaxBound, MSH%xStep)
         MSH%xNTotal = product(MSH%xNStep)
         RDF%xNTotal = MSH%xNTotal
 
@@ -109,7 +109,7 @@ contains
         type(RF)  , intent(inout) :: RDF
         type(MESH), intent(inout) :: MSH
 
-        RDF%origin = find_xNStep(MSH%xMinGlob, MSH%xMinInt, MSH%xStep)
+        RDF%origin = find_xNStep(MSH%xMinGlob, MSH%xMinBound , MSH%xStep)
 
     end subroutine get_XPoints_globCoords
     !-----------------------------------------------------------------------------------------------
@@ -293,7 +293,7 @@ contains
 
         MSH%considerNeighbour = .true.
         where(MSH%neigh < 0) MSH%considerNeighbour = .false.
-        where(minval(MSH%neighShift,1) < 0) MSH%considerNeighbour = .false.
+        !where(minval(MSH%neighShift,1) < 0) MSH%considerNeighbour = .false.
 
         call wLog(" MSH%considerNeighbour = ")
         call wLog(MSH%considerNeighbour)
@@ -440,12 +440,12 @@ contains
             if(MSH%neigh(neighPos) < 0) cycle
 
             where(MSH%neighShift(:,neighPos) > 0)
-                MSH%xMaxNeigh(:,neighPos) = MSH%xMaxExt - MSH%xStep
+                MSH%xMaxNeigh(:,neighPos) = MSH%xMaxExt - MSH%overlap*corrL/2.0D0 !- MSH%xStep
                 MSH%xMinNeigh(:,neighPos) = MSH%xMaxInt + MSH%xStep
                 MSH%xOrNeigh(:,neighPos)  = MSH%xMaxInt
             elsewhere(MSH%neighShift(:,neighPos) < 0)
                 MSH%xMaxNeigh(:,neighPos) = MSH%xMinInt - MSH%xStep
-                MSH%xMinNeigh(:,neighPos) = MSH%xMinExt + MSH%xStep
+                MSH%xMinNeigh(:,neighPos) = MSH%xMinExt + MSH%xStep + MSH%overlap*corrL/2.0D0
                 MSH%xOrNeigh(:,neighPos)  = MSH%xMinInt
             elsewhere
                 MSH%xMaxNeigh(:,neighPos) = MSH%xMaxInt
@@ -454,6 +454,25 @@ contains
             end where
 
         end do
+
+
+        !Dimensioning Bounding Box
+        MSH%xMinBound = MSH%xMinInt
+        MSH%xMaxBound = MSH%xMaxInt
+
+        do i = 1, size(MSH%xMaxNeigh, 2)
+
+            if(.not. MSH%considerNeighbour(i)) cycle
+
+            where (MSH%xMinNeigh(:,i) < MSH%xMinBound) MSH%xMinBound = MSH%xMinNeigh(:,i)
+            where (MSH%xMaxNeigh(:,i) > MSH%xMaxBound) MSH%xMaxBound = MSH%xMaxNeigh(:,i)
+        end do
+
+        call wLog(" OUT MSH%xMinBound")
+        call wLog(MSH%xMinBound)
+        call wLog(" OUT MSH%xMaxBound")
+        call wLog(MSH%xMaxBound)
+        call wLog(" ")
 
         call show_MESHneigh(MSH, " ", onlyExisting = .true., forLog = .true.)
 
@@ -589,10 +608,10 @@ contains
             if(RDF%independent) then
                 call wLog("-> set_neighbours")
                 call set_neighbours (MSH)
-                call wLog("-> get_overlap_geometry")
-                call get_overlap_geometry (MSH, RDF%corrL)
                 call wLog("-> get_NeighbourCriteria")
                 call get_NeighbourCriteria (MSH)
+                call wLog("-> get_overlap_geometry")
+                call get_overlap_geometry (MSH, RDF%corrL)
             end if
 
             call wLog("-> Getting Global Matrix Reference")
@@ -734,13 +753,14 @@ contains
 
             nPointsO   = find_xNStep(xMaxExt=MSH%overlap*RDF%corrL, xStep=MSH%xStep) - 2 !The extremes are considered in the non-overlapping area
             nPointsNO  = find_xNStep(xMaxExt=nonOvlp/dble(MSH%procPerDim), xStep=MSH%xStep)
+            where(MSH%procPerDim == 1) nPointsO = 0
 
             call wLog("        nPointsO = ")
             call wLog(nPointsO)
             call wLog("        nPointsNO = ")
             call wLog(nPointsNO)
 
-            if(any(nPointsO<1) .or. any(nPointsNO<1)) stop("Step or Overlap not adapted to the points per Correlation asked")
+            if(any(nPointsO<1 .and. MSH%procPerDim > 1) .or. any(nPointsNO<1)) stop("Step or Overlap not adapted to the points per Correlation asked")
 
             !Global Extremes
 

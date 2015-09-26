@@ -113,7 +113,7 @@ contains
         !LOCAL VARIABLES
         integer :: i;
         integer :: minIndexNeigh, maxIndexNeigh
-        logical, dimension(size(MSH%neigh)) :: considerNeighbour
+        !logical, dimension(size(MSH%neigh)) :: considerNeighbour
         !integer, dimension(16) :: testVec
         integer :: partitionType = 1
 
@@ -152,7 +152,7 @@ contains
                 call gen_Std_Gauss_FFT(RDF)
         end select
 
-        !RDF%randField = 0.0 ! For Tests
+        RDF%randField = 0.0 ! For Tests
 
         if(RDF%independent) then
             !Communicating borders to neighbours
@@ -165,11 +165,11 @@ contains
             call wLog("    ->Discovering neighbours seed")
             call get_neighbours_info(RDF, MSH)
             call wLog("    ->Discovering neighbours index")
-            call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
+            call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh)
             call wLog("    ->Applying Weighting Functions")
-            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
             call wLog("    ->Adding Neighbours Contribution")
-            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
         end if
 
         !Reverting Normalization

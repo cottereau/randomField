@@ -67,20 +67,20 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour)
+    subroutine getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh)
         !INPUT
         type(MESH), intent(in) :: MSH
         !OUTPUT
         integer, intent(out) :: minIndexNeigh, maxIndexNeigh
-        logical, dimension(:), intent(out) :: considerNeighbour
+        !logical, dimension(:), intent(out) :: considerNeighbour
 
-        considerNeighbour = .true.
-        where(MSH%neigh < 0) considerNeighbour = .false.
-        where(minval(MSH%neighShift,1) < 0) considerNeighbour = .false.
+        !considerNeighbour = .true.
+        !where(MSH%neigh < 0) considerNeighbour = .false.
+        !where(minval(MSH%neighShift,1) < 0) considerNeighbour = .false.
 
         !Global Min and Max positions
-        minIndexNeigh = minval(pack(MSH%indexNeigh(1,:), considerNeighbour))
-        maxIndexNeigh = maxval(pack(MSH%indexNeigh(2,:), considerNeighbour))
+        minIndexNeigh = minval(pack(MSH%indexNeigh(1,:), MSH%considerNeighbour))
+        maxIndexNeigh = maxval(pack(MSH%indexNeigh(2,:), MSH%considerNeighbour))
 
     end subroutine getNeighIndexRange
 
@@ -88,12 +88,12 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+    subroutine applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
         !INPUT:
         type(RF), intent(in) :: RDF
         type(MESH), intent(in) :: MSH
         integer, intent(in) :: minIndexNeigh, maxIndexNeigh
-        logical, dimension(:), intent(in) ::considerNeighbour
+        !logical, dimension(:), intent(in) ::considerNeighbour
         integer, intent(in) :: partitionType
 
         !LOCAL
@@ -106,7 +106,7 @@ contains
         !Building Shape Functions in all directions
         do direction = 1, size(MSH%neigh)
 
-            if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
+            if(.not. MSH%considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
 
             !Positions in temp Vector
             minPos = MSH%indexNeigh(1,direction)
@@ -125,10 +125,10 @@ contains
 
         end do !Direction
 
-        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
-                                                       * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
+        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
+        !                                               * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
 
-        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
+        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
 
     end subroutine applyWeightingFunctions
 
@@ -136,11 +136,11 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, considerNeighbour, partitionType)
+    subroutine takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
         !INPUT
         type(MESH), intent(in) :: MSH
         integer, intent(in) :: minIndexNeigh, maxIndexNeigh
-        logical, dimension(:), intent(in) ::considerNeighbour
+        !logical, dimension(:), intent(in) ::considerNeighbour
         integer, intent(in) :: partitionType
         !OUTPUT
         type(RF), intent(inout) :: RDF
@@ -160,7 +160,7 @@ contains
 
         do direction = 1, size(MSH%neigh)
 
-            if(.not. considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
+            if(.not. MSH%considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
 
             call wLog(" ------------------------------------------- ")
             call wLog("   DIRECTION      = ")
@@ -185,7 +185,7 @@ contains
 
             do neighPos = 1, size(MSH%neigh)
 
-                if(.not. considerNeighbour(neighPos)) cycle !Don't consider Neighbours in this direction
+                if(.not. MSH%considerNeighbour(neighPos)) cycle !Don't consider Neighbours in this direction
 
                 sndRcv = .true.
 
@@ -240,10 +240,10 @@ contains
 
                     !Sum of the contribution
 
-                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
-                                                     (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
+                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
+                    !                                 (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
 
-                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
+                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
                 else
                     call wLog("    CONTRIBUTION NOT ACCEPTED ")
                 end if

@@ -25,7 +25,8 @@ module type_MESH
         double precision, dimension(:), allocatable :: xStep;
         integer         , dimension(:), allocatable :: pointsPerCorrL;
         double precision, dimension(:), allocatable :: xMaxInt, xMinInt; !Non-overlapping area
-        double precision, dimension(:), allocatable :: xMaxExt, xMinExt; !Bounding box of the domain in this proc
+        double precision, dimension(:), allocatable :: xMaxExt, xMinExt; !Interface with neighbours proc
+        double precision, dimension(:), allocatable :: xMaxBound, xMinBound; !Bounding box for generation in this proc
         double precision, dimension(:,:), allocatable :: xMaxNeigh, xMinNeigh; !Overlapping area in each direction
         double precision, dimension(:,:), allocatable :: xOrNeigh; !Origin for Shape Functions
         integer         , dimension(2,1) :: indexLocal
@@ -61,6 +62,8 @@ module type_MESH
             allocate(MESH_a%coords(nDim))
             allocate(MESH_a%xMaxExt(nDim))
             allocate(MESH_a%xMinExt(nDim))
+            allocate(MESH_a%xMaxBound(nDim))
+            allocate(MESH_a%xMinBound(nDim))
             allocate(MESH_a%neigh((3**nDim)-1))
             allocate(MESH_a%xMaxNeigh(nDim,(3**nDim)-1))
             allocate(MESH_a%xMinNeigh(nDim,(3**nDim)-1))
@@ -71,7 +74,8 @@ module type_MESH
             allocate(MESH_a%overLap(nDim))
             allocate(MESH_a%pointsPerCorrL(nDim))
 
-
+            MESH_a%xMaxBound     = -1
+            MESH_a%xMinBound     = -1
             MESH_a%xMaxExt     = -1
             MESH_a%xMinExt     = -1
             MESH_a%xStep    = -1
@@ -278,6 +282,8 @@ module type_MESH
             if (allocated(MESH_a%indexNeigh)) deallocate(MESH_a%indexNeigh)
             if (allocated(MESH_a%xMaxExt))  deallocate(MESH_a%xMaxExt)
             if (allocated(MESH_a%xMinExt))  deallocate(MESH_a%xMinExt)
+            if (allocated(MESH_a%xMaxBound))  deallocate(MESH_a%xMaxBound)
+            if (allocated(MESH_a%xMinBound))  deallocate(MESH_a%xMinBound)
             if (allocated(MESH_a%neighShift)) deallocate(MESH_a%neighShift)
             if (allocated(MESH_a%overlap))    deallocate(MESH_a%overlap)
             if (allocated(MESH_a%pointsPerCorrL)) deallocate(MESH_a%pointsPerCorrL)
