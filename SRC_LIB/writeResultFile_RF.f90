@@ -698,6 +698,7 @@ contains
 
     end subroutine write_HDF5_Unstr_per_proc_XMF
 
+
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -728,12 +729,15 @@ contains
         integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
         integer(HID_T)                 :: plist_id      ! Property list identifier
         integer(HID_T)                 :: filespace     ! Dataspace identifier in file
-        integer                        :: rank !Dataset rank (number of dimensions)
+        integer                        :: rank, rank1D !Dataset rank (number of dimensions)
         integer(HSIZE_T), dimension(MSH%nDim) :: dims !Dataset dimensions
+        integer(HSIZE_T), dimension(1) :: dims1D !Dataset dimensions
         integer                        :: error !Error flag
         integer                        :: info, code
         integer(HSIZE_T) , dimension(MSH%nDim) :: count
         integer(HSSIZE_T), dimension(MSH%nDim) :: offset
+        integer(HSIZE_T) , dimension(1) :: count1D
+        integer(HSSIZE_T), dimension(1) :: offset1D
         integer(HSIZE_T), dimension(1) :: attr_dim
 
         !LOCAL VARIABLES
@@ -753,7 +757,7 @@ contains
 
 
         info = MPI_INFO_NULL
-        rank = MSH%nDim
+
 
         !Discovering needed global information
         !write(get_fileId(),*) "RDF%xNStep = ", RDF%xNStep
@@ -766,51 +770,93 @@ contains
         dsetname = trim(adjustL(fileName)) ! Dataset name
         fileHDF5Name = trim(fileName)//"-ALLprocStruct.h5"
         fullPath     = string_join(folderPath,"/"//fileHDF5Name)
-        !write(get_fileId(),*) "' fileHDF5Name = ", fileHDF5Name
+        call wLog("' fileHDF5Name = ")
+        call wLog(fileHDF5Name)
 
-        !PREPARING ENVIROMENT
-        dims = total_xNStep
-        !dims = dims(size(dims):1:-1) !transpose
-        call wLog("dims = ")
-        call wLog(int(dims))
-
-        !if(transp) dims = [xDim, sum(all_n_Dim)]
         call h5open_f(error) ! Initialize FORTRAN interface.
         call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error) !creates property list (plist_id)
+        !call h5pset_deflate_f(plist_id, 5, error) !Activates Compression  TO DO
         call h5pset_fapl_mpio_f(plist_id, communicator, info, error) !sets property list
         call h5fcreate_f(fullPath, H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id) !create file with the property list (file_id)
         call h5pclose_f(plist_id, error) !closes property list (plist_id)
-        call h5screate_simple_f(rank, dims, filespace, error) ! Create the dataspace, the size of the whole table (filespace).
+        !call h5screate_simple_f(rank, dims, filespace, error) ! Create the dataspace, the size of the whole table (filespace).
 
-        !DEFINITION OF THE TYPE OF THE TABLE
 
-        call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, &
-                          dset_id, error) ! Appropriates the dataspace to the dataset (dset_id)
-        call h5sclose_f(filespace, error) ! Closes the dataspace (it was already used (filespace)
+        if(RDF%independent) then
+            !PREPARING ENVIROMENT
+            dims = total_xNStep
+            call wLog("dims = ")
+            call wLog(int(dims))
+            rank = MSH%nDim
 
-        !CHOOSING SPACE IN MEMORY FOR THIS PROC
-        count = RDF%xNStep
-        !count = count(size(count):1:-1) !transpose
-        call wLog("count = ")
-        call wLog(int(count))
-        call h5screate_simple_f(rank, count, memspace, error)  !Initialize memspace
+            call h5screate_simple_f(rank, dims, filespace, error) ! Create the dataspace, the size of the whole table (filespace).
 
-        ! Select hyperslab in the file.
-        offset = RDF%origin - 1!Lines Offset to start writing
+            !DEFINITION OF THE TYPE OF THE TABLE
+            call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, &
+                              dset_id, error) ! Appropriates the dataspace to the dataset (dset_id)
+            call h5sclose_f(filespace, error) ! Closes the dataspace (it was already used (filespace)
 
-        call wLog("offset = ")
-        call wLog(int(offset))
+            !CHOOSING SPACE IN MEMORY FOR THIS PROC
+            count = RDF%xNStep
+            !count = count(size(count):1:-1) !transpose
+            call wLog("count = ")
+            call wLog(int(count))
+            call h5screate_simple_f(rank, count, memspace, error)  !Initialize memspace
 
-        call h5dget_space_f(dset_id, filespace, error)
-        call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, error)
+            ! Select hyperslab in the file.
+            offset = RDF%origin - 1!Lines Offset to start writing
 
-        ! Create property list for collective dataset write
-        call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
-        call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+            call wLog("offset = ")
+            call wLog(int(offset))
 
-        ! Write dataset
-        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, RDF%randField, dims, error, &
+            call h5dget_space_f(dset_id, filespace, error)
+            call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, error)
+
+            ! Create property list for collective dataset write
+            call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+            call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+
+            ! Write dataset
+            call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, RDF%randField, dims, error, &
                 file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+        else
+            !PREPARING ENVIROMENT
+            dims1D = product(total_xNStep)
+            call wLog("dims1D = ")
+            call wLog(int(dims1D))
+            rank1D  = 1
+
+            call h5screate_simple_f(rank1D, dims1D, filespace, error) ! Create the dataspace, the size of the whole table (filespace).
+
+            !DEFINITION OF THE TYPE OF THE TABLE
+            call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, &
+                              dset_id, error) ! Appropriates the dataspace to the dataset (dset_id)
+            call h5sclose_f(filespace, error) ! Closes the dataspace (it was already used (filespace)
+
+            !CHOOSING SPACE IN MEMORY FOR THIS PROC
+            count1D = RDF%xNTotal
+            !count = count(size(count):1:-1) !transpose
+            call wLog("count1D = ")
+            call wLog(int(count1D))
+            call h5screate_simple_f(rank1D, count1D, memspace, error)  !Initialize memspace,
+
+            ! Select hyperslab in the file.
+            offset1D = MSH%xNInit - 1!Lines Offset to start writing
+
+            call wLog("offset1D = ")
+            call wLog(int(offset1D))
+
+            call h5dget_space_f(dset_id, filespace, error)
+            call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset1D, count1D, error)
+
+            ! Create property list for collective dataset write
+            call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+            call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+
+            ! Write dataset
+            call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, RDF%randField, dims1D, error, &
+                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+        end if
 
         ! Close dataspaces.
         call h5sclose_f(filespace, error)
@@ -836,6 +882,146 @@ contains
         !write(get_fileId(),*) "------------END Writing result HDF5 file (MPI)-----------------------";
 
     end subroutine write_pHDF5_Str
+
+
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine write_pHDF5_Str(MSH, RDF, fileName, rang, folderPath, &
+!                                 communicator, HDF5Name)
+!        implicit none
+!
+!        !INPUTS
+!        type(MESH), intent(in) :: MSH
+!        type(RF)  , intent(in) :: RDF
+!        character(len=*)                  , intent(in) :: filename;
+!        integer                           , intent(in) :: rang;
+!        character(len=*)                  , intent(in) :: folderPath
+!        integer                           , intent(in) :: communicator
+!
+!        !OUTPUTS
+!        character(len=110) , optional  , intent(out) ::HDF5Name
+!
+!        !HDF5 VARIABLES
+!        character(len=110)             :: fileHDF5Name, fullPath !File name
+!        character(len=30)              :: eventName, coordName, attr_name;        !Dataset names
+!        integer(HID_T)                 :: file_id       !File identifier
+!        integer(HID_T)                 :: dset_id       !Dataset identifier
+!        integer(HID_T)                 :: dspace_id     !Dataspace identifier
+!        integer(HID_T)                 :: attr_id       !Attribute identifier
+!        integer(HID_T)                 :: attrspace_id  !Attribute Space identifier
+!        integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
+!        integer(HID_T)                 :: plist_id      ! Property list identifier
+!        integer(HID_T)                 :: filespace     ! Dataspace identifier in file
+!        integer                        :: rank !Dataset rank (number of dimensions)
+!        integer(HSIZE_T), dimension(MSH%nDim) :: dims !Dataset dimensions
+!        integer                        :: error !Error flag
+!        integer                        :: info, code
+!        integer(HSIZE_T) , dimension(MSH%nDim) :: count
+!        integer(HSSIZE_T), dimension(MSH%nDim) :: offset
+!        integer(HSIZE_T), dimension(1) :: attr_dim
+!
+!        !LOCAL VARIABLES
+!        integer :: yDim, xDim, i
+!        integer :: nb_procs
+!        character (len=12) :: numberStr, rangStr;
+!        integer(kind=8), dimension(MSH%nDim) :: total_xNStep
+!        character(LEN=8) :: dsetname
+!        logical :: bool !for tests
+!        integer :: tmp_val
+!
+!
+!
+!        call wLog("------------START Writing result HDF5 file (MPI)-----------------------")
+!        !write(get_fileId(),*) "fileName         = ", fileName
+!        !write(get_fileId(),*) "folderPath       = ", folderPath
+!
+!
+!        info = MPI_INFO_NULL
+!        rank = MSH%nDim
+!
+!        !Discovering needed global information
+!        !write(get_fileId(),*) "RDF%xNStep = ", RDF%xNStep
+!        !write(get_fileId(),*) "MSH%nDim   = ", MSH%nDim
+!        total_xNStep = nint((MSH%xMaxGlob - MSH%xMinGlob)/MSH%xStep, 8) + 1
+!        !call MPI_ALLREDUCE (RDF%xNStep, total_xNStep, MSH%nDim, MPI_INTEGER, MPI_SUM, communicator, code)
+!
+!
+!        !Creating file name
+!        dsetname = trim(adjustL(fileName)) ! Dataset name
+!        fileHDF5Name = trim(fileName)//"-ALLprocStruct.h5"
+!        fullPath     = string_join(folderPath,"/"//fileHDF5Name)
+!        !write(get_fileId(),*) "' fileHDF5Name = ", fileHDF5Name
+!
+!        !PREPARING ENVIROMENT
+!        dims = total_xNStep
+!        !dims = dims(size(dims):1:-1) !transpose
+!        call wLog("dims = ")
+!        call wLog(int(dims))
+!
+!        !if(transp) dims = [xDim, sum(all_n_Dim)]
+!        call h5open_f(error) ! Initialize FORTRAN interface.
+!        call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error) !creates property list (plist_id)
+!        call h5pset_fapl_mpio_f(plist_id, communicator, info, error) !sets property list
+!        call h5fcreate_f(fullPath, H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id) !create file with the property list (file_id)
+!        call h5pclose_f(plist_id, error) !closes property list (plist_id)
+!        call h5screate_simple_f(rank, dims, filespace, error) ! Create the dataspace, the size of the whole table (filespace).
+!
+!        !DEFINITION OF THE TYPE OF THE TABLE
+!
+!        call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, &
+!                          dset_id, error) ! Appropriates the dataspace to the dataset (dset_id)
+!        call h5sclose_f(filespace, error) ! Closes the dataspace (it was already used (filespace)
+!
+!        !CHOOSING SPACE IN MEMORY FOR THIS PROC
+!        count = RDF%xNStep
+!        !count = count(size(count):1:-1) !transpose
+!        call wLog("count = ")
+!        call wLog(int(count))
+!        call h5screate_simple_f(rank, count, memspace, error)  !Initialize memspace
+!
+!        ! Select hyperslab in the file.
+!        offset = RDF%origin - 1!Lines Offset to start writing
+!
+!        call wLog("offset = ")
+!        call wLog(int(offset))
+!
+!        call h5dget_space_f(dset_id, filespace, error)
+!        call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, error)
+!
+!        ! Create property list for collective dataset write
+!        call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error)
+!        call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+!
+!        ! Write dataset
+!        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, RDF%randField, dims, error, &
+!                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+!
+!        ! Close dataspaces.
+!        call h5sclose_f(filespace, error)
+!        call h5sclose_f(memspace, error)
+!
+!        ! Close the dataset and property list.
+!        call h5dclose_f(dset_id, error)
+!        call h5pclose_f(plist_id, error)
+!
+!        ! Close the file.
+!        call h5fclose_f(file_id, error)
+!
+!        ! Close FORTRAN predefined datatypes.
+!        call h5close_f(error)
+!
+!        !write(*,*) "fileHDF5Name = ", fileHDF5Name
+!        if(present(HDF5Name)) then
+!            HDF5Name = trim(adjustL(fileHDF5Name))
+!            HDF5Name = adjustL(HDF5Name)
+!            !write(get_fileId(),*) "'inside write HDF5' output -- HDF5Name = ", HDF5Name
+!        end if
+!
+!        !write(get_fileId(),*) "------------END Writing result HDF5 file (MPI)-----------------------";
+!
+!    end subroutine write_pHDF5_Str
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

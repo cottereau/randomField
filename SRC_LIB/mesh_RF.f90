@@ -24,54 +24,56 @@ contains
         !LOCAL
         integer :: i, j, counterXPoints
         integer, dimension(MSH%nDim) :: tempXNStep
-!        double precision, dimension(MSH%nDim) :: minForStep, maxForStep
-!
-!        !COUNTING POINTS
-!        minForStep = MSH%xMinInt
-!        maxForStep = MSH%xMaxInt
-!
-!        do j = 1, size(MSH%xMaxNeigh, 2)
-!
-!            if(.not. MSH%considerNeighbour(j)) cycle
-!
-!            where (MSH%xMinNeigh(:,j) < minForStep) minForStep = MSH%xMinNeigh(:,j)
-!            where (MSH%xMaxNeigh(:,j) > maxForStep) maxForStep = MSH%xMaxNeigh(:,j)
-!        end do
+        !        double precision, dimension(MSH%nDim) :: minForStep, maxForStep
+        !
+        !        !COUNTING POINTS
+        !        minForStep = MSH%xMinInt
+        !        maxForStep = MSH%xMaxInt
+        !
+        !        do j = 1, size(MSH%xMaxNeigh, 2)
+        !
+        !            if(.not. MSH%considerNeighbour(j)) cycle
+        !
+        !            where (MSH%xMinNeigh(:,j) < minForStep) minForStep = MSH%xMinNeigh(:,j)
+        !            where (MSH%xMaxNeigh(:,j) > maxForStep) maxForStep = MSH%xMaxNeigh(:,j)
+        !        end do
 
-        !ALLOCATING (Internal + External)
-        MSH%xNStep  = find_xNStep(MSH%xMinBound, MSH%xMaxBound, MSH%xStep)
-        MSH%xNTotal = product(MSH%xNStep)
-        RDF%xNTotal = MSH%xNTotal
-
-        call wLog("TOTAL")
-        call wLog("MSH%xNStep")
-        call wLog(MSH%xNStep)
-
-        allocate(xPoints(MSH%nDim, MSH%xNTotal))
-
-        call wLog("shape(xPoints)    ")
-        call wLog(shape(xPoints))
-        call wLog(" ")
-
-        counterXPoints = 0;
-
-        !Internal Points
-        tempXNStep = find_xNStep(MSH%xMinInt, MSH%xMaxInt, MSH%xStep)
-        do i = 1, product(tempXNStep)
-            call get_Permutation(i, MSH%xMaxInt, tempXNStep, &
-                                 xPoints(:,i+counterXPoints), MSH%xMinInt,  &
-                                 snapExtremes = .true.);
-        end do
-        counterXPoints = counterXPoints + product(tempXNStep);
-
-        call wLog("INTERNAL")
-        call wLog("tempXNStep")
-        call wLog(tempXNStep)
-        call wLog(" ")
-
-        !Border Points
         if(MSH%independent) then
-        call wLog("NEIGHBOURS")
+
+            !ALLOCATING (Internal + External)
+            MSH%xNStep  = find_xNStep(MSH%xMinBound, MSH%xMaxBound, MSH%xStep)
+            MSH%xNTotal = product(MSH%xNStep)
+            RDF%xNTotal = MSH%xNTotal
+
+            call wLog("TOTAL")
+            call wLog("MSH%xNStep")
+            call wLog(MSH%xNStep)
+
+            allocate(xPoints(MSH%nDim, MSH%xNTotal))
+
+            call wLog("shape(xPoints)    ")
+            call wLog(shape(xPoints))
+            call wLog(" ")
+
+            counterXPoints = 0;
+
+            !Internal Points
+            tempXNStep = find_xNStep(MSH%xMinInt, MSH%xMaxInt, MSH%xStep)
+            do i = 1, product(tempXNStep)
+                call get_Permutation(i, MSH%xMaxInt, tempXNStep, &
+                    xPoints(:,i+counterXPoints), MSH%xMinInt,  &
+                    snapExtremes = .true.);
+            end do
+            counterXPoints = counterXPoints + product(tempXNStep);
+
+            call wLog("INTERNAL")
+            call wLog("tempXNStep")
+            call wLog(tempXNStep)
+            call wLog(" ")
+
+            !Border Points
+
+            call wLog("NEIGHBOURS")
             do j = 1, size(MSH%xMaxNeigh, 2)
 
                 if(.not. MSH%considerNeighbour(j)) cycle
@@ -82,19 +84,40 @@ contains
                 call wLog(tempXNStep)
 
                 do i = 1, product(tempXNStep)
-                     call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, &
-                                          xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), &
-                                          snapExtremes = .true.);
+                    call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, &
+                        xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), &
+                        snapExtremes = .true.);
                 end do
 
                 MSH%indexNeigh(1, j) = counterXPoints + 1
                 counterXPoints = counterXPoints + product(tempXNStep);
                 MSH%indexNeigh(2,j) = counterXPoints
             end do
-        end if
-        call wLog(" ")
 
-        RDF%xPoints => xPoints
+            call wLog(" ")
+
+            RDF%xPoints => xPoints
+
+        else
+            call wLog("LINEAR GENERATION")
+
+            allocate(xPoints(MSH%nDim, MSH%xNTotal))
+
+            counterXPoints = 0
+            tempXNStep = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
+            call wLog("tempXNStep")
+            call wLog(tempXNStep)
+            do i = MSH%xNInit, MSH%xNEnd
+                counterXPoints = counterXPoints +1
+                call get_Permutation(i, MSH%xMaxGlob, tempXNStep, &
+                    xPoints(:,counterXPoints), MSH%xMinGlob,  &
+                    snapExtremes = .true.);
+            end do
+            call wLog(" ")
+
+            RDF%xPoints => xPoints
+
+        end if
 
     end subroutine set_XPoints
 
@@ -595,7 +618,7 @@ contains
             MSH%xNTotal = size(RDF%xPoints, 2)
             RDF%xNTotal = MSH%xNTotal
 
-        else
+        else if(RDF%independent) then
             call wLog("-> set_procPerDim")
             call set_procPerDim (MSH%nb_procs, MSH%nDim, MSH%procPerDim)
             call wLog("-> MPI_CART_CREATE")
@@ -605,14 +628,12 @@ contains
             call wLog("-> define_generation_geometry")
             call define_generation_geometry (MSH, RDF)
 
-            if(RDF%independent) then
-                call wLog("-> set_neighbours")
-                call set_neighbours (MSH)
-                call wLog("-> get_NeighbourCriteria")
-                call get_NeighbourCriteria (MSH)
-                call wLog("-> get_overlap_geometry")
-                call get_overlap_geometry (MSH, RDF%corrL)
-            end if
+            call wLog("-> set_neighbours")
+            call set_neighbours (MSH)
+            call wLog("-> get_NeighbourCriteria")
+            call get_NeighbourCriteria (MSH)
+            call wLog("-> get_overlap_geometry")
+            call get_overlap_geometry (MSH, RDF%corrL)
 
             call wLog("-> Getting Global Matrix Reference")
             call get_XPoints_globCoords(RDF, MSH)
@@ -620,6 +641,9 @@ contains
             call wLog(RDF%origin)
             call wLog(" ")
 
+        else
+            call wLog("-> define_generation_geometry")
+            call define_generation_geometry (MSH, RDF)
         end if
 
     end subroutine define_topography
@@ -680,6 +704,7 @@ contains
 
         !GLOBAL CASE (Not INDEPENDENT)
         if(.not. MSH%independent) then
+
             !Global extremes
             half  = (MSH%xMaxGlob + MSH%xMinGlob)/2.0D0
             delta = MSH%xMaxGlob - MSH%xMinGlob
@@ -695,24 +720,66 @@ contains
             call wLog(MSH%xMaxGlob - MSH%xMinGlob)
             call wLog(" ")
 
-            !Local Extremes
-            delta = delta/MSH%procPerDim
-            MSH%xMinExt = MSH%xMinGlob + (delta)*(dble(MSH%coords)) !Adding the others processors
-            MSH%xMaxExt = MSH%xMinExt + delta
-            where(MSH%coords /= MSH%procPerDim-1) MSH%xMaxExt = MSH%xMaxExt-MSH%xStep
+            MSH%XNGlob = product(find_xNStep(xMaxExt=(MSH%xMaxGlob - MSH%xMinGlob), xStep=MSH%xStep))
 
-            !Copy to the internal boundary
-            MSH%xMinInt   = MSH%xMinExt
-            MSH%xMaxInt   = MSH%xMaxExt
+            MSH%xNEnd = (MSH%rang + 1) * MSH%XNGlob/MSH%nb_procs + 1
+            MSH%xNInit  = MSH%rang * MSH%XNGlob/MSH%nb_procs + 1
+
+            if(MSH%rang == MSH%nb_procs-1) then
+                MSH%xNEnd = MSH%XNGlob
+            else
+                MSH%xNEnd = MSH%xNEnd - 1
+            end if
+
+            MSH%xNTotal = MSH%xNEnd - MSH%xNInit + 1
+            RDF%xNTotal = MSH%xNTotal
 
             call wLog(" ")
-            call wLog("        OUT MSH%xMinExt = ")
-            call wLog(MSH%xMinExt)
-            call wLog("        OUT MSH%xMaxExt = ")
-            call wLog(MSH%xMaxExt)
-            call wLog("            delta       = ")
-            call wLog(MSH%xMaxExt - MSH%xMinExt)
-            call wLog(" ")
+            call wLog("        OUT MSH%xNInit = ")
+            call wLog(int(MSH%xNInit))
+            call wLog("        OUT MSH%xNEnd = ")
+            call wLog(int(MSH%xNEnd))
+            call wLog("        OUT MSH%xNTotal = ")
+            call wLog(int(MSH%xNTotal))
+            call wLog("        OUT RDF%xNTotal = ")
+            call wLog(int(RDF%xNTotal))
+            call wLog("        OUT MSH%xNGlob = ")
+            call wLog(int(MSH%xNGlob))
+
+
+!            !Global extremes
+!            half  = (MSH%xMaxGlob + MSH%xMinGlob)/2.0D0
+!            delta = MSH%xMaxGlob - MSH%xMinGlob
+!            call roundToMultiple(delta, MSH%xStep*dble(MSH%procPerDim)*2.0D0, up=.true.)
+!            MSH%xMinGlob = half - delta/2.0D0
+!            MSH%xMaxGlob = half + delta/2.0D0
+!
+!            call wLog("        OUT MSH%xMinGlob (Round 2) = ")
+!            call wLog(MSH%xMinGlob)
+!            call wLog("        OUT MSH%xMaxGlob (Round 2) = ")
+!            call wLog(MSH%xMaxGlob)
+!            call wLog("            delta        (Round 2) = ")
+!            call wLog(MSH%xMaxGlob - MSH%xMinGlob)
+!            call wLog(" ")
+!
+!            !Local Extremes
+!            delta = delta/MSH%procPerDim
+!            MSH%xMinExt = MSH%xMinGlob + (delta)*(dble(MSH%coords)) !Adding the others processors
+!            MSH%xMaxExt = MSH%xMinExt + delta
+!            where(MSH%coords /= MSH%procPerDim-1) MSH%xMaxExt = MSH%xMaxExt-MSH%xStep
+!
+!            !Copy to the internal boundary
+!            MSH%xMinInt   = MSH%xMinExt
+!            MSH%xMaxInt   = MSH%xMaxExt
+!
+!            call wLog(" ")
+!            call wLog("        OUT MSH%xMinExt = ")
+!            call wLog(MSH%xMinExt)
+!            call wLog("        OUT MSH%xMaxExt = ")
+!            call wLog(MSH%xMaxExt)
+!            call wLog("            delta       = ")
+!            call wLog(MSH%xMaxExt - MSH%xMinExt)
+!            call wLog(" ")
 
         end if
 

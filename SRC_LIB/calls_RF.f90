@@ -152,7 +152,7 @@ contains
                 call gen_Std_Gauss_FFT(RDF)
         end select
 
-        RDF%randField = 0.0 ! For Tests
+        !RDF%randField = 0.0 ! For Tests
 
         if(RDF%independent) then
             !Communicating borders to neighbours
@@ -185,7 +185,7 @@ contains
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
         end do
 
-        !RDF%randField = RDF%rang ! For Tests
+        RDF%randField = RDF%rang ! For Tests
 
     end subroutine gen_Std_Gauss
 

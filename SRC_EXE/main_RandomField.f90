@@ -27,7 +27,7 @@ program main_RandomField
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeFiles = .true.
     logical :: sameFolder = .true.
-    integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
+    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
 
     double precision, dimension(:), allocatable :: step_mult, step_add, step_initial
     double precision, dimension(:), allocatable :: corrL_mult, corrL_add, corrL_initial
@@ -409,9 +409,9 @@ program main_RandomField
             call wLog(minval(RDF%xPoints,2))
 
 
-            !i = size(RDF%xPoints,2)
-            !if(i>50) i = 50
-            !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
+            i = size(RDF%xPoints,2)
+            if(i>50) i = 50
+            call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
 
             call allocate_randField(RDF, RDF%randField_Local)
 

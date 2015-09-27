@@ -125,10 +125,10 @@ contains
 
         end do !Direction
 
-        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
-        !                                               * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
+        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
+                                                       * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
 
-        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
+        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
 
     end subroutine applyWeightingFunctions
 
@@ -240,10 +240,10 @@ contains
 
                     !Sum of the contribution
 
-                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
-                    !                                 (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
+                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
+                                                     (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
 
-                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
+                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
                 else
                     call wLog("    CONTRIBUTION NOT ACCEPTED ")
                 end if

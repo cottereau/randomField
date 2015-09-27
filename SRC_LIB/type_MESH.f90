@@ -16,7 +16,8 @@ module type_MESH
         !MESH VARIABLES
             !nDim independent
         character (len=15) :: meshType, meshMod;
-        integer :: nDim = -1, xNTotal = -1;
+        integer :: nDim = -1
+        integer :: xNTotal = -1, xNInit = -1, xNEnd = -1, xNGlob = -1
         logical :: independent
             !nDim dependent
         integer         , dimension(:), allocatable :: xNStep, procPerDim;
