@@ -21,23 +21,32 @@ program main_Stat
     integer :: code, commLocal, rang, nb_procs, comm;
     integer :: nDim, Nmc, method, corrMod, margiFirst
     type(STAT) :: STA
+    character(len=70) :: testeChar, testInt
     character(len=200), parameter :: resPath = "./results/res/h5/samples-ALLprocStruct.h5"
     character(len=200), parameter :: meshPath = "./mesh_input"
     character(len=200), parameter :: genPath = "./gen_input"
     character(len=200), parameter :: outPath = "./results/res/singleGen"
-    write(*,*) "STATISTICS !!!!!!!!!!!!!!!"
 
     comm = MPI_COMM_WORLD
 
     call init(comm)
+    if(STA%rang == 0) then
+        write(*,*) "  -----------------------------------------------"
+        write(*,*) "  -------------CALCULATING STATISTICS------------"
+        write(*,*) "  -----------------------------------------------"
+        write(*,*) " "
+    end if
     call read_RF_h5_File_Attributes()
     call set_Local_Range()
     call set_Sk_Dir()
     call read_RF_h5_File_Table()
     call calculate_average_and_stdVar_MPI(STA)
     call rebuild_Sk(STA)
-    call show_STAT(STA, "HEY STAT", 6)
+    !call show_STAT(STA, "HEY STAT", 6)
+
     call finalize()
+
+
 
     contains
 
@@ -58,8 +67,6 @@ program main_Stat
             STA%rang     = rang
             STA%nb_procs = nb_procs
 
-            write(*,*) "comm = ", comm
-
         end subroutine init
 
         !---------------------------------------------------------------------------------
@@ -76,8 +83,11 @@ program main_Stat
             integer(HID_T) :: file_id, attr_id, space_id, dset_id
             double precision, dimension(:), allocatable :: locData
 
+            if(STA%rang == 0) write(*,*) " Searching for file: ",resPath
+
             call h5open_f(hdferr) ! Initialize FORTRAN interface.
             call h5fopen_f(trim(resPath), H5F_ACC_RDONLY_F, file_id, hdferr) !Open File
+            if(hdferr /= 0) stop("ERROR OPENING FILE")
 
             !READING SCALARS----------------------------
             !BOOL
@@ -230,9 +240,7 @@ program main_Stat
             !write(*,*) "dims    = ", dims
             !write(*,*) "maxdims = ", maxdims
             !if(STA%rang == 1) write(*,*) "STA%randField(:,1)            = ", STA%randField(:,1)
-            !write(*,*) "locRF(1:10,1)            = ", locRF(1:10,1)
             !write(*,*) "STA%randField(1:10,1)    = ", STA%randField(1:10,1)
-            !write(*,*) "locRF(160:170,1)         = ", locRF(160:170,1)
             !write(*,*) "STA%randField(160:170,1) = ", STA%randField(160:170,1)
 
             call h5fclose_f(file_id, hdferr) ! Close the file.

@@ -28,8 +28,8 @@ module type_STAT
         integer(kind=8) , dimension(:), allocatable :: xNStep, xNStep_Loc!, kNStep
         integer,          dimension(:), allocatable :: procPerDim, coords
         integer,          dimension(:,:), allocatable :: localRange
-        integer,          dimension(:,:), allocatable :: Sk_Ind
-        double precision, dimension(:), allocatable :: Sk_Dir
+        integer,          dimension(:,:), allocatable :: Sk_Ind, SkTot_Ind
+        double precision, dimension(:), allocatable :: Sk_Dir, SkTot_Dir
         !integer(kind=8) :: xNTotal, kNTotal
         !integer(kind=8) :: sum_xNTotal, sum_kNTotal
 
@@ -68,6 +68,7 @@ module type_STAT
             allocate(STAT_a%coords(nDim))
             allocate(STAT_a%localRange(nDim,2))
             allocate(STAT_a%Sk_Ind(nDim,2))
+            allocate(STAT_a%SkTot_Ind(nDim,2))
             STAT_a%corrL  = -1
             STAT_a%xMinGlob = -1
             STAT_a%xMaxGlob = -1
@@ -167,6 +168,9 @@ module type_STAT
             if(allocated(STAT_a%Sk_Ind))      deallocate(STAT_a%Sk_Ind)
             if(allocated(STAT_a%Sk_Dir))      deallocate(STAT_a%Sk_Dir)
             if(allocated(STAT_a%xNStep_Loc))  deallocate(STAT_a%xNStep_Loc)
+            if(allocated(STAT_a%SkTot_Dir))   deallocate(STAT_a%SkTot_Dir)
+            if(allocated(STAT_a%SkTot_Ind))   deallocate(STAT_a%SkTot_Ind)
+
             STAT_a%init = .false.
 
         end subroutine finalize_STAT

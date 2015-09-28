@@ -120,6 +120,9 @@ contains
         !testVec = [(i, i = 1, 16)]
 
         !Normalization
+        call wLog(" ")
+        call wLog("->Normalizing Coordinates")
+        call wLog(" ")
         do i = 1, RDF%nDim
             RDF%xPoints(i,:) = RDF%xPoints(i,:)/RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
@@ -128,8 +131,12 @@ contains
             RDF%xMaxExt(i) = RDF%xMaxExt(i)/RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
             RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)/RDF%corrL(i)
+
             MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)/RDF%corrL(i)
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)/RDF%corrL(i)
+            MSH%xMaxBound(i)   = MSH%xMaxBound(i)/RDF%corrL(i)
+            MSH%xMinBound(i)   = MSH%xMinBound(i)/RDF%corrL(i)
+            MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)/RDF%corrL(i)
         end do
 
         !Generating Standard Gaussian Field
@@ -173,19 +180,23 @@ contains
         end if
 
         !Reverting Normalization
-        !write(get_fileId(),*) " "
-        !write(get_fileId(),*) "->Reverting Normalization"
+        call wLog(" ")
+        call wLog("->Reverting Normalization")
         do i = 1, RDF%nDim
             RDF%xPoints(i,:) = RDF%xPoints(i,:)*RDF%corrL(i)
             RDF%xMinGlob(i)  = RDF%xMinGlob(i)*RDF%corrL(i)
             RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)*RDF%corrL(i)
             RDF%xMinExt(i) = RDF%xMinExt(i)*RDF%corrL(i)
             RDF%xMaxExt(i) = RDF%xMaxExt(i)*RDF%corrL(i)
+
             MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)*RDF%corrL(i)
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
+            MSH%xMaxBound(i)   = MSH%xMaxBound(i)*RDF%corrL(i)
+            MSH%xMinBound(i)   = MSH%xMinBound(i)*RDF%corrL(i)
+            MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)*RDF%corrL(i)
         end do
 
-        RDF%randField = RDF%rang ! For Tests
+        !RDF%randField = RDF%rang ! For Tests
 
     end subroutine gen_Std_Gauss
 
