@@ -40,8 +40,8 @@ program main_Stat
     call set_Local_Range()
     call set_Sk_Dir()
     call read_RF_h5_File_Table()
-    call calculate_average_and_stdVar_MPI(STA)
-    call rebuild_Sk(STA)
+    !call calculate_average_and_stdVar_MPI(STA)
+    !call rebuild_Sk(STA)
     !call show_STAT(STA, "HEY STAT", 6)
 
     call finalize()
@@ -88,10 +88,10 @@ program main_Stat
             call h5open_f(hdferr) ! Initialize FORTRAN interface.
             call h5fopen_f(trim(resPath), H5F_ACC_RDONLY_F, file_id, hdferr) !Open File
             if(hdferr /= 0) stop("ERROR OPENING FILE")
+            !write(*,*) "hdferr = ", hdferr
 
             !READING SCALARS----------------------------
             !BOOL
-            write(*,*) "-> 1"
             attr_name = "independent"
             call read_h5attr_bool(file_id, trim(adjustL(attr_name)), STA%independent)
 
@@ -207,8 +207,11 @@ program main_Stat
             locDims(:) = STA%localRange(:,2) - STA%localRange(:,1) + 1
             write(*,*) " locDims = ", locDims
 
+            if(STA%rang == 0) write(*,*) " Searching for file: ",resPath
             call h5open_f(hdferr) ! Initialize FORTRAN interface.
             call h5fopen_f(trim(resPath), H5F_ACC_RDONLY_F, file_id, hdferr) !Open File
+            if(hdferr /= 0) stop("ERROR OPENING FILE inside read_RF_h5_File_Table")
+            !write(*,*) "hdferr = ", hdferr
 
             !Allocating Vectors
 
@@ -227,7 +230,13 @@ program main_Stat
             write(*,*) " locDims  = ", locDims
             !For hyperslab lecture
             !IN
-            call h5sselect_hyperslab_f(space_id, H5S_SELECT_SET_F, offset, locDims, hdferr) !Select Hyperslab IN
+            if(STA%independent) then
+                call h5sselect_hyperslab_f(space_id, H5S_SELECT_SET_F, offset, locDims, hdferr) !Select Hyperslab IN
+            else
+                write(*,*) "Developement to non-independent INPUT"
+            end if
+            !call h5sselect_hyperslab_f(space_id, H5S_SELECT_OR, offset, locDims, hdferr) !Add Selection to he hyperslab IN
+
             !OUT
             call h5screate_simple_f(2, locShape, mem_id, hdferr) !Create memory dataspace
             call h5sselect_hyperslab_f(mem_id, H5S_SELECT_SET_F, zero2D, locShape, hdferr) !Select Hyperslab OUT

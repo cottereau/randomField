@@ -9,7 +9,7 @@ module mesh_RF
     implicit none
 
 contains
-    !--------------²---------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -20,30 +20,23 @@ contains
         type(MESH) :: MSH
         type(RF)   :: RDF
         double precision, dimension(:, :), allocatable, intent(out), target :: xPoints;
+        integer, dimension(MSH%nDim) :: tempXNStep
 
         !LOCAL
         integer :: i, j, counterXPoints
-        integer, dimension(MSH%nDim) :: tempXNStep
-        !        double precision, dimension(MSH%nDim) :: minForStep, maxForStep
-        !
-        !        !COUNTING POINTS
-        !        minForStep = MSH%xMinInt
-        !        maxForStep = MSH%xMaxInt
-        !
-        !        do j = 1, size(MSH%xMaxNeigh, 2)
-        !
-        !            if(.not. MSH%considerNeighbour(j)) cycle
-        !
-        !            where (MSH%xMinNeigh(:,j) < minForStep) minForStep = MSH%xMinNeigh(:,j)
-        !            where (MSH%xMaxNeigh(:,j) > maxForStep) maxForStep = MSH%xMaxNeigh(:,j)
-        !        end do
+        !integer, dimension(MSH%nDim) :: tempXNStep
 
         if(MSH%independent) then
 
             !ALLOCATING (Internal + External)
-            MSH%xNStep  = find_xNStep(MSH%xMinBound, MSH%xMaxBound, MSH%xStep)
-            MSH%xNTotal = product(MSH%xNStep)
-            RDF%xNTotal = MSH%xNTotal
+
+            call wLog("GENERATION BY VOLUME (Independent)")
+            call wLog("MSH%xNStep ")
+            call wLog(int(MSH%xNStep))
+            call wLog("MSH%xNTotal ")
+            call wLog(MSH%xNTotal )
+            call wLog("RDF%xNTotal ")
+            call wLog(int(RDF%xNTotal))
 
             call wLog("TOTAL")
             call wLog("MSH%xNStep")
@@ -104,12 +97,10 @@ contains
             allocate(xPoints(MSH%nDim, MSH%xNTotal))
 
             counterXPoints = 0
-            tempXNStep = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
-            call wLog("tempXNStep")
-            call wLog(tempXNStep)
+
             do i = MSH%xNInit, MSH%xNEnd
                 counterXPoints = counterXPoints +1
-                call get_Permutation(i, MSH%xMaxGlob, tempXNStep, &
+                call get_Permutation(i, MSH%xMaxGlob, MSH%xNStep, &
                     xPoints(:,counterXPoints), MSH%xMinGlob,  &
                     snapExtremes = .true.);
             end do
@@ -132,7 +123,9 @@ contains
         type(RF)  , intent(inout) :: RDF
         type(MESH), intent(inout) :: MSH
 
+
         RDF%origin = find_xNStep(MSH%xMinGlob, MSH%xMinBound , MSH%xStep)
+
 
     end subroutine get_XPoints_globCoords
     !-----------------------------------------------------------------------------------------------
@@ -603,6 +596,7 @@ contains
         !LOCAL
         logical, dimension(MSH%nDim) :: periods
         integer :: code
+        integer, dimension (MSH%nDim) :: tempXNStep
 
         periods(:) = .false.
 
@@ -617,6 +611,13 @@ contains
             MSH%xMaxExt = MSH%xMaxGlob
             MSH%xNTotal = size(RDF%xPoints, 2)
             RDF%xNTotal = MSH%xNTotal
+            MSH%xMinBound = MSH%xMinGlob
+            MSH%xMaxBound = MSH%xMaxGlob
+            call wLog("     MSH%xMinBound = ")
+            call wLog(MSH%xMinBound)
+            call wLog("     MSH%xMaxBound = ")
+            call wLog(MSH%xMaxBound)
+            call wLog(" ")
 
         else if(RDF%independent) then
             call wLog("-> set_procPerDim")
@@ -625,16 +626,14 @@ contains
             call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
             call wLog("-> MPI_CART_COORDS")
             call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
-            call wLog("-> define_generation_geometry")
-            call define_generation_geometry (MSH, RDF)
 
             call wLog("-> set_neighbours")
             call set_neighbours (MSH)
             call wLog("-> get_NeighbourCriteria")
             call get_NeighbourCriteria (MSH)
-            call wLog("-> get_overlap_geometry")
-            call get_overlap_geometry (MSH, RDF%corrL)
 
+            call wLog("-> define_generation_geometry")
+            call define_generation_geometry (MSH, RDF)
             call wLog("-> Getting Global Matrix Reference")
             call get_XPoints_globCoords(RDF, MSH)
             call wLog("     RDF%origin = ")
@@ -644,6 +643,24 @@ contains
         else
             call wLog("-> define_generation_geometry")
             call define_generation_geometry (MSH, RDF)
+            tempXNStep = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
+            call get_Permutation(MSH%xNInit, MSH%xMaxGlob, tempXNStep, &
+                                 MSH%xMinBound, MSH%xMinGlob,  &
+                                 snapExtremes = .true.)
+            call get_Permutation(MSH%xNEnd, MSH%xMaxGlob, tempXNStep, &
+                                 MSH%xMaxBound, MSH%xMinGlob,  &
+                                 snapExtremes = .true.);
+            call wLog("     MSH%xMinBound (Linear)= ")
+            call wLog(MSH%xMinBound)
+            call wLog("     MSH%xMaxBound (Linear) = ")
+            call wLog(MSH%xMaxBound)
+            call wLog(" ")
+            call wLog("-> Getting Global Matrix Reference")
+            call get_XPoints_globCoords(RDF, MSH)
+            call wLog("     RDF%origin = ")
+            call wLog(RDF%origin)
+            call wLog(" ")
+
         end if
 
     end subroutine define_topography
@@ -661,7 +678,6 @@ contains
         type(RF)  , intent(inout) :: RDF
 
         !LOCAL
-        integer :: i
         double precision, dimension(MSH%nDim) :: delta, half, ovlp, nonOvlp, minVol
         double precision, dimension(MSH%nDim) :: locNO, locO
         integer, dimension(MSH%nDim) :: nPointsNO, nPointsO, nPointsTot, nPointsLoc
@@ -731,10 +747,10 @@ contains
                 MSH%xNEnd = MSH%xNEnd - 1
             end if
 
+            MSH%xNStep = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
             MSH%xNTotal = MSH%xNEnd - MSH%xNInit + 1
             RDF%xNTotal = MSH%xNTotal
 
-            call wLog(" ")
             call wLog("        OUT MSH%xNInit = ")
             call wLog(int(MSH%xNInit))
             call wLog("        OUT MSH%xNEnd = ")
@@ -743,8 +759,10 @@ contains
             call wLog(int(MSH%xNTotal))
             call wLog("        OUT RDF%xNTotal = ")
             call wLog(int(RDF%xNTotal))
-            call wLog("        OUT MSH%xNGlob = ")
-            call wLog(int(MSH%xNGlob))
+            call wLog("        OUT MSH%xNTotal = ")
+            call wLog(int(MSH%xNTotal))
+            call wLog("        OUT MSH%xNStep = ")
+            call wLog(int(MSH%xNStep))
 
 
 !            !Global extremes
@@ -781,10 +799,9 @@ contains
 !            call wLog(MSH%xMaxExt - MSH%xMinExt)
 !            call wLog(" ")
 
-        end if
 
         !INDEPENDENT CASE (For Localization)
-        if(MSH%independent) then
+        else if(MSH%independent) then
 
 
             !Rounding overlap
@@ -872,6 +889,20 @@ contains
             call wLog(MSH%xMinInt)
             call wLog("        OUT MSH%xMaxInt = ")
             call wLog(MSH%xMaxInt)
+
+            call wLog("-> get_overlap_geometry")
+            call get_overlap_geometry (MSH, RDF%corrL)
+
+            MSH%xNStep  = find_xNStep(MSH%xMinBound, MSH%xMaxBound, MSH%xStep)
+            MSH%xNTotal = product(MSH%xNStep)
+            RDF%xNTotal = MSH%xNTotal
+
+            call wLog("        OUT RDF%xNTotal = ")
+            call wLog(int(RDF%xNTotal))
+            call wLog("        OUT MSH%xNTotal = ")
+            call wLog(int(MSH%xNTotal))
+            call wLog("        OUT MSH%xNStep = ")
+            call wLog(int(MSH%xNStep))
 
         end if
 

@@ -406,7 +406,6 @@ contains
         integer, dimension(1:), optional, intent(in) :: seedIn
         integer, optional, intent(in) :: seedStart
         !LOCAL
-        integer :: clock
         integer, dimension(:), allocatable :: seed
 
         if(present(seedIn)) then
@@ -492,157 +491,157 @@ contains
 
     end subroutine calculate_random_seed
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine get_SequenceParam(axis, nPlane, nStep, beg, step, ends)
-
-        implicit none
-
-        !INPUT
-        integer,               intent(in) :: axis, nPlane
-        integer, dimension(1:), intent(in) :: nStep;
-
-        !OUTPUT
-        integer, intent(out) :: beg, step, ends;
-
-        !LOCAL VARIABLES
-        integer :: i, nDim, position, posPlane, gap;
-
-        beg  = 0
-        nDim = size(nStep)
-
-        step = product(nStep(axis+1:));
-        if (i == nDim) step = 1;
-        gap = step*nStep(axis)
-        beg = cyclicMod(nPlane, step) &
-            + int((nPlane-0.9)/step)*gap
-        ends = beg + step*(nStep(axis)-1)
-
-    end subroutine get_SequenceParam
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine set_DeltaMatrix(xPoints, deltaMatrix)
-
-        implicit none
-
-        !INPUT
-        double precision, dimension(:, :), intent(in)  :: xPoints;
-
-        !OUTPUT
-        double precision, dimension(:,:), intent(out) :: deltaMatrix;
-
-        !LOCAL VARIABLES
-        logical         , dimension(:, :)   , allocatable :: uniqMask;
-        logical         , dimension(:)      , allocatable :: minMask;
-        integer          :: pos, posNeigh;
-        integer          :: i, j, k, nDim, nPoints, nFactors;
-        double precision :: tolerance = 1.0d-6, increment;
-
-        !Matrix of distances between points: distMatrix (point 1, point 2, dimension)
-        nDim        = size(xPoints, 1)
-        nPoints     = size(xPoints, 2)
-        deltaMatrix = 0;
-
-        allocate(minMask  (nPoints))
-        allocate(uniqMask (nDim, nPoints))
-
-        !call DispCarvalhol(transpose(xPoints),"transpose(xPoints)", nColumns = 15)
-
-        !Building the unicity mask
-        do i = 1, nDim
-            uniqMask(i,:) = .true.
-            do j = 1, nPoints
-                if(uniqMask(i,j)) then
-                    do k = j + 1, nPoints
-                        if(xPoints(i, k) == xPoints(i, j)) then
-                            uniqMask(i,k) = .false.
-                        end if
-                    end do
-                end if
-            end do
-        end do
-
-        !call DispCarvalhol(transpose(uniqMask(:,1:20)),"transpose(uniqMask(:,1:20))", nColumns = 15)
-        !call DispCarvalhol(transpose(uniqMask(:,:)),"transpose(uniqMask(:,:))", nColumns = 15)
-
-        !Building the delta matrix
-        deltaMatrix = 0
-        do i = 1, nDim
-            minMask  = uniqMask(i,:)
-            nFactors = count(minMask)
-            do j = 1, nFactors - 1
-                pos          = minloc(xPoints(i,:), dim = 1, mask = minMask)
-                minMask(pos) = .false.
-                posNeigh     = minloc(xPoints(i,:), dim = 1, mask = minMask)
-                increment    = (xPoints(i, posNeigh) - xPoints(i, pos)) / 2
-                deltaMatrix(i, pos)      = deltaMatrix(i, pos     ) + increment
-                deltaMatrix(i, posNeigh) = deltaMatrix(i, posNeigh) + increment
-
-                !!Supposing the extremes symetrics
-                !if (pos == 1) deltaMatrix(pos     , i) = deltaMatrix(pos     , i) + increment
-                !if (pos == (nFactors - 1)) deltaMatrix(posNeigh, i) = deltaMatrix(posNeigh, i) + increment
-            end do
-        end do
-
-        !call DispCarvalhol(deltaMatrix,"deltaMatrix", nColumns = 15)
-
-        !Filling the rest o the delta matrix (repeated values)
-        do i = 1, nDim
-            uniqMask(i, :) = .true.
-            do j = 1, nPoints
-                if(uniqMask(i, j)) then
-                    do k = j + 1, nPoints
-                        if(xPoints(i, k) == xPoints(i, j)) then
-                            deltaMatrix(i,k) = deltaMatrix(i,j)
-                            uniqMask(i,k) = .false.
-                        end if
-                    end do
-                end if
-            end do
-        end do
-
-
-        if(allocated(minMask))  deallocate(minMask)
-        if(allocated(uniqMask)) deallocate(uniqMask)
-
-    end subroutine set_DeltaMatrix
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine set_DistMatrix(xPoints, distMatrix)
-
-        implicit none
-
-        !INPUT
-        double precision, dimension(:, :), intent(in)  :: xPoints;
-
-        !OUTPUT
-        double precision, dimension(:,:,:), intent(out) :: distMatrix;
-
-        !LOCAL VARIABLES
-        integer          :: i, nDim, nPoints;
-
-        nDim    = size(xPoints, 1)
-        nPoints = size(xPoints, 2)
-
-        !Building the distance Matrix
-        do i = 1, nPoints
-            !write(*,*) "i = ", i
-            distMatrix(i, :, :) = transpose(xPoints);
-        end do
-        do i = 1, nDim
-            distMatrix(:, :, i) = transpose(distMatrix(:, :, i)) - distMatrix(:, :, i)
-        end do
-        distMatrix(:, :, :) = abs(distMatrix(:, :, :))
-
-    end subroutine set_DistMatrix
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine get_SequenceParam(axis, nPlane, nStep, beg, step, ends)
+!
+!        implicit none
+!
+!        !INPUT
+!        integer,               intent(in) :: axis, nPlane
+!        integer, dimension(1:), intent(in) :: nStep;
+!
+!        !OUTPUT
+!        integer, intent(out) :: beg, step, ends;
+!
+!        !LOCAL VARIABLES
+!        integer :: i, nDim, gap;
+!
+!        beg  = 0
+!        nDim = size(nStep)
+!
+!        step = product(nStep(axis+1:));
+!        if (i == nDim) step = 1;
+!        gap = step*nStep(axis)
+!        beg = cyclicMod(nPlane, step) &
+!            + int((nPlane-0.9)/step)*gap
+!        ends = beg + step*(nStep(axis)-1)
+!
+!    end subroutine get_SequenceParam
+!
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine set_DeltaMatrix(xPoints, deltaMatrix)
+!
+!        implicit none
+!
+!        !INPUT
+!        double precision, dimension(:, :), intent(in)  :: xPoints;
+!
+!        !OUTPUT
+!        double precision, dimension(:,:), intent(out) :: deltaMatrix;
+!
+!        !LOCAL VARIABLES
+!        logical         , dimension(:, :)   , allocatable :: uniqMask;
+!        logical         , dimension(:)      , allocatable :: minMask;
+!        integer          :: pos, posNeigh;
+!        integer          :: i, j, k, nDim, nPoints, nFactors;
+!        double precision :: increment;
+!
+!        !Matrix of distances between points: distMatrix (point 1, point 2, dimension)
+!        nDim        = size(xPoints, 1)
+!        nPoints     = size(xPoints, 2)
+!        deltaMatrix = 0;
+!
+!        allocate(minMask  (nPoints))
+!        allocate(uniqMask (nDim, nPoints))
+!
+!        !call DispCarvalhol(transpose(xPoints),"transpose(xPoints)", nColumns = 15)
+!
+!        !Building the unicity mask
+!        do i = 1, nDim
+!            uniqMask(i,:) = .true.
+!            do j = 1, nPoints
+!                if(uniqMask(i,j)) then
+!                    do k = j + 1, nPoints
+!                        if(xPoints(i, k) == xPoints(i, j)) then
+!                            uniqMask(i,k) = .false.
+!                        end if
+!                    end do
+!                end if
+!            end do
+!        end do
+!
+!        !call DispCarvalhol(transpose(uniqMask(:,1:20)),"transpose(uniqMask(:,1:20))", nColumns = 15)
+!        !call DispCarvalhol(transpose(uniqMask(:,:)),"transpose(uniqMask(:,:))", nColumns = 15)
+!
+!        !Building the delta matrix
+!        deltaMatrix = 0
+!        do i = 1, nDim
+!            minMask  = uniqMask(i,:)
+!            nFactors = count(minMask)
+!            do j = 1, nFactors - 1
+!                pos          = minloc(xPoints(i,:), dim = 1, mask = minMask)
+!                minMask(pos) = .false.
+!                posNeigh     = minloc(xPoints(i,:), dim = 1, mask = minMask)
+!                increment    = (xPoints(i, posNeigh) - xPoints(i, pos)) / 2
+!                deltaMatrix(i, pos)      = deltaMatrix(i, pos     ) + increment
+!                deltaMatrix(i, posNeigh) = deltaMatrix(i, posNeigh) + increment
+!
+!                !!Supposing the extremes symetrics
+!                !if (pos == 1) deltaMatrix(pos     , i) = deltaMatrix(pos     , i) + increment
+!                !if (pos == (nFactors - 1)) deltaMatrix(posNeigh, i) = deltaMatrix(posNeigh, i) + increment
+!            end do
+!        end do
+!
+!        !call DispCarvalhol(deltaMatrix,"deltaMatrix", nColumns = 15)
+!
+!        !Filling the rest o the delta matrix (repeated values)
+!        do i = 1, nDim
+!            uniqMask(i, :) = .true.
+!            do j = 1, nPoints
+!                if(uniqMask(i, j)) then
+!                    do k = j + 1, nPoints
+!                        if(xPoints(i, k) == xPoints(i, j)) then
+!                            deltaMatrix(i,k) = deltaMatrix(i,j)
+!                            uniqMask(i,k) = .false.
+!                        end if
+!                    end do
+!                end if
+!            end do
+!        end do
+!
+!
+!        if(allocated(minMask))  deallocate(minMask)
+!        if(allocated(uniqMask)) deallocate(uniqMask)
+!
+!    end subroutine set_DeltaMatrix
+!
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine set_DistMatrix(xPoints, distMatrix)
+!
+!        implicit none
+!
+!        !INPUT
+!        double precision, dimension(:, :), intent(in)  :: xPoints;
+!
+!        !OUTPUT
+!        double precision, dimension(:,:,:), intent(out) :: distMatrix;
+!
+!        !LOCAL VARIABLES
+!        integer          :: i, nDim, nPoints;
+!
+!        nDim    = size(xPoints, 1)
+!        nPoints = size(xPoints, 2)
+!
+!        !Building the distance Matrix
+!        do i = 1, nPoints
+!            !write(*,*) "i = ", i
+!            distMatrix(i, :, :) = transpose(xPoints);
+!        end do
+!        do i = 1, nDim
+!            distMatrix(:, :, i) = transpose(distMatrix(:, :, i)) - distMatrix(:, :, i)
+!        end do
+!        distMatrix(:, :, :) = abs(distMatrix(:, :, :))
+!
+!    end subroutine set_DistMatrix
 
 end module math_RF
 !! Local Variables:

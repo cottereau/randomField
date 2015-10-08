@@ -442,9 +442,9 @@ program main_RandomField
                 call wLog(tLoc2 - tLoc1)
             end if
 
-            i = size(RDF%xPoints,2)
+            !i = size(RDF%xPoints,2)
             !if(i>50) i = 50
-            call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
+            !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
 
 
             !i = size(RDF%xPoints,2)
@@ -494,7 +494,7 @@ program main_RandomField
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         subroutine end_communication()
-            call finalize_log_file(rang)
+            call finalize_log_file()
             call MPI_FINALIZE(code)
         end subroutine end_communication
 

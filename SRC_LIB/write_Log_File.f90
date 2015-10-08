@@ -49,16 +49,10 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine finalize_log_file(rang)
+    subroutine finalize_log_file()
         implicit none
-        !INPUT
-        integer, intent(in) :: rang
-        !LOCAL
-        integer :: fileId
 
-        fileId = log_file_RF_ID
-
-        close(fileId)
+        close(log_file_RF_ID)
 
     end subroutine finalize_log_file
 

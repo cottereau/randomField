@@ -59,9 +59,6 @@ contains
         !OUTPUT
         character (len=200) :: stringTot;
 
-        !LOCAL
-        integer :: i
-
         !write(*,*) "WRITE Flag string_join"
         stringTot = ""
         stringTot = trim(adjustL(string1))
