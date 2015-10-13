@@ -196,7 +196,7 @@ contains
             MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)*RDF%corrL(i)
         end do
 
-        !RDF%randField = RDF%rang ! For Tests
+        RDF%randField = RDF%rang ! For Tests
 
     end subroutine gen_Std_Gauss
 

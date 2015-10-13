@@ -11,8 +11,11 @@ module randomFieldND
     use type_MESH
     use common_variables_RF
     use writeResultFile_RF
+    use, intrinsic :: iso_c_binding
     implicit none
-    include 'fftw3.f'
+    !include 'fftw3.f'
+    include 'fftw3-mpi.f03'
+        ! <INCLUDE IN THE LINE BEFORE THIS
     !WARNING before this line we have include 'fftw3.f'
     !use blas
 
@@ -360,6 +363,84 @@ contains
         type(RF), intent(inout) :: RDF
         double precision, dimension(:), target :: SkVec
         double precision, dimension(:), target :: randFieldVec
+
+        !POINTERS TO INPUT
+        double precision, dimension(RDF%kNTotal) :: gammaK, phiK
+        double precision, dimension(:,:)  , pointer :: SkVec_2D
+        double precision, dimension(:,:,:), pointer :: SkVec_3D
+        double precision, dimension(:,:)  , pointer :: RF_2D
+        double precision, dimension(:,:,:)  , pointer :: RF_3D
+
+        !LOCAL
+        integer, dimension(RDF%nDim) :: M;
+        double complex  , dimension(:,:)  , pointer :: SkSym_2D
+        double complex  , dimension(:,:,:), pointer :: SkSym_3D
+        double complex  , dimension(product(2*RDF%xNStep-2)), target :: SkSym
+        double precision, dimension(product(2*RDF%xNStep-2)), target :: RFSym
+        double precision, dimension(:,:)  , pointer :: RFSym_2D
+        double precision, dimension(:,:,:)  , pointer :: RFSym_3D
+        integer, dimension(RDF%nDim) :: kS, kE, kSc, kEc, kCore;
+        integer :: pos, i,j
+        integer*8 plan, planTest1, planTest2
+        double precision :: sizesProd
+
+        !START EXEMPLE
+        integer(C_INTPTR_T), parameter :: L = 3
+        integer(C_INTPTR_T), parameter :: M = 4
+        type(C_PTR) :: plan, cdata
+        complex(C_DOUBLE_COMPLEX), pointer :: data(:,:)
+        integer(C_INTPTR_T) :: i, j, alloc_local, local_M, local_j_offset
+
+        call wLog("Inside FFT Global")
+
+        !get local data size and allocate (note dimension reversal)
+        alloc_local = fftw_mpi_local_size_2d(M, L, MPI_COMM_WORLD, &
+            local_M, local_j_offset)
+        cdata = fftw_alloc_complex(alloc_local)
+        call c_f_pointer(cdata, data, [L,local_M])
+
+        !   create MPI plan for in-place forward DFT (note dimension reversal)
+        plan = fftw_mpi_plan_dft_2d(M, L, data, data, MPI_COMM_WORLD, &
+            FFTW_FORWARD, FFTW_ESTIMATE)
+
+        ! initialize data to some function my_function(i,j)
+        do j = 1, local_M
+            do i = 1, L
+                data(i, j) = i+ j*L
+            end do
+        end do
+
+        ! compute transform (as many times as desired)
+        call fftw_mpi_execute_dft(plan, data, data)
+
+        call fftw_destroy_plan(plan)
+        call fftw_free(cdata)
+
+        !END EXEMPLE
+
+
+        M = 2*RDF%xNStep-2
+
+        if(RDF%nDim == 2) then
+            SkVec_2D(1:RDF%kNStep(1),1:RDF%kNStep(2)) => SkVec
+            RF_2D(1:RDF%xNStep(1),1:RDF%xNStep(2))    => randFieldVec
+            SkSym_2D(1:M(1),1:M(2)) => SkSym
+            RFSym_2D(1:M(1),1:M(2)) => RFSym
+        else if(RDF%nDim == 3) then
+            SkVec_3D(1:RDF%kNStep(1),1:RDF%kNStep(2),1:RDF%kNStep(3)) => SkVec
+            RF_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3))    => randFieldVec
+            SkSym_3D(1:M(1),1:M(2),1:M(3)) => SkSym
+            RFSym_3D(1:M(1),1:M(2),1:M(3)) => RFSym
+        end if
+
+        if(associated(RF_2D))    nullify(RF_2D)
+        if(associated(RF_3D))    nullify(RF_3D)
+        if(associated(RFSym_2D)) nullify(RFSym_2D)
+        if(associated(RFSym_3D)) nullify(RFSym_3D)
+        if(associated(SkVec_2D)) nullify(SkVec_2D)
+        if(associated(SkVec_3D)) nullify(SkVec_3D)
+        if(associated(SkSym_2D)) nullify(SkSym_2D)
+        if(associated(SkSym_3D)) nullify(SkSym_3D)
 
     end subroutine gen_Std_Gauss_FFT_step2_glob
 

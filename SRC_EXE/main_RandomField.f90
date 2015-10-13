@@ -410,7 +410,7 @@ program main_RandomField
 
 
             i = size(RDF%xPoints,2)
-            if(i>50) i = 50
+            !if(i>50) i = 50
             call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
 
             call allocate_randField(RDF, RDF%randField_Local)
@@ -430,61 +430,60 @@ program main_RandomField
             call wLog("-> Generating Random Field")
             call create_RF_Unstruct_Init (RDF, MSH)
 
-
-            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
-                call wLog(" ")
-                call wLog("-> Reordering Random Field")
-                if(RDF%rang == 0) write(*,*) "-> Reordering Random Field"
-                tLoc1 = MPI_Wtime()
-                call reorderRandomFieldStruct(RDF, MSH)
-                tLoc2 = MPI_Wtime()
-                call wLog("       time (s)")
-                call wLog(tLoc2 - tLoc1)
-            end if
-
-            !i = size(RDF%xPoints,2)
-            !if(i>50) i = 50
-            !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
-
-
-            !i = size(RDF%xPoints,2)
-            !if(i>50) i = 50
-            !call dispCarvalhol(RDF%xPoints(1:i,:), "xPoints", "(F20.5)",unit_in = RDF%log_ID)
-
-            !call show_RF(RDF, forLog_in = .true.)
-
-            !call multiVariateTransformation (RDF%margiFirst, RDF%fieldAvg, RDF%fieldVar, RDF%randField)
-
-            t2 = MPI_Wtime();
-            call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
-            RDF%gen_CPU_Time = all_t2 - all_t1
-            if(RDF%rang == 0) write(*,*) "Generation CPU Time = ", all_t2 - all_t1
-            call wLog ("    Generation CPU Time (s)")
-            call wLog (RDF%gen_CPU_Time)
-            all_t3 = -1.0D0
-
-            if(writeFiles) then
-                call wLog("-> Writing XMF and hdf5 files");
-                if(RDF%rang == 0) write(*,*) "-> Writing XMF and hdf5 files"
-
-                if(outputStyle==1) then
-                    call wLog("   (Parallel)");
-                    call write_Mono_XMF_h5(RDF, MSH, connectList, monotype, "trans_", RDF%rang, single_path, &
-                                                    MPI_COMM_WORLD, ["_All"], [0], 0, style=outputStyle)
-                else
-                    call wLog("   (Per Proc)");
-                    call write_Mono_XMF_h5(RDF, MSH, connectList, monotype, "trans_", RDF%rang, single_path, &
-                                                    MPI_COMM_WORLD, ["_All"], [RDF%rang], 0, style=outputStyle)
-                end if
-                t3 = MPI_Wtime();
-                call MPI_ALLREDUCE (t3, all_t3, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
-                if(RDF%rang == 0) write(*,*) "Writing Files Time = ", all_t3 - all_t2
-                call wLog ("    Writing Files CPU Time (s)")
-                call wLog (all_t3 - all_t2)
-            end if
-
-            call write_generation_spec(MSH, RDF, single_path, "singleGen", &
-                                       [all_t1,all_t2,all_t3])
+!            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
+!                call wLog(" ")
+!                call wLog("-> Reordering Random Field")
+!                if(RDF%rang == 0) write(*,*) "-> Reordering Random Field"
+!                tLoc1 = MPI_Wtime()
+!                call reorderRandomFieldStruct(RDF, MSH)
+!                tLoc2 = MPI_Wtime()
+!                call wLog("       time (s)")
+!                call wLog(tLoc2 - tLoc1)
+!            end if
+!
+!            !i = size(RDF%xPoints,2)
+!            !if(i>50) i = 50
+!            !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
+!
+!
+!            !i = size(RDF%xPoints,2)
+!            !if(i>50) i = 50
+!            !call dispCarvalhol(RDF%xPoints(1:i,:), "xPoints", "(F20.5)",unit_in = RDF%log_ID)
+!
+!            !call show_RF(RDF, forLog_in = .true.)
+!
+!            !call multiVariateTransformation (RDF%margiFirst, RDF%fieldAvg, RDF%fieldVar, RDF%randField)
+!
+!            t2 = MPI_Wtime();
+!            call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
+!            RDF%gen_CPU_Time = all_t2 - all_t1
+!            if(RDF%rang == 0) write(*,*) "Generation CPU Time = ", all_t2 - all_t1
+!            call wLog ("    Generation CPU Time (s)")
+!            call wLog (RDF%gen_CPU_Time)
+!            all_t3 = -1.0D0
+!
+!            if(writeFiles) then
+!                call wLog("-> Writing XMF and hdf5 files");
+!                if(RDF%rang == 0) write(*,*) "-> Writing XMF and hdf5 files"
+!
+!                if(outputStyle==1) then
+!                    call wLog("   (Parallel)");
+!                    call write_Mono_XMF_h5(RDF, MSH, connectList, monotype, "trans_", RDF%rang, single_path, &
+!                                                    MPI_COMM_WORLD, ["_All"], [0], 0, style=outputStyle)
+!                else
+!                    call wLog("   (Per Proc)");
+!                    call write_Mono_XMF_h5(RDF, MSH, connectList, monotype, "trans_", RDF%rang, single_path, &
+!                                                    MPI_COMM_WORLD, ["_All"], [RDF%rang], 0, style=outputStyle)
+!                end if
+!                t3 = MPI_Wtime();
+!                call MPI_ALLREDUCE (t3, all_t3, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
+!                if(RDF%rang == 0) write(*,*) "Writing Files Time = ", all_t3 - all_t2
+!                call wLog ("    Writing Files CPU Time (s)")
+!                call wLog (all_t3 - all_t2)
+!            end if
+!
+!            call write_generation_spec(MSH, RDF, single_path, "singleGen", &
+!                                       [all_t1,all_t2,all_t3])
 
 
         end subroutine single_realization

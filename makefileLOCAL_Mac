@@ -22,7 +22,7 @@
 #### PATH TO HDF5 AND MPI LIBRARY AND INCLUDES - to be modified by user (to be completed if not the stantard ones)
 LIBHDF5     = -L/opt/local/lib -lhdf5 -lhdf5_hl -lhdf5_fortran -lhdf5hl_fortran
 INCLUDEHDF5 = -I/opt/local/include
-LIBFFTW     = -L/opt/local/lib -lfftw3 -lfftw3_threads
+LIBFFTW     = -L/opt/local/lib -lfftw3 -lfftw3_threads -lfftw3_mpi
 INCLUDEFFTW = -I/opt/local/include
 
 
