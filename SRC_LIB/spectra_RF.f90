@@ -56,6 +56,7 @@ contains
 
         !LOCAL
         integer :: i
+        integer ::kNLocal
         double precision :: kAdjust    = 1.0D0 !"kNStep minimum" multiplier
         double precision :: periodMult = 1.1D0 !"range" multiplier
         double precision :: rAdjust    = 1.0D0 !"rNStep minimum" multiplier
@@ -101,18 +102,17 @@ contains
                 end do
 
             case(FFT)
-                RDF%kNStep(:) = RDF%xNStep(:); !Number of points in k
+                !RDF%kNStep(:) = 2*(RDF%xNStep(:)+1); !Number of points in k
+                RDF%kNStep(:) = RDF%xNStep(:);
                 RDF%kDelta(:) = RDF%kDelta(:)
                 RDF%kNTotal   = product(RDF%kNStep);
-                RDF%kMax(:)   = dble(RDF%kNStep(:) - 1) * RDF%kDelta(:) !Redefinition of kMax
+                RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
 
-                allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
-                do i = 1, RDF%kNTotal
-                    call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
-                end do
+                kNLocal = RDF%kNEnd - RDF%kNInit + 1
 
-                do i = 1, RDF%nDim
-                    RDF%kPoints(i, :) = RDF%kPoints(i, :)/RDF%corrL(i)
+                allocate(RDF%kPoints(RDF%nDim, kNLocal))
+                do i = RDF%kNInit, RDF%kNEnd
+                    call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i-RDF%kNInit+1), snapExtremes = .true.);
                 end do
 
         end select

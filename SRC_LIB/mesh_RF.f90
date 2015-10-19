@@ -5,6 +5,7 @@ module mesh_RF
     use write_Log_File
     use type_RF
     use type_MESH
+    use fftw3
 
     implicit none
 
@@ -222,6 +223,12 @@ contains
         integer, dimension(MSH%nDim) :: xNStepGlob
         integer :: sliceSize
 
+        !FFTW
+        integer(C_INTPTR_T) :: L, M, N
+        integer(C_INTPTR_T) :: local_LastDim
+        integer(C_INTPTR_T) :: local_j_offset
+        integer(C_INTPTR_T) :: alloc_local
+
         !GLOBAL MANIPULATIONS
 
         !Defining MSH%xStep
@@ -279,7 +286,8 @@ contains
 
             xNStepGlob = find_xNStep(xMaxExt=(MSH%xMaxGlob - MSH%xMinGlob), xStep=MSH%xStep)
 
-            !if(RDF%method == FFT) then
+            if(RDF%method == FFT) then
+
                 if(xNStepGlob(MSH%nDim) < MSH%nb_procs) then
                    xNStepGlob(MSH%nDim) = MSH%nb_procs
                    half  = (MSH%xMaxGlob + MSH%xMinGlob)/2.0D0
@@ -297,42 +305,74 @@ contains
                    call wLog(" ")
 
                    xNStepGlob = find_xNStep(xMaxExt=(MSH%xMaxGlob - MSH%xMinGlob), xStep=MSH%xStep)
-
                 end if
-            !end if
 
-            MSH%XNGlob = product(xNStepGlob)
-
-            MSH%xNEnd = (MSH%rang + 1) * MSH%XNGlob/MSH%nb_procs + 1
-            MSH%xNInit  = MSH%rang * MSH%XNGlob/MSH%nb_procs + 1
-
-            if(MSH%rang == MSH%nb_procs-1) then
-                MSH%xNEnd = MSH%XNGlob
-            else
-                MSH%xNEnd = MSH%xNEnd - 1
-            end if
-
-            !if(RDF%method == FFT) then
+                call wLog("xNStepGlob = ")
+                call wLog(xNStepGlob)
 
                 if(xNStepGlob(MSH%nDim) < MSH%nb_procs) stop("ERROR!! When using parallel FFT the last dimension should have at least 1 slice by proc")
 
-                !Divising last dimension
-                MSH%xNEnd   = (MSH%rang + 1) * xNStepGlob(MSH%nDim)/MSH%nb_procs + 1
-                MSH%xNInit  = MSH%rang * xNStepGlob(MSH%nDim)/MSH%nb_procs + 1
+                if(RDF%nDim == 2) then
+                    L = xNStepGlob(1)
+                    M = xNStepGlob(2)
+                    alloc_local = fftw_mpi_local_size_2d(M, L, RDF%comm, &
+                                                         local_LastDim, local_j_offset) !FOR MPI
+                else if(RDF%nDim == 3) then
+                    L = xNStepGlob(1)
+                    M = xNStepGlob(2)
+                    N = xNStepGlob(3)
+                    alloc_local = fftw_mpi_local_size_3d(N, M, L, RDF%comm, &
+                                                         local_LastDim, local_j_offset) !FOR MPI
+                else
+                    stop("Inside define_generation_geometry no mesh division for FFT in this dimension")
+                end if
+
+                call wLog("local_LastDim = ")
+                call wLog(int(local_LastDim))
+                call wLog("local_j_offset = ")
+                call wLog(int(local_j_offset))
+
+                MSH%xNGlob = product(xNStepGlob)
+                MSH%xNInit = local_j_offset + 1
+                MSH%xNEnd  = MSH%xNInit + local_LastDim - 1
+
+                sliceSize = 1
+                if(MSH%nDim > 1) sliceSize = product(xNStepGlob(1:RDF%nDim -1))
+                MSH%xNInit = (MSH%xNInit - 1) * sliceSize + 1
+                MSH%xNEnd  =  MSH%xNEnd *sliceSize
+
+
+!                !Divising last dimension
+!                MSH%xNEnd   = (MSH%rang + 1) * xNStepGlob(MSH%nDim)/MSH%nb_procs + 1
+!                MSH%xNInit  = MSH%rang * xNStepGlob(MSH%nDim)/MSH%nb_procs + 1
+!
+!                if(MSH%rang == MSH%nb_procs-1) then
+!                    MSH%xNEnd = xNStepGlob(MSH%nDim)
+!                else
+!                    MSH%xNEnd = MSH%xNEnd - 1
+!                end if
+!
+!                !Multiplying by slice size
+!                sliceSize = 1
+!                if(MSH%nDim > 1) sliceSize = product(xNStepGlob(1:MSH%nDim -1))
+!                MSH%xNInit = (MSH%xNInit - 1) * sliceSize + 1
+!                MSH%xNEnd  = MSH%xNEnd *sliceSize
+!
+!                RDF%kNInit = MSH%xNInit
+!                RDF%kNEnd  = MSH%xNEnd
+
+            else
+                MSH%xNGlob = product(xNStepGlob)
+
+                MSH%xNEnd = (MSH%rang + 1) * MSH%XNGlob/MSH%nb_procs + 1
+                MSH%xNInit  = MSH%rang * MSH%XNGlob/MSH%nb_procs + 1
 
                 if(MSH%rang == MSH%nb_procs-1) then
-                    MSH%xNEnd = xNStepGlob(MSH%nDim)
+                    MSH%xNEnd = MSH%XNGlob
                 else
                     MSH%xNEnd = MSH%xNEnd - 1
                 end if
-
-                !Multiplying by slice size
-                sliceSize = 1
-                if(MSH%nDim > 1) sliceSize = product(xNStepGlob(1:MSH%nDim -1))
-                MSH%xNInit = (MSH%xNInit - 1) * sliceSize + 1
-                MSH%xNEnd  = MSH%xNEnd *sliceSize
-
-            !end if
+            end if
 
             MSH%xNStep = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
             MSH%xNTotal = MSH%xNEnd - MSH%xNInit + 1

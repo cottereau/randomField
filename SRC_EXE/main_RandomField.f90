@@ -401,35 +401,35 @@ program main_RandomField
             call wLog(RDF%seed)
             call wLog(" ")
 
-            call wLog("-> Setting xPoints")
-            call set_XPoints(MSH, RDF, RDF%xPoints_Local)
-            call wLog("      maxval(RDF%xPoints,2) = ")
-            call wLog(maxval(RDF%xPoints,2))
-            call wLog( "      minval(RDF%xPoints,2) = ")
-            call wLog(minval(RDF%xPoints,2))
-
-
-            i = size(RDF%xPoints,2)
-            !if(i>50) i = 50
-            call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
-
-            call allocate_randField(RDF, RDF%randField_Local)
-
-            call wLog("-> Setting folder path")
-            single_path = string_vec_join([results_path,"/",results_folder_name])
-            call wLog("     single_path = "//trim(single_path))
-
-            !Discovering the total number of points in all procs
-            call MPI_ALLREDUCE (RDF%xNTotal, all_xNTotal,1,MPI_INTEGER, &
-                                MPI_SUM,comm,code)
-            !Getting Initial Time
-            t1 = MPI_Wtime();
-            call MPI_ALLREDUCE (t1, all_t1, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
-            !if(RDF%rang == 0) write(*,*) "Time Zero = ", all_t1
-
-            call wLog("-> Generating Random Field")
-            call create_RF_Unstruct_Init (RDF, MSH)
-
+!            call wLog("-> Setting xPoints")
+!            call set_XPoints(MSH, RDF, RDF%xPoints_Local)
+!            call wLog("      maxval(RDF%xPoints,2) = ")
+!            call wLog(maxval(RDF%xPoints,2))
+!            call wLog( "      minval(RDF%xPoints,2) = ")
+!            call wLog(minval(RDF%xPoints,2))
+!
+!
+!            !i = size(RDF%xPoints,2)
+!            !if(i>50) i = 50
+!            !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
+!
+!            call allocate_randField(RDF, RDF%randField_Local)
+!
+!            call wLog("-> Setting folder path")
+!            single_path = string_vec_join([results_path,"/",results_folder_name])
+!            call wLog("     single_path = "//trim(single_path))
+!
+!            !Discovering the total number of points in all procs
+!            call MPI_ALLREDUCE (RDF%xNTotal, all_xNTotal,1,MPI_INTEGER, &
+!                                MPI_SUM,comm,code)
+!            !Getting Initial Time
+!            t1 = MPI_Wtime();
+!            call MPI_ALLREDUCE (t1, all_t1, 1, MPI_DOUBLE_PRECISION, MPI_SUM,comm,code)
+!            !if(RDF%rang == 0) write(*,*) "Time Zero = ", all_t1
+!
+!            call wLog("-> Generating Random Field")
+!            call create_RF_Unstruct_Init (RDF, MSH)
+!
 !            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
 !                call wLog(" ")
 !                call wLog("-> Reordering Random Field")

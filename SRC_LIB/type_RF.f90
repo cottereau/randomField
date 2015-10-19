@@ -33,6 +33,8 @@ module type_RF
         double precision, dimension(:, :), allocatable :: xPoints_Local
         double precision, dimension(:, :), allocatable :: randField_Local
         integer, dimension(:)  , allocatable :: kNStep, xNStep
+        integer :: kNInit, kNEnd
+        integer, dimension(:)  , allocatable :: kExtent
         integer, dimension(:)  , allocatable :: origin
         integer, dimension(:,:), allocatable :: neighSeed
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
@@ -70,6 +72,7 @@ module type_RF
             allocate(RF_a%xMaxExt(nDim))
             allocate(RF_a%xMinExt(nDim))
             allocate(RF_a%origin(nDim))
+            allocate(RF_a%kExtent(nDim))
             call random_seed(size = n)
             allocate(RF_a%seed(n))
             allocate(RF_a%neighSeed(n,(3**nDim)-1))
@@ -83,6 +86,7 @@ module type_RF
             RF_a%xMinExt = -1
             RF_a%xMaxExt = -1
             RF_a%kNStep = -1
+            RF_a%kExtent = -1
             RF_a%xNStep = -1
             RF_a%gen_CPU_Time = -1
             RF_a%calculate(:) = .true.
@@ -251,6 +255,8 @@ module type_RF
             RF_a%corrMod    = -1
             RF_a%margiFirst = -1
             RF_a%method     = -1
+
+            if(allocated(RF_a%kExtent))   deallocate(RF_a%kExtent)
             if(allocated(RF_a%corrL))     deallocate(RF_a%corrL)
             if(allocated(RF_a%randField_Local)) deallocate(RF_a%randField_Local)
             if(allocated(RF_a%xPoints_Local))   deallocate(RF_a%xPoints_Local)

@@ -102,7 +102,8 @@ contains
             end if
         end do
         if (mod(commentCount,2) == 1) contentVector(conStart:) = "" !Treating final comment
-        !        write(*,*) "contentVector = ", contentVector
+        !call DispCarvalhol(contentVector, "contentVector BEFORE")
+        !write(*,*) " size(contentVector) = ", size(contentVector)
 
         !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Starting data treatment
         blankTotal  = 0;
@@ -138,9 +139,9 @@ contains
                 blankTotal = blankTotal+1
                 !write(*,*) "Comment or blank";
             endif
-            read(fileID,'(A)',IOSTAT = stat) contentVector(i)
         enddo
 
+        !call DispCarvalhol(contentVector, "contentVector")
         !write(*,*) "dataTotal            = ", dataTotal;
         !write(*,*) "tagTotal             = ", tagTotal;
         !write(*,*) "blank/comment Total  = ", blankTotal;

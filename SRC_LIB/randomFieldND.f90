@@ -11,13 +11,11 @@ module randomFieldND
     use type_MESH
     use common_variables_RF
     use writeResultFile_RF
-    use, intrinsic :: iso_c_binding
-    implicit none
-    !include 'fftw3.f'
-    include 'fftw3-mpi.f03'
-        ! <INCLUDE IN THE LINE BEFORE THIS
-    !WARNING before this line we have include 'fftw3.f'
+    use fftw3
     !use blas
+    !use, intrinsic :: iso_c_binding
+    implicit none
+
 
 
 
@@ -333,177 +331,614 @@ contains
     subroutine gen_Std_Gauss_FFT(RDF)
 
         implicit none
-
-        !INPUT OUTPUT
+        !INPUT
         type(RF), intent(inout) :: RDF
+        !LOCAL
+        integer(C_INTPTR_T) :: L, M, N
+        integer(C_INTPTR_T) :: local_M, local_N
+        integer(C_INTPTR_T) :: local_j_offset
+        real(C_DOUBLE), pointer :: data_real_2D(:,:), data_real_3D(:,:,:)
+        type(C_PTR) :: cdata, plan
+        integer(C_INTPTR_T) :: alloc_local
+        integer :: sliceSize
+        integer :: kNLocal
+        integer, dimension(RDF%nDim) :: kNStepLocal
+        double precision, dimension(:), allocatable :: gammaK, phiK
+        integer :: i, j, k, ind
+        double precision :: trashNumber
 
-        !write(get_fileId(),*) "Inside FFT"
+        call wLog("gen_Std_Gauss_FFT_init")
+        call wLog(" ")
 
-        !write(get_fileId(),*) "Defining kPoints and SkVec"
-        call set_kPoints(RDF)
-        call set_SkVec(RDF)
 
-        !write(get_fileId(),*) "Step 2"
         if(RDF%independent) then
-            call gen_Std_Gauss_FFT_step2_indep(RDF, RDF%SkVec, RDF%randField(:,1))
+            call set_kPoints(RDF)
+            call set_SkVec(RDF)
+            call gen_Std_Gauss_FFT_step2_monoproc(RDF, RDF%SkVec)
+            call wLog("Defining kPoints and SkVec")
+            call set_kPoints(RDF)
+            call set_SkVec(RDF)
+
         else
-            call gen_Std_Gauss_FFT_step2_glob(RDF, RDF%SkVec, RDF%randField(:,1))
+            call fftw_mpi_init()
+
+            if(RDF%nDim == 2) then
+                L = RDF%xNStep(1)
+                M = RDF%xNStep(2)
+                alloc_local = fftw_mpi_local_size_2d(M, L, RDF%comm, &
+                                                     local_M, local_j_offset) !FOR MPI
+                cdata = fftw_alloc_real(alloc_local)
+                call c_f_pointer(cdata, data_real_2D, [L, local_M])
+            else if(RDF%nDim == 3) then
+                L = RDF%xNStep(1)
+                M = RDF%xNStep(2)
+                N = RDF%xNStep(3)
+                alloc_local = fftw_mpi_local_size_3d(N, M, L, RDF%comm, &
+                                                     local_N, local_j_offset) !FOR MPI
+                cdata = fftw_alloc_real(alloc_local)
+                call c_f_pointer(cdata, data_real_3D, [L, M, local_N])
+            else
+                stop("Inside gen_Std_Gauss_FFT dimension not yet implemented for this generation method")
+            end if
+
+            !Defining kInit and kEnd
+            RDF%kNInit = local_j_offset + 1
+            RDF%kNEnd  = RDF%kNInit + local_M - 1
+
+            !call wLog("RDF%kNInit")
+            !call wLog(int(RDF%kNInit))
+            !call wLog("RDF%kNEnd")
+            !call wLog(int(RDF%kNEnd))
+
+            sliceSize = 1
+            if(RDF%nDim > 1) sliceSize = product(RDF%xNStep(1:RDF%nDim -1))
+            RDF%kNInit = (RDF%kNInit - 1) * sliceSize + 1
+            RDF%kNEnd  = RDF%kNEnd *sliceSize
+
+            !RDF%origin  = [1, int(local_j_offset) + 1]
+            !RDF%kExtent = [L , local_M]
+            RDF%origin = 1
+            RDF%origin(RDF%nDim) = int(local_j_offset) + 1
+            RDF%kExtent = RDF%xNStep
+            RDF%kExtent(RDF%nDim) = int(local_M)
+
+            call set_kPoints(RDF)
+            call set_SkVec(RDF)
+
+            !call wLog("RDF%kPoints")
+            !call wLog(RDF%kPoints)
+            !call wLog("RDF%SkVec")
+            !call wLog(RDF%SkVec)
+
+
+
+            kNLocal = size(RDF%kPoints,2)
+            !kNStepLocal = RDF%kNStep
+            !kNStepLocal(RDF%nDim) = kNLocal/sliceSize
+
+            call wLog("kNLocal")
+            call wLog(kNLocal)
+            allocate(gammaK(kNLocal))
+            allocate(phik(kNLocal))
+
+            !Putting away the random numbers from others k (that are in others procs)
+            do i = 1, RDF%kNInit-1
+                call random_number(trashNumber)
+            end do
+            call random_number(gammaK(:))
+            do i = RDF%kNEnd+1, product(RDF%kNStep)
+                call random_number(trashNumber)
+            end do
+            do i = 1, RDF%kNInit-1
+                call random_number(trashNumber)
+            end do
+            call random_number(phiK(:))
+
+            call wLog("shape(gammaK)")
+            call wLog(shape(gammaK))
+            call wLog("shape(phiK)")
+            call wLog(shape(phiK))
+            call wLog("shape(RDF%SkVec)")
+            call wLog(shape(RDF%SkVec))
+
+            gammaK       = gammaK -0.5
+            RDF%SkVec(:) =  gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+            !RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+
+            if(allocated(gammaK)) deallocate(gammaK)
+            if(allocated(phik))   deallocate(phik)
+
+            !cdata = fftw_alloc_real(alloc_local)
+            !call c_f_pointer(cdata, data_real_2D, [L,local_M])
+
+            if(RDF%nDim == 2) then
+                plan = fftw_mpi_plan_r2r(RDF%nDim, [M, L], data_real_2D, data_real_2D, &
+                                         RDF%comm, [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+                data_real_2D(:,:) = reshape(RDF%SkVec, [L, local_M])
+                call fftw_mpi_execute_r2r(plan, data_real_2D, data_real_2D)
+                RDF%randField(:,1) = pack(data_real_2D(1:L,1:local_M), .true.)
+
+            else if(RDF%nDim == 3) then
+                plan = fftw_mpi_plan_r2r(RDF%nDim, [N, M, L], data_real_3D, data_real_3D, &
+                                         RDF%comm, [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+                data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M, local_N])
+                call fftw_mpi_execute_r2r(plan, data_real_3D, data_real_3D)
+                RDF%randField(:,1) = pack(data_real_3D(1:L, 1:M, 1:local_N), .true.)
+            end if
+
+            !call wLog("L")
+            !call wLog(int(L))
+            !call wLog("local_M")
+            !call wLog(int(local_M))
+            call wLog("shape(RDF%SkVec)")
+            call wLog(shape(RDF%SkVec))
+            call wLog("shape(RDF%randField)")
+            call wLog(shape(RDF%randField))
+
+
+            call fftw_destroy_plan(plan)
+            call fftw_free(cdata)
+
+            call wLog("L")
+            call wLog(int(L))
+            call wLog("M")
+            call wLog(int(M))
+            call wLog("local_M")
+            call wLog(int(local_M))
+            call wLog("local_j_offset")
+            call wLog(int(local_j_offset))
+            call wLog("RDF%kNInit")
+            call wLog(int(RDF%kNInit))
+            call wLog("RDF%kNEnd")
+            call wLog(int(RDF%kNEnd))
+
+
+!                !cdata = fftw_alloc_real(alloc_local)
+!                !call c_f_pointer(cdata, data_real_2D, [L,M])
+!
+!                !data_real_2D => SkVec
+!
+
+            !call gen_Std_Gauss_FFT_step2_multiproc(RDF, RDF%SkVec)
         end if
+
+
+        !call gen_Std_Gauss_FFT_step2_monoproc(RDF, RDF%SkVec)
+        !call gen_Std_Gauss_FFT_step2_multiproc(RDF, RDF%SkVec)
+
     end subroutine gen_Std_Gauss_FFT
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine gen_Std_Gauss_FFT_step2_glob(RDF, SkVec, randFieldVec)
+    subroutine gen_Std_Gauss_FFT_step2_multiproc(RDF, SkVec)
 
         implicit none
 
         !INPUT OUTPUT
         type(RF), intent(inout) :: RDF
-        double precision, dimension(:), target :: SkVec
-        double precision, dimension(:), target :: randFieldVec
-
-        !POINTERS TO INPUT
-        double precision, dimension(RDF%kNTotal) :: gammaK, phiK
-        double precision, dimension(:,:)  , pointer :: SkVec_2D
-        double precision, dimension(:,:,:), pointer :: SkVec_3D
-        double precision, dimension(:,:)  , pointer :: RF_2D
-        double precision, dimension(:,:,:)  , pointer :: RF_3D
-
-        !LOCAL
-        integer, dimension(RDF%nDim) :: M;
-        double complex  , dimension(:,:)  , pointer :: SkSym_2D
-        double complex  , dimension(:,:,:), pointer :: SkSym_3D
-        double complex  , dimension(product(2*RDF%xNStep-2)), target :: SkSym
-        double precision, dimension(product(2*RDF%xNStep-2)), target :: RFSym
-        double precision, dimension(:,:)  , pointer :: RFSym_2D
-        double precision, dimension(:,:,:)  , pointer :: RFSym_3D
-        integer, dimension(RDF%nDim) :: kS, kE, kSc, kEc, kCore;
-        integer :: pos, i,j
-        integer*8 plan, planTest1, planTest2
-        double precision :: sizesProd
+        double precision, dimension(RDF%kNTotal), target :: SkVec
+        !double precision, dimension(RDF%xNTotal), target :: randFieldVec
 
         !START EXEMPLE
-        integer(C_INTPTR_T), parameter :: L = 3
-        integer(C_INTPTR_T), parameter :: M = 4
-        type(C_PTR) :: plan, cdata
-        complex(C_DOUBLE_COMPLEX), pointer :: data(:,:)
+        integer(C_INTPTR_T) :: L, M, N, globDim
+        !integer(4), parameter :: Lb = 3
+        !integer(4), parameter :: Mb = 4
+        type(C_PTR) :: plan, cdata_complex, cdata_real
+        complex(C_DOUBLE_COMPLEX), pointer :: data_complex(:,:)
+        real(C_DOUBLE), pointer :: data_real_2D(:,:), data_real_3D(:,:,:)
         integer(C_INTPTR_T) :: i, j, alloc_local, local_M, local_j_offset
+        double precision, dimension(size(RDF%kPoints,2)) :: gammaK, phiK
+        double precision :: trashNumber
+        integer :: kNLocal
+        integer, dimension(RDF%nDim) :: kNStepLocal
+        integer :: pointsPerSlice
+        double precision, dimension(12), target :: vecTest=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
-        call wLog("Inside FFT Global")
+        !call fftw_mpi_init()
 
-        !get local data size and allocate (note dimension reversal)
-        alloc_local = fftw_mpi_local_size_2d(M, L, MPI_COMM_WORLD, &
-            local_M, local_j_offset)
-        cdata = fftw_alloc_complex(alloc_local)
-        call c_f_pointer(cdata, data, [L,local_M])
-
-        !   create MPI plan for in-place forward DFT (note dimension reversal)
-        plan = fftw_mpi_plan_dft_2d(M, L, data, data, MPI_COMM_WORLD, &
-            FFTW_FORWARD, FFTW_ESTIMATE)
-
-        ! initialize data to some function my_function(i,j)
-        do j = 1, local_M
-            do i = 1, L
-                data(i, j) = i+ j*L
-            end do
+        !Putting away the random numbers from others k (that are in others procs)
+        do i = 1, RDF%kNInit-1
+            call random_number(trashNumber)
         end do
 
-        ! compute transform (as many times as desired)
-        call fftw_mpi_execute_dft(plan, data, data)
+        kNLocal = size(RDF%kPoints,2)
+        kNStepLocal = RDF%kNStep
+        pointsPerSlice = 1
+        if(RDF%nDim > 1) pointsPerSlice = product(RDF%kNStep(1:RDF%nDim-1))
+        kNStepLocal(RDF%nDim) = kNLocal/pointsPerSlice
 
-        call fftw_destroy_plan(plan)
-        call fftw_free(cdata)
+        call random_number(gammaK(:))
+        call random_number(phiK(:))
+        gammaK   = gammaK -0.5
+        SkVec(:) =  gammak*sqrt(SkVec)*cos(2.0D0*PI*phik);
 
-        !END EXEMPLE
+        call wLog("Inside gen_Std_Gauss_FFT")
+
+        !get local data size and allocate (note dimension reversal)
 
 
-        M = 2*RDF%xNStep-2
+        !alloc_local = fftw_mpi_local_size_2d(M, L, MPI_COMM_WORLD, &
+        !                                     local_M, local_j_offset) !FOR MPI
+        !cdata_complex = fftw_alloc_complex(alloc_local)
 
-        if(RDF%nDim == 2) then
-            SkVec_2D(1:RDF%kNStep(1),1:RDF%kNStep(2)) => SkVec
-            RF_2D(1:RDF%xNStep(1),1:RDF%xNStep(2))    => randFieldVec
-            SkSym_2D(1:M(1),1:M(2)) => SkSym
-            RFSym_2D(1:M(1),1:M(2)) => RFSym
-        else if(RDF%nDim == 3) then
-            SkVec_3D(1:RDF%kNStep(1),1:RDF%kNStep(2),1:RDF%kNStep(3)) => SkVec
-            RF_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3))    => randFieldVec
-            SkSym_3D(1:M(1),1:M(2),1:M(3)) => SkSym
-            RFSym_3D(1:M(1),1:M(2),1:M(3)) => RFSym
+        !cdata_real = c_loc(SkVec)
+        !cdata_real= fftw_alloc_real(L*M)
+
+        !cdata = fftw_alloc_real(alloc_local)
+        !call c_f_pointer(cdata, data_real_2D, [L,M])
+
+        !data_real_2D => SkVec
+
+
+
+        if(RDF%nDim == 1) then
+            stop("No FFT method implemented for 1D cases")
+            L = RDF%kNStep(1)
+
+        else if(RDF%nDim == 2) then
+
+            L = RDF%kNStep(1)
+            M = kNLocal/L
+
+            cdata_real= fftw_alloc_real(L*M)
+
+!                L = RDF%kNStep(1)
+!                M = RDF%kNStep(2)
+!                alloc_local = fftw_mpi_local_size_2d(M, L, RDF%comm, &
+!                                                     local_M, local_j_offset) !FOR MPI
+!                cdata = fftw_alloc_real(alloc_local)
+!                call c_f_pointer(cdata, data_real_2D, [L,M])
+!
+!                data_real_2D => SkVec
+
+
+!            call c_f_pointer(cdata_real, data_real_2D, [L,M])
+!            !plan = fftw_plan_r2r_2d(int(M), int(L), data_real_2D, data_real_2D, FFTW_REDFT01, &
+!            !                        FFTW_REDFT01, FFTW_ESTIMATE)
+!            plan = fftw_mpi_plan_r2r(RDF%nDim, [M, L], data_real_2D, data_real_2D, &
+!                                     RDF%comm, [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+!            !FFTW_BACKWARD
+!            call fftw_mpi_execute_r2r(plan, data_real_2D, data_real_2D)
+!            RDF%randField(:,1) = pack(data_real_2D(1:RDF%xNStep(1), 1:RDF%xNStep(2)), .true.)
+!            call fftw_destroy_plan(plan)
+!
+!        else if(RDF%nDim == 3) then
+!
+!            L = RDF%kNStep(1)
+!            M = RDF%kNStep(2)
+!            N = kNLocal/(L*M)
+!            call c_f_pointer(cdata_real, data_real_3D, [L,M,N])
+!            !plan = fftw_plan_r2r_3d(int(N), int(M), int(L), data_real_3D, data_real_3D, FFTW_REDFT01, &
+!            !                        FFTW_REDFT01, FFTW_REDFT01, FFTW_ESTIMATE)
+!            plan = fftw_mpi_plan_r2r(RDF%nDim, [N, M, L], data_real_3D, data_real_3D, &
+!                                     RDF%comm, [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+!            call fftw_mpi_execute_r2r(plan, data_real_3D, data_real_3D)
+!            RDF%randField(:,1) = pack(data_real_3D(1:RDF%xNStep(1), 1:RDF%xNStep(2), 1:RDF%xNStep(3)), .true.)
+!            call fftw_destroy_plan(plan)
+
+        else
+            stop("No FFT method implemented only for 2D and 3D cases")
         end if
 
-        if(associated(RF_2D))    nullify(RF_2D)
-        if(associated(RF_3D))    nullify(RF_3D)
-        if(associated(RFSym_2D)) nullify(RFSym_2D)
-        if(associated(RFSym_3D)) nullify(RFSym_3D)
-        if(associated(SkVec_2D)) nullify(SkVec_2D)
-        if(associated(SkVec_3D)) nullify(SkVec_3D)
-        if(associated(SkSym_2D)) nullify(SkSym_2D)
-        if(associated(SkSym_3D)) nullify(SkSym_3D)
 
-    end subroutine gen_Std_Gauss_FFT_step2_glob
+    end subroutine gen_Std_Gauss_FFT_step2_multiproc
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine gen_Std_Gauss_FFT_step2_indep(RDF, SkVec, randFieldVec)
+    subroutine gen_Std_Gauss_FFT_step2_monoproc(RDF, SkVec)
 
         implicit none
 
         !INPUT OUTPUT
         type(RF), intent(inout) :: RDF
-        double precision, dimension(:), target :: SkVec
-        double precision, dimension(:), target :: randFieldVec
+        double precision, dimension(RDF%kNTotal), target :: SkVec
+        !double precision, dimension(RDF%xNTotal), target :: randFieldVec
 
-        !POINTERS TO INPUT
+        !START EXEMPLE
+        integer(C_INTPTR_T) :: L, M, N
+        !integer(4), parameter :: Lb = 3
+        !integer(4), parameter :: Mb = 4
+        type(C_PTR) :: plan, cdata_complex, cdata_real
+        complex(C_DOUBLE_COMPLEX), pointer :: data_complex(:,:)
+        real(C_DOUBLE), pointer :: data_real_2D(:,:), data_real_3D(:,:,:)
+        integer(C_INTPTR_T) :: i, j, alloc_local, local_M, local_j_offset
         double precision, dimension(RDF%kNTotal) :: gammaK, phiK
-        double precision, dimension(:,:)  , pointer :: SkVec_2D
-        double precision, dimension(:,:,:), pointer :: SkVec_3D
-        double precision, dimension(:,:)  , pointer :: RF_2D
-        double precision, dimension(:,:,:)  , pointer :: RF_3D
+        double precision, dimension(12), target :: vecTest=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
-        !LOCAL
-        integer, dimension(RDF%nDim) :: M;
-        double complex  , dimension(:,:)  , pointer :: SkSym_2D
-        double complex  , dimension(:,:,:), pointer :: SkSym_3D
-        double complex  , dimension(product(2*RDF%xNStep-2)), target :: SkSym
-        double precision, dimension(product(2*RDF%xNStep-2)), target :: RFSym
-        double precision, dimension(:,:)  , pointer :: RFSym_2D
-        double precision, dimension(:,:,:)  , pointer :: RFSym_3D
-        integer, dimension(RDF%nDim) :: kS, kE, kSc, kEc, kCore;
-        integer :: pos, i,j
-        integer*8 plan, planTest1, planTest2
-        double precision :: sizesProd
 
-        !TESTS
-        integer, parameter :: N = 2000, N_h = 1000
-        double complex,   dimension(N) :: testV1, testV2
-        double complex  , dimension(N) :: testComplxSym
-        double precision, dimension(N) :: testReal
-        double complex  , dimension(N,N) :: testComplxSym2D
-        double complex  , dimension(N,N) :: testComplxSym2D_B
-        double precision, dimension(N,N) :: testReal2D
-        double complex,   dimension(N,N) :: arr
+        call random_number(gammaK(:))
+        call random_number(phiK(:))
+        gammaK   = gammaK -0.5
+        SkVec(:) =  gammak*sqrt(SkVec)*cos(2.0D0*PI*phik);
 
-        !write(get_fileId(),*) "RDF%xNStep   = ", RDF%xNStep
-        !write(get_fileId(),*) "shape(SkVec) = ", shape(SkVec)
-        !write(get_fileId(),*) "RDF%kNStep   = ", RDF%kNStep
+        call wLog("Inside gen_Std_Gauss_FFT")
 
-        M = 2*RDF%xNStep-2
+        !get local data size and allocate (note dimension reversal)
+        !alloc_local = fftw_mpi_local_size_2d(M, L, MPI_COMM_WORLD, &
+        !                                     local_M, local_j_offset) !FOR MPI
+        !cdata_complex = fftw_alloc_complex(alloc_local)
 
-        if(RDF%nDim == 2) then
-            SkVec_2D(1:RDF%kNStep(1),1:RDF%kNStep(2)) => SkVec
-            RF_2D(1:RDF%xNStep(1),1:RDF%xNStep(2))    => randFieldVec
-            SkSym_2D(1:M(1),1:M(2)) => SkSym
-            RFSym_2D(1:M(1),1:M(2)) => RFSym
+        cdata_real = c_loc(SkVec)
+        !cdata_real= fftw_alloc_real(L*M)
+
+
+        if(RDF%nDim == 1) then
+            stop("No FFT method implemented for 1D cases")
+            L = RDF%kNStep(1)
+
+        else if(RDF%nDim == 2) then
+
+            L = RDF%kNStep(1)
+            M = RDF%kNStep(2)
+            call c_f_pointer(cdata_real, data_real_2D, [L,M])
+            !plan = fftw_plan_r2r_2d(int(M), int(L), data_real_2D, data_real_2D, FFTW_REDFT01, &
+            !                        FFTW_REDFT01, FFTW_ESTIMATE)
+            plan = fftw_plan_r2r(RDF%nDim, [int(M), int(L)], data_real_2D, data_real_2D, &
+                                    [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+            !FFTW_BACKWARD
+            call fftw_execute_r2r(plan, data_real_2D, data_real_2D)
+            RDF%randField(:,1) = pack(data_real_2D(1:RDF%xNStep(1), 1:RDF%xNStep(2)), .true.)
+            call fftw_destroy_plan(plan)
+
         else if(RDF%nDim == 3) then
-            SkVec_3D(1:RDF%kNStep(1),1:RDF%kNStep(2),1:RDF%kNStep(3)) => SkVec
-            RF_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3))    => randFieldVec
-            SkSym_3D(1:M(1),1:M(2),1:M(3)) => SkSym
-            RFSym_3D(1:M(1),1:M(2),1:M(3)) => RFSym
+
+            L = RDF%kNStep(1)
+            M = RDF%kNStep(2)
+            N = RDF%kNStep(3)
+            call c_f_pointer(cdata_real, data_real_3D, [L,M,N])
+            !plan = fftw_plan_r2r_3d(int(N), int(M), int(L), data_real_3D, data_real_3D, FFTW_REDFT01, &
+            !                        FFTW_REDFT01, FFTW_REDFT01, FFTW_ESTIMATE)
+            plan = fftw_plan_r2r(RDF%nDim, [int(N), int(M), int(L)], data_real_3D, data_real_3D, &
+                                    [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+            call fftw_execute_r2r(plan, data_real_3D, data_real_3D)
+            RDF%randField(:,1) = pack(data_real_3D(1:RDF%xNStep(1), 1:RDF%xNStep(2), 1:RDF%xNStep(3)), .true.)
+            call fftw_destroy_plan(plan)
+
+        else
+            stop("No FFT method implemented only for 2D and 3D cases")
         end if
+
+
+    end subroutine gen_Std_Gauss_FFT_step2_monoproc
+
+
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine gen_Std_Gauss_FFT(RDF)
+!
+!        implicit none
+!
+!        !INPUT OUTPUT
+!        type(RF), intent(inout) :: RDF
+!
+!        !write(get_fileId(),*) "Inside FFT"
+!
+!        !write(get_fileId(),*) "Defining kPoints and SkVec"
+!        call set_kPoints(RDF)
+!        call set_SkVec(RDF)
+!
+!        !write(get_fileId(),*) "Step 2"
+!        !if(RDF%independent) then
+!            call gen_Std_Gauss_FFT_step2_indep(RDF, RDF%SkVec, RDF%randField(:,1))
+!        !else
+!        !    call gen_Std_Gauss_FFT_step2_glob(RDF, RDF%SkVec, RDF%randField(:,1))
+!        !end if
+!    end subroutine gen_Std_Gauss_FFT
+
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine gen_Std_Gauss_FFT_step2_glob(RDF, SkVec, randFieldVec)
+!
+!        implicit none
+!
+!        !INPUT OUTPUT
+!        type(RF), intent(inout) :: RDF
+!        double precision, dimension(:), target :: SkVec
+!        double precision, dimension(:), target :: randFieldVec
+!
+!        !POINTERS TO INPUT
+!        double precision, dimension(RDF%kNTotal) :: gammaK, phiK
+!        double precision, dimension(:,:)  , pointer :: SkVec_2D
+!        double precision, dimension(:,:,:), pointer :: SkVec_3D
+!        double precision, dimension(:,:)  , pointer :: RF_2D
+!        double precision, dimension(:,:,:)  , pointer :: RF_3D
+!
+!        !LOCAL
+!        integer, dimension(RDF%nDim) :: M;
+!        double complex  , dimension(:,:)  , pointer :: SkSym_2D
+!        double complex  , dimension(:,:,:), pointer :: SkSym_3D
+!        double complex  , dimension(product(2*RDF%xNStep-2)), target :: SkSym
+!        double precision, dimension(product(2*RDF%xNStep-2)), target :: RFSym
+!        double precision, dimension(:,:)  , pointer :: RFSym_2D
+!        double precision, dimension(:,:,:)  , pointer :: RFSym_3D
+!        integer, dimension(RDF%nDim) :: kS, kE, kSc, kEc, kCore;
+!        integer :: pos, i,j
+!        integer*8 plan, planTest1, planTest2
+!        double precision :: sizesProd
+
+        !START EXEMPLE
+!        integer(C_INTPTR_T), parameter :: L = 3
+!        integer(C_INTPTR_T), parameter :: M = 4
+!        type(C_PTR) :: plan, cdata
+!        complex(C_DOUBLE_COMPLEX), pointer :: data(:,:)
+!        integer(C_INTPTR_T) :: i, j, alloc_local, local_M, local_j_offset
+
+!        call wLog("Inside FFT Global")
+
+!        !get local data size and allocate (note dimension reversal)
+!        alloc_local = fftw_mpi_local_size_2d(M, L, MPI_COMM_WORLD, &
+!            local_M, local_j_offset)
+!        cdata = fftw_alloc_complex(alloc_local)
+!        call c_f_pointer(cdata, data, [L,local_M])
+!
+!        !   create MPI plan for in-place forward DFT (note dimension reversal)
+!        plan = fftw_mpi_plan_dft_2d(M, L, data, data, MPI_COMM_WORLD, &
+!            FFTW_FORWARD, FFTW_ESTIMATE)
+!
+!        ! initialize data to some function my_function(i,j)
+!        do j = 1, local_M
+!            do i = 1, L
+!                data(i, j) = i+ j*L
+!            end do
+!        end do
+!
+!        ! compute transform (as many times as desired)
+!        call fftw_mpi_execute_dft(plan, data, data)
+!
+!        call fftw_destroy_plan(plan)
+!        call fftw_free(cdata)
+!
+!        !END EXEMPLE
+!
+!
+!        M = 2*RDF%xNStep-2
+!
+!        if(RDF%nDim == 2) then
+!            SkVec_2D(1:RDF%kNStep(1),1:RDF%kNStep(2)) => SkVec
+!            RF_2D(1:RDF%xNStep(1),1:RDF%xNStep(2))    => randFieldVec
+!            SkSym_2D(1:M(1),1:M(2)) => SkSym
+!            RFSym_2D(1:M(1),1:M(2)) => RFSym
+!        else if(RDF%nDim == 3) then
+!            SkVec_3D(1:RDF%kNStep(1),1:RDF%kNStep(2),1:RDF%kNStep(3)) => SkVec
+!            RF_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3))    => randFieldVec
+!            SkSym_3D(1:M(1),1:M(2),1:M(3)) => SkSym
+!            RFSym_3D(1:M(1),1:M(2),1:M(3)) => RFSym
+!        end if
+!
+!        !START IMPLEMENTATION 2D---------------------------------------
+!
+!        !VISUALIZATION of SkVec_2D BEFORE
+!        !RF_2D = SkVec_2D
+!        call wLog("Creating Field by FFT")
+!
+!        call random_number(gammaK(:))
+!        call random_number(phiK(:))
+!        gammaK = gammaK -0.5
+!
+!        SkVec(:) =  gammak*sqrt(SkVec)*cos(2.0D0*PI*phik);
+!
+!        kCore =  RDF%kNStep
+!        kS  = 2
+!        kE  = kCore - 1
+!        kSc = kCore + 1
+!        kEc = M
+!
+!        !Core
+!        SkSym_2D(1:kCore(1), 1:kCore(2)) = SkVec_2D(1:kCore(1), 1:kCore(2))
+!        !Sides
+!        SkSym_2D(kSc(1):kEc(1)  , 1:kCore(2)) = SkVec_2D(kS(1):kE(1),:)
+!        SkSym_2D(1:kCore(1), kSc(2):kEc(2)  ) = SkVec_2D(:,kS(2):kE(2))
+!        !Diagonal
+!        SkSym_2D(kSc(1):kEc(1)  , kSc(2):kEc(2)  ) = SkVec_2D(kS(1):kE(1), kS(2):kE(2))
+!        !Hermitian Conjugate
+!        SkSym_2D(kSc(1):kEc(1), :) = -conjg(SkSym_2D(kEc(1):kSc(1):-1, :))
+!        SkSym_2D(:, kSc(2):kEc(2)) = -conjg(SkSym_2D(:, kEc(2):kSc(2):-1))
+!
+!
+!        call dfftw_plan_dft_2d(planTest2, size(SkSym_2D,1), size(SkSym_2D,2), SkSym_2D, SkSym_2D, &
+!                               FFTW_BACKWARD, FFTW_ESTIMATE)
+!        call dfftw_execute_dft(planTest2, SkSym_2D, SkSym_2D)
+!        call dfftw_destroy_plan(planTest2)
+!        !write(get_fileId(),*) "After FFT"
+!
+!        !write(get_fileId(),*) "shape(RF_2D)    = ", shape(RF_2D)
+!        !write(get_fileId(),*) "shape(SkSym_2D) = ", shape(SkSym_2D)
+!
+!        !VISUALIZATION of SkSym_2D
+!        RF_2D = real(SkSym_2D(1:kCore(1),1:kCore(2)))/dble(product(shape(SkSym_2D)))
+!
+!        if(associated(RF_2D))    nullify(RF_2D)
+!        if(associated(RF_3D))    nullify(RF_3D)
+!        if(associated(RFSym_2D)) nullify(RFSym_2D)
+!        if(associated(RFSym_3D)) nullify(RFSym_3D)
+!        if(associated(SkVec_2D)) nullify(SkVec_2D)
+!        if(associated(SkVec_3D)) nullify(SkVec_3D)
+!        if(associated(SkSym_2D)) nullify(SkSym_2D)
+!        if(associated(SkSym_3D)) nullify(SkSym_3D)
+!
+!    end subroutine gen_Std_Gauss_FFT_step2_glob
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+!    subroutine gen_Std_Gauss_FFT_step2_indep(RDF, SkVec, randFieldVec)
+!
+!        implicit none
+!
+!        !INPUT OUTPUT
+!        type(RF), intent(inout) :: RDF
+!        double precision, dimension(:), target :: SkVec
+!        double precision, dimension(:), target :: randFieldVec
+!
+!        !POINTERS TO INPUT
+!        double precision, dimension(RDF%kNTotal) :: gammaK, phiK
+!
+!        SkVec(:) =  gammak*sqrt(SkVec)*cos(2.0D0*PI*phik);
+!        double precision, dimension(:,:)  , pointer :: SkVec_2D
+!        double precision, dimension(:,:,:), pointer :: SkVec_3D
+!        double precision, dimension(:,:)  , pointer :: RF_2D
+!        double precision, dimension(:,:,:)  , pointer :: RF_3D
+!
+!        !LOCAL
+!        !integer, dimension(RDF%nDim) :: M;
+!        double complex  , dimension(:,:)  , pointer :: SkSym_2D
+!        double complex  , dimension(:,:,:), pointer :: SkSym_3D
+!        double complex  , dimension(product(2*RDF%xNStep-2)), target :: SkSym
+!        double precision, dimension(product(2*RDF%xNStep-2)), target :: RFSym
+!        double precision, dimension(:,:)  , pointer :: RFSym_2D
+!        double precision, dimension(:,:,:)  , pointer :: RFSym_3D
+!        integer, dimension(RDF%nDim) :: kS, kE, kSc, kEc, kCore;
+!        integer :: pos, i,j
+!        integer*8 plan, planTest1, planTest2
+!        double precision :: sizesProd
+!
+!        !TESTS
+!        integer, parameter :: N = 2000, N_h = 1000
+!        double complex,   dimension(N) :: testV1, testV2
+!        double complex  , dimension(N) :: testComplxSym
+!        double precision, dimension(N) :: testReal
+!        double complex  , dimension(N,N) :: testComplxSym2D
+!        double complex  , dimension(N,N) :: testComplxSym2D_B
+!        double precision, dimension(N,N) :: testReal2D
+!        double complex,   dimension(N,N) :: arr
+!
+!        !START C EXEMPLE
+!        integer(C_INTPTR_T) :: L
+!        integer(C_INTPTR_T) :: M
+!        integer(C_INTPTR_T) :: N
+!        type(C_PTR) :: plan, cdata
+!        complex(C_DOUBLE_COMPLEX), pointer :: data(:,:)
+!        integer(C_INTPTR_T) :: i, j, alloc_local, local_M, local_j_offset
+!
+!
+!        !write(get_fileId(),*) "RDF%xNStep   = ", RDF%xNStep
+!        !write(get_fileId(),*) "shape(SkVec) = ", shape(SkVec)
+!        !write(get_fileId(),*) "RDF%kNStep   = ", RDF%kNStep
+!
+!        !M = 2*RDF%xNStep-2
+!
+!        if(RDF%nDim == 2) then
+!            SkVec_2D(1:RDF%kNStep(1),1:RDF%kNStep(2)) => SkVec
+!            RF_2D(1:RDF%xNStep(1),1:RDF%xNStep(2))    => randFieldVec
+!            L = RDF%kNStep(1)
+!            M = RDF%kNStep(2)
+!            !SkSym_2D(1:M(1),1:M(2)) => SkSym
+!            !RFSym_2D(1:M(1),1:M(2)) => RFSym
+!        else if(RDF%nDim == 3) then
+!            SkVec_3D(1:RDF%kNStep(1),1:RDF%kNStep(2),1:RDF%kNStep(3)) => SkVec
+!            RF_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3))    => randFieldVec
+!            !SkSym_3D(1:M(1),1:M(2),1:M(3)) => SkSym
+!            !RFSym_3D(1:M(1),1:M(2),1:M(3)) => RFSym
+!        end if
 
         !START TEST 1D---------------------------------------------------
 !        testV1(:) = 0.0D0
@@ -564,12 +999,6 @@ contains
 !        testV2(:) = 0.0D0
 !        testV1(686:1314) = [(sin(dble(i)/100), i =0, 628)]
 !        testReal(:) = real(testV1(1:N))
-!
-!        !write(get_fileId(),*) "shape(RF_2D)      = ", shape(RF_2D)
-!        !write(get_fileId(),*) "shape(testReal2D) = ", shape(testReal2D)
-!        !write(get_fileId(),*) "shape(testComplxSym2D) = ", shape(testComplxSym2D)
-!        !write(get_fileId(),*) "RDF%nDim   = ", RDF%nDim
-!        !write(get_fileId(),*) "RDF%xNStep = ", RDF%xNStep
 !
 !        do j = 1, RDF%xNStep(2)
 !            do i = 1, RDF%xNStep(1)
@@ -638,45 +1067,6 @@ contains
     !        testComplxSym2D_B = 0.0D0
     !        testComplxSym2D_B(1:N/2+1, 1:N/2+1)= testComplxSym2D(1:N/2+1, 1:N/2+1)
     !
-    !        !write(get_fileId(),*) " MinVAL ", minval(abs(testComplxSym2D(1002:,:)))
-    !        !write(get_fileId(),*) " MaxVAL ", maxval(abs(testComplxSym2D(1002:,:)))
-    !        !write(get_fileId(),*) " MaxLOC ", maxloc(abs(testComplxSym2D(1002:,:)))
-    !        !write(get_fileId(),*) " MinVAL ", minval(abs(testComplxSym2D(:,1002:)))
-    !        !write(get_fileId(),*) " MaxVAL ", maxval(abs(testComplxSym2D(:,1002:)))
-    !
-    !        !write(get_fileId(),*) " Diag ++ "
-    !        do i = 1, 5
-    !            !write(get_fileId(),*) " i = ", i
-    !            !write(get_fileId(),*) " testComplxSym2D(i,i)   = ", testComplxSym2D(i,i)
-    !            !write(get_fileId(),*) " testComplxSym2D_B(i,i) = ", testComplxSym2D_B(i,i)
-    !        end do
-    !        do i = 995,1005
-    !            !write(get_fileId(),*) " i = ", i
-    !            !write(get_fileId(),*) " testComplxSym2D(i,i)   = ", testComplxSym2D(i,i)
-    !            !write(get_fileId(),*) " testComplxSym2D_B(i,i) = ", testComplxSym2D_B(i,i)
-    !        end do
-    !        do i = 1995,2000
-    !            !write(get_fileId(),*) " i = ", i
-    !            !write(get_fileId(),*) " testComplxSym2D(i,i)   = ", testComplxSym2D(i,i)
-    !            !write(get_fileId(),*) " testComplxSym2D_B(i,i) = ", testComplxSym2D_B(i,i)
-    !        end do
-    !
-    !        !write(get_fileId(),*) " Diag +- "
-    !        do i = 1, 5
-    !            !write(get_fileId(),*) " i = ", i
-    !            !write(get_fileId(),*) " testComplxSym2D(i,i)   = ", testComplxSym2D(i,2000-i)
-    !            !write(get_fileId(),*) " testComplxSym2D_B(i,i) = ", testComplxSym2D_B(i,2000-i)
-    !        end do
-    !        do i = 995,1005
-    !            !write(get_fileId(),*) " i = ", i
-    !            !write(get_fileId(),*) " testComplxSym2D(i,i)   = ", testComplxSym2D(i,2000-i)
-    !            !write(get_fileId(),*) " testComplxSym2D_B(i,i) = ", testComplxSym2D_B(i,2000-i)
-    !        end do
-    !        do i = 1995,2000
-    !            !write(get_fileId(),*) " i = ", i
-    !            !write(get_fileId(),*) " testComplxSym2D(i,i)   = ", testComplxSym2D(i,2000-i)
-    !            !write(get_fileId(),*) " testComplxSym2D_B(i,i) = ", testComplxSym2D_B(i,2000-i)
-    !        end do
     !
     !        !call dfftw_plan_dft_c2r(planTest1, RDF%nDim, RDF%xNStep, &
     !        !                        testComplxSym2D_B, testReal2D, FFTW_ESTIMATE);
@@ -699,93 +1089,90 @@ contains
 
         !START IMPLEMENTATION 2D---------------------------------------
 
-        !VISUALIZATION of SkVec_2D BEFORE
-        !RF_2D = SkVec_2D
-        call wLog("Creating Field by FFT")
-
-        call random_number(gammaK(:))
-        call random_number(phiK(:))
-        gammaK = gammaK -0.5
-
-        !write(get_fileId(),*) "shape(gammaK) = ", shape(gammaK)
-        !write(get_fileId(),*) "SkVec(1)      BEF  = ", SkVec(1)
-        !write(get_fileId(),*) "SkVec_2D(1,1) BEF  = ", SkVec_2D(1,1)
-
-        SkVec(:) =  gammak*sqrt(SkVec)*cos(2.0D0*PI*phik);
-
-        !write(get_fileId(),*) "SkVec(1)      AFT  = ", SkVec(1)
-        !write(get_fileId(),*) "SkVec_2D(1,1) AFT  = ", SkVec_2D(1,1)
-
-        !VISUALIZATION of SkVec_2D AFTER
-        !RF_2D = SkVec_2D
-
-        !write(get_fileId(),*) "Symmetrization"
-        kCore =  RDF%kNStep
-        kS  = 2
-        kE  = kCore - 1
-        kSc = kCore + 1
-        kEc = M;
-
-!        !Treating odd numbers
-!        where(mod(RDF%kNStep,2) /= 0)
-!            kE    = kE + 1
-!            kCore = kCore +1
-!        end where
-
-        !write(get_fileId(),*) " kCore = ", kCore
-        !write(get_fileId(),*) " kS    = ", kS
-        !write(get_fileId(),*) " kE    = ", kE
-        !write(get_fileId(),*) " kSc   = ", kSc
-        !write(get_fileId(),*) " kEc   = ", kEc
-
-        !Core
-        SkSym_2D(1:kCore(1), 1:kCore(2)) = SkVec_2D(1:kCore(1), 1:kCore(2))
-        !Sides
-        SkSym_2D(kSc(1):kEc(1)  , 1:kCore(2)) = SkVec_2D(kS(1):kE(1),:)
-        SkSym_2D(1:kCore(1), kSc(2):kEc(2)  ) = SkVec_2D(:,kS(2):kE(2))
-        !Diagonal
-        SkSym_2D(kSc(1):kEc(1)  , kSc(2):kEc(2)  ) = SkVec_2D(kS(1):kE(1), kS(2):kE(2))
-        !Hermitian Conjugate
-        SkSym_2D(kSc(1):kEc(1), :) = -conjg(SkSym_2D(kEc(1):kSc(1):-1, :))
-        SkSym_2D(:, kSc(2):kEc(2)) = -conjg(SkSym_2D(:, kEc(2):kSc(2):-1))
-
-        !VISUALIZATION of SkSym_2D
-        !RF_2D = SkSym_2D
-
-        !write(get_fileId(),*) "Before FFT"
-        call dfftw_plan_dft_2d(planTest2, size(SkSym_2D,1), size(SkSym_2D,2), SkSym_2D, SkSym_2D, &
-                               FFTW_BACKWARD, FFTW_ESTIMATE)
-        call dfftw_execute_dft(planTest2, SkSym_2D, SkSym_2D)
-        call dfftw_destroy_plan(planTest2)
-        !write(get_fileId(),*) "After FFT"
-
-        !write(get_fileId(),*) "shape(RF_2D)    = ", shape(RF_2D)
-        !write(get_fileId(),*) "shape(SkSym_2D) = ", shape(SkSym_2D)
-
-        !VISUALIZATION of SkSym_2D
-        RF_2D = real(SkSym_2D(1:kCore(1),1:kCore(2)))/dble(product(shape(SkSym_2D)))
-
-        !VISUALIZATION of SkSym (1:2)
-        !RF_2D = 5.0
-        !RF_2D(1,1)   = real(SkSym_2D(1,1))
-        !RF_2D(2:,1)  = real(SkSym_2D(2:M(1)-1:2,1))
-        !RF_2D(1,2:)  = real(SkSym_2D(1,2:M(2)-1:2))
-
-        !RF_2D(2:,2:) = real(SkSym_2D(2:M(1)-1:2, 2:M(2)-1:2))
-        
-        !RF_2D(kCore(1),kCore(2))   = real(SkSym_2D(kCore(1),kCore(2)))
-        !RF_2D(2:,kCore(1))  = real(SkSym_2D(2:M(1)-1:2,kCore(1)))
-        !RF_2D(kCore(1),2:)  = real(SkSym_2D(kCore(1),2:M(2)-1:2))
-
-
-        !VISUALIZATION of the result
-        !RF_2D = aimag(SkSym_2D(1:RDF%kNStep(1), 1:RDF%kNStep(2)))/dble(product(shape(SkSym_2D)))
-        !RF_2D = real(SkSym_2D(1:RDF%kNStep(1), 1:RDF%kNStep(2)))/dble(product(shape(SkSym_2D)))
-
-
-
+!        !VISUALIZATION of SkVec_2D BEFORE
+!        !RF_2D = SkVec_2D
+!        call wLog("Creating Field by FFT")
+!
+!        call random_number(gammaK(:))
+!        call random_number(phiK(:))
+!        gammaK = gammaK -0.5
+!
+!        SkVec(:) =  gammak*sqrt(SkVec)*cos(2.0D0*PI*phik);
+!
+!
+!        !VISUALIZATION of SkVec_2D AFTER
+!        !RF_2D = SkVec_2D
+!
+!        !write(get_fileId(),*) "Symmetrization"
+!        kCore =  RDF%kNStep
+!        kS  = 2
+!        kE  = kCore - 1
+!        kSc = kCore + 1
+!        kEc = M;
+!
+!        !Core
+!        SkSym_2D(1:kCore(1), 1:kCore(2)) = SkVec_2D(1:kCore(1), 1:kCore(2))
+!        !Sides
+!        SkSym_2D(kSc(1):kEc(1)  , 1:kCore(2)) = SkVec_2D(kS(1):kE(1),:)
+!        SkSym_2D(1:kCore(1), kSc(2):kEc(2)  ) = SkVec_2D(:,kS(2):kE(2))
+!        !Diagonal
+!        SkSym_2D(kSc(1):kEc(1)  , kSc(2):kEc(2)  ) = SkVec_2D(kS(1):kE(1), kS(2):kE(2))
+!        !Hermitian Conjugate
+!        SkSym_2D(kSc(1):kEc(1), :) = -conjg(SkSym_2D(kEc(1):kSc(1):-1, :))
+!        SkSym_2D(:, kSc(2):kEc(2)) = -conjg(SkSym_2D(:, kEc(2):kSc(2):-1))
+!
+!        !VISUALIZATION of SkSym_2D
+!        !RF_2D = SkSym_2D
+!
+!        !write(get_fileId(),*) "Before FFT"
+!        call dfftw_plan_dft_2d(planTest2, size(SkSym_2D,1), size(SkSym_2D,2), SkSym_2D, SkSym_2D, &
+!                               FFTW_BACKWARD, FFTW_ESTIMATE)
+!        call dfftw_execute_dft(planTest2, SkSym_2D, SkSym_2D)
+!        call dfftw_destroy_plan(planTest2)
+!
+!        !VISUALIZATION of SkSym_2D
+!        RF_2D = real(SkSym_2D(1:kCore(1),1:kCore(2)))/dble(product(shape(SkSym_2D)))
+!
+!        !VISUALIZATION of SkSym (1:2)
+!        !RF_2D = 5.0
+!        !RF_2D(1,1)   = real(SkSym_2D(1,1))
+!        !RF_2D(2:,1)  = real(SkSym_2D(2:M(1)-1:2,1))
+!        !RF_2D(1,2:)  = real(SkSym_2D(1,2:M(2)-1:2))
+!
+!        !RF_2D(2:,2:) = real(SkSym_2D(2:M(1)-1:2, 2:M(2)-1:2))
+!
+!        !RF_2D(kCore(1),kCore(2))   = real(SkSym_2D(kCore(1),kCore(2)))
+!        !RF_2D(2:,kCore(1))  = real(SkSym_2D(2:M(1)-1:2,kCore(1)))
+!        !RF_2D(kCore(1),2:)  = real(SkSym_2D(kCore(1),2:M(2)-1:2))
+!
+!
+!        !VISUALIZATION of the result
+!        !RF_2D = aimag(SkSym_2D(1:RDF%kNStep(1), 1:RDF%kNStep(2)))/dble(product(shape(SkSym_2D)))
+!        !RF_2D = real(SkSym_2D(1:RDF%kNStep(1), 1:RDF%kNStep(2)))/dble(product(shape(SkSym_2D)))
 
         !END IMPLEMENTATION 2D--------------------------------
+
+!        !START 2D SECOND IMPLEMENTATION---------------------
+!        call wLog("Creating Field by FFT (Imlpementation 2)")
+!
+!        call random_number(gammaK(:))
+!        call random_number(phiK(:))
+!        gammaK = gammaK -0.5
+!
+!        SkVec(:) =  gammak*sqrt(SkVec)*cos(2.0D0*PI*phik);
+!
+!
+!        !call dfftw_plan_dft_r2r_2d(planTest2, size(SkVec_2D,1), size(SkVec_2D,2), SkVec_2D, SkVec_2D, &
+!        !                       FFTW_REDFT01, FFTW_REDFT01, FFTW_ESTIMATE)
+!        call dfftw_plan_dft_r2r(planTest2, RDF%nDim, shape(SkVec_2D), SkVec_2D, SkVec_2D, &
+!                                [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+!        call dfftw_execute_dft(planTest2, SkVec_2D, SkVec_2D)
+!        call dfftw_destroy_plan(planTest2)
+!
+!        RF_2D = SkVec_2D
+
+
+        !END 2D SECOND IMPLEMENTATION-----------------------
 
         !START TEST 3D---------------------------------------------------
 
@@ -1067,21 +1454,21 @@ contains
 !            !!write(get_fileId(),*) "allocated(RDF%randField) = ", allocated(RDF%randField)
 !            RDF%randField(pos,1) = (realOut(posVec(1), posVec(2), posVec(3)))
 !        end do
-
-        !deallocate(Dk)
-        !if(allocated(Dk_base)) deallocate(Dk_base)
-        !if(allocated(realOut)) deallocate(realOut)
-
-        if(associated(RF_2D))    nullify(RF_2D)
-        if(associated(RF_3D))    nullify(RF_3D)
-        if(associated(RFSym_2D)) nullify(RFSym_2D)
-        if(associated(RFSym_3D)) nullify(RFSym_3D)
-        if(associated(SkVec_2D)) nullify(SkVec_2D)
-        if(associated(SkVec_3D)) nullify(SkVec_3D)
-        if(associated(SkSym_2D)) nullify(SkSym_2D)
-        if(associated(SkSym_3D)) nullify(SkSym_3D)
-
-    end subroutine gen_Std_Gauss_FFT_step2_indep
+!
+!        !deallocate(Dk)
+!        !if(allocated(Dk_base)) deallocate(Dk_base)
+!        !if(allocated(realOut)) deallocate(realOut)
+!
+!        if(associated(RF_2D))    nullify(RF_2D)
+!        if(associated(RF_3D))    nullify(RF_3D)
+!        if(associated(RFSym_2D)) nullify(RFSym_2D)
+!        if(associated(RFSym_3D)) nullify(RFSym_3D)
+!        if(associated(SkVec_2D)) nullify(SkVec_2D)
+!        if(associated(SkVec_3D)) nullify(SkVec_3D)
+!        if(associated(SkSym_2D)) nullify(SkSym_2D)
+!        if(associated(SkSym_3D)) nullify(SkSym_3D)
+!
+!    end subroutine gen_Std_Gauss_FFT_step2_indep
 
 end module randomFieldND
 !! Local Variables:

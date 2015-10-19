@@ -76,7 +76,8 @@ COMM_OBJ += ./charFunctions.o \
 ./lsame.o \
 ./xerbla.o \
 ./dger.o \
-./systemUt_RF.o
+./systemUt_RF.o \
+./fftw3.o
 
 #./type_TEST.o \
 #./test_func_RF.o \
@@ -128,6 +129,7 @@ randomFieldND.o      : constants_RF.o \
                        common_variables_RF.o \
                        displayCarvalhol.o \
 			           dgemm.o \
+			           fftw3.o \
 			           math_RF.o \
 			           mesh_RF.o \
 			           ranlib.o \
@@ -144,7 +146,8 @@ localization_RF.o    : constants_RF.o \
 			           type_MESH.o \
 			           type_RF.o \
 			           write_Log_File.o
-mesh_RF.o            : math_RF.o \
+mesh_RF.o            : fftw3.o \
+                       math_RF.o \
 			           type_MESH.o \
                        type_RF.o \
 			           write_Log_File.o

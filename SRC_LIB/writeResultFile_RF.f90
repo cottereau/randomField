@@ -812,28 +812,47 @@ contains
             call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
 
         else
-            !CHOOSING SPACE IN MEMORY FOR THIS PROC
-            call wLog("count1D = ")
-            call wLog(int(count1D))
-            call wLog("RDF%origin = ")
-            call wLog(int(RDF%origin))
-            call h5screate_simple_f(rank1D, count1D, memspace, error)  !NEW memspace
+            if(RDF%method == FFT) then
+                !CHOOSING SPACE IN MEMORY FOR THIS PROC
+                countND = RDF%kExtent
+                call wLog("countND = ")
+                call wLog(int(countND))
+                write(*,*) "countND = ", countND
+                call h5screate_simple_f(rank, countND, memspace, error)  !NEW memspace
 
-            !CHOOSING SPACE IN FILE FOR THIS PROC
-            call h5dget_space_f(dset_id, filespace, error) !GET filespace
-            ! Select hyperslab in the file.
-            allocate(localSlab(RDF%nDim, RDF%xNTotal))
-            do i = 1, MSH%nDim
-                localSlab(i,:) = nint((RDF%xPoints(i,:)-MSH%xMinGlob(i))/MSH%xStep(i)) + 1
-            end do
+                !CHOOSING SPACE IN FILE FOR THIS PROC
+                call h5dget_space_f(dset_id, filespace, error) !GET filespace
+                ! Select hyperslab in the file.
+                offset = RDF%origin - 1!Lines Offset to start writing
+                call wLog("offset = ")
+                call wLog(int(offset))
+                write(*,*) "offset = ", offset
+                call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
 
-            call wLog("localSlab = ")
-            call wLog(int(localSlab))
+            else
+                !CHOOSING SPACE IN MEMORY FOR THIS PROC
+                call wLog("count1D = ")
+                call wLog(int(count1D))
+                call wLog("RDF%origin = ")
+                call wLog(int(RDF%origin))
+                call h5screate_simple_f(rank1D, count1D, memspace, error)  !NEW memspace
 
-            count1D = RDF%xNTotal
-            call h5sselect_elements_f(filespace, H5S_SELECT_SET_F, RDF%nDim, count1D(1), &
-                                      localSlab, error) !SET filespace (to the portion in the list hyperslab)
-            deallocate(localSlab)
+                !CHOOSING SPACE IN FILE FOR THIS PROC
+                call h5dget_space_f(dset_id, filespace, error) !GET filespace
+                ! Select hyperslab in the file.
+                allocate(localSlab(RDF%nDim, RDF%xNTotal))
+                do i = 1, MSH%nDim
+                    localSlab(i,:) = nint((RDF%xPoints(i,:)-MSH%xMinGlob(i))/MSH%xStep(i)) + 1
+                end do
+
+                !call wLog("localSlab = ")
+                !call wLog(int(localSlab))
+
+                count1D = RDF%xNTotal
+                call h5sselect_elements_f(filespace, H5S_SELECT_SET_F, RDF%nDim, count1D(1), &
+                                          localSlab, error) !SET filespace (to the portion in the list hyperslab)
+                deallocate(localSlab)
+            end if
         end if
 
         ! Create property list for collective dataset write
