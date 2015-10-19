@@ -335,7 +335,7 @@ contains
         type(RF), intent(inout) :: RDF
         !LOCAL
         integer(C_INTPTR_T) :: L, M, N
-        integer(C_INTPTR_T) :: local_M, local_N
+        integer(C_INTPTR_T) :: local_LastDim
         integer(C_INTPTR_T) :: local_j_offset
         real(C_DOUBLE), pointer :: data_real_2D(:,:), data_real_3D(:,:,:)
         type(C_PTR) :: cdata, plan
@@ -350,8 +350,8 @@ contains
         call wLog("gen_Std_Gauss_FFT_init")
         call wLog(" ")
 
-
         if(RDF%independent) then
+            call wLog("    LOCAL")
             call set_kPoints(RDF)
             call set_SkVec(RDF)
             call gen_Std_Gauss_FFT_step2_monoproc(RDF, RDF%SkVec)
@@ -361,34 +361,42 @@ contains
 
         else
             call fftw_mpi_init()
+            call wLog("    GLOBAL")
 
             if(RDF%nDim == 2) then
                 L = RDF%xNStep(1)
                 M = RDF%xNStep(2)
                 alloc_local = fftw_mpi_local_size_2d(M, L, RDF%comm, &
-                                                     local_M, local_j_offset) !FOR MPI
+                                                     local_LastDim, local_j_offset) !FOR MPI
                 cdata = fftw_alloc_real(alloc_local)
-                call c_f_pointer(cdata, data_real_2D, [L, local_M])
+                call c_f_pointer(cdata, data_real_2D, [L, local_LastDim])
+
             else if(RDF%nDim == 3) then
                 L = RDF%xNStep(1)
                 M = RDF%xNStep(2)
                 N = RDF%xNStep(3)
                 alloc_local = fftw_mpi_local_size_3d(N, M, L, RDF%comm, &
-                                                     local_N, local_j_offset) !FOR MPI
+                                                     local_LastDim, local_j_offset) !FOR MPI
                 cdata = fftw_alloc_real(alloc_local)
-                call c_f_pointer(cdata, data_real_3D, [L, M, local_N])
+                call c_f_pointer(cdata, data_real_3D, [L, M, local_LastDim])
+
             else
                 stop("Inside gen_Std_Gauss_FFT dimension not yet implemented for this generation method")
+
             end if
 
             !Defining kInit and kEnd
             RDF%kNInit = local_j_offset + 1
-            RDF%kNEnd  = RDF%kNInit + local_M - 1
+            RDF%kNEnd  = RDF%kNInit + local_LastDim - 1
+            call wLog("local_j_offset")
+            call wLog(int(local_j_offset))
+            call wLog("local_LastDim")
+            call wLog(int(local_LastDim))
 
-            !call wLog("RDF%kNInit")
-            !call wLog(int(RDF%kNInit))
-            !call wLog("RDF%kNEnd")
-            !call wLog(int(RDF%kNEnd))
+            call wLog("RDF%kNInit")
+            call wLog(int(RDF%kNInit))
+            call wLog("RDF%kNEnd")
+            call wLog(int(RDF%kNEnd))
 
             sliceSize = 1
             if(RDF%nDim > 1) sliceSize = product(RDF%xNStep(1:RDF%nDim -1))
@@ -400,7 +408,7 @@ contains
             RDF%origin = 1
             RDF%origin(RDF%nDim) = int(local_j_offset) + 1
             RDF%kExtent = RDF%xNStep
-            RDF%kExtent(RDF%nDim) = int(local_M)
+            RDF%kExtent(RDF%nDim) = int(local_LastDim)
 
             call set_kPoints(RDF)
             call set_SkVec(RDF)
@@ -416,6 +424,10 @@ contains
             !kNStepLocal = RDF%kNStep
             !kNStepLocal(RDF%nDim) = kNLocal/sliceSize
 
+            call wLog("RDF%origin")
+            call wLog(RDF%origin)
+            call wLog("RDF%kExtent")
+            call wLog(RDF%kExtent)
             call wLog("kNLocal")
             call wLog(kNLocal)
             allocate(gammaK(kNLocal))
@@ -454,22 +466,22 @@ contains
             if(RDF%nDim == 2) then
                 plan = fftw_mpi_plan_r2r(RDF%nDim, [M, L], data_real_2D, data_real_2D, &
                                          RDF%comm, [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
-                data_real_2D(:,:) = reshape(RDF%SkVec, [L, local_M])
+                data_real_2D(:,:) = reshape(RDF%SkVec, [L, local_LastDim])
                 call fftw_mpi_execute_r2r(plan, data_real_2D, data_real_2D)
-                RDF%randField(:,1) = pack(data_real_2D(1:L,1:local_M), .true.)
+                RDF%randField(:,1) = pack(data_real_2D(1:L,1:local_LastDim), .true.)
 
             else if(RDF%nDim == 3) then
                 plan = fftw_mpi_plan_r2r(RDF%nDim, [N, M, L], data_real_3D, data_real_3D, &
                                          RDF%comm, [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
-                data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M, local_N])
+                data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M, local_LastDim])
                 call fftw_mpi_execute_r2r(plan, data_real_3D, data_real_3D)
-                RDF%randField(:,1) = pack(data_real_3D(1:L, 1:M, 1:local_N), .true.)
+                RDF%randField(:,1) = pack(data_real_3D(1:L, 1:M, 1:local_LastDim), .true.)
             end if
 
             !call wLog("L")
             !call wLog(int(L))
-            !call wLog("local_M")
-            !call wLog(int(local_M))
+            !call wLog("local_LastDim")
+            !call wLog(int(local_LastDim))
             call wLog("shape(RDF%SkVec)")
             call wLog(shape(RDF%SkVec))
             call wLog("shape(RDF%randField)")
@@ -483,8 +495,8 @@ contains
             call wLog(int(L))
             call wLog("M")
             call wLog(int(M))
-            call wLog("local_M")
-            call wLog(int(local_M))
+            call wLog("local_LastDim")
+            call wLog(int(local_LastDim))
             call wLog("local_j_offset")
             call wLog(int(local_j_offset))
             call wLog("RDF%kNInit")
@@ -492,12 +504,6 @@ contains
             call wLog("RDF%kNEnd")
             call wLog(int(RDF%kNEnd))
 
-
-!                !cdata = fftw_alloc_real(alloc_local)
-!                !call c_f_pointer(cdata, data_real_2D, [L,M])
-!
-!                !data_real_2D => SkVec
-!
 
             !call gen_Std_Gauss_FFT_step2_multiproc(RDF, RDF%SkVec)
         end if

@@ -341,26 +341,6 @@ contains
                 MSH%xNInit = (MSH%xNInit - 1) * sliceSize + 1
                 MSH%xNEnd  =  MSH%xNEnd *sliceSize
 
-
-!                !Divising last dimension
-!                MSH%xNEnd   = (MSH%rang + 1) * xNStepGlob(MSH%nDim)/MSH%nb_procs + 1
-!                MSH%xNInit  = MSH%rang * xNStepGlob(MSH%nDim)/MSH%nb_procs + 1
-!
-!                if(MSH%rang == MSH%nb_procs-1) then
-!                    MSH%xNEnd = xNStepGlob(MSH%nDim)
-!                else
-!                    MSH%xNEnd = MSH%xNEnd - 1
-!                end if
-!
-!                !Multiplying by slice size
-!                sliceSize = 1
-!                if(MSH%nDim > 1) sliceSize = product(xNStepGlob(1:MSH%nDim -1))
-!                MSH%xNInit = (MSH%xNInit - 1) * sliceSize + 1
-!                MSH%xNEnd  = MSH%xNEnd *sliceSize
-!
-!                RDF%kNInit = MSH%xNInit
-!                RDF%kNEnd  = MSH%xNEnd
-
             else
                 MSH%xNGlob = product(xNStepGlob)
 
