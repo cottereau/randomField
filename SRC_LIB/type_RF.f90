@@ -42,6 +42,10 @@ module type_RF
         double precision, dimension(:), allocatable :: xMaxExt, xMinExt;
         double precision, pointer :: xPoints(:,:)
         double precision, pointer :: randField(:,:)
+        double precision, dimension(:,:)    , pointer :: RF_2D
+        double precision, dimension(:,:,:)  , pointer :: RF_3D
+        double precision, dimension(:,:,:)    , pointer :: xPoints_2D
+        double precision, dimension(:,:,:,:)  , pointer :: xPoints_3D
         logical, dimension(:), allocatable :: calculate
 
     end type RF
@@ -212,28 +216,7 @@ module type_RF
 
         end subroutine show_RF
 
-        !---------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------
-        !---------------------------------------------------------------------------------
-        subroutine allocate_randField(RDF, randField)
-            !INPUT AND OUTPUT
-            type(RF)   :: RDF
-            double precision, dimension(:,:), allocatable, target :: randField
 
-            if(allocated(randField)) then
-                if(.not.(size(randField,1) == RDF%xNTotal .and. size(randField,1) == RDF%Nmc)) then
-                    nullify(RDF%randField)
-                    deallocate(randField)
-                end if
-            end if
-
-            if(.not.allocated(randField)) then
-                allocate(randField(RDF%xNTotal, RDF%Nmc))
-                RDF%randField => randField
-            end if
-
-        end subroutine allocate_randField
 
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
@@ -275,8 +258,12 @@ module type_RF
             if(allocated(RF_a%xNStep))     deallocate(RF_a%xNStep)
             if(allocated(RF_a%kDelta))     deallocate(RF_a%kDelta)
             if(allocated(RF_a%origin))     deallocate(RF_a%origin)
-            if(associated(RF_a%xPoints))   nullify(RF_a%xPoints)
-            if(associated(RF_a%randField)) nullify(RF_a%randField)
+            if(associated(RF_a%xPoints))    nullify(RF_a%xPoints)
+            if(associated(RF_a%randField))  nullify(RF_a%randField)
+            if(associated(RF_a%RF_2D))      nullify(RF_a%RF_2D)
+            if(associated(RF_a%RF_3D))      nullify(RF_a%RF_3D)
+            if(associated(RF_a%xPoints_2D)) nullify(RF_a%xPoints_2D)
+            if(associated(RF_a%xPoints_3D)) nullify(RF_a%xPoints_3D)
             RF_a%init = .false.
 
         end subroutine finalize_RF

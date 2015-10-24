@@ -158,27 +158,32 @@ contains
             case(FFT)
                 call gen_Std_Gauss_FFT(RDF)
         end select
-!
-!        !RDF%randField = 0.0 ! For Tests
-!
-!        if(RDF%independent) then
-!            !Communicating borders to neighbours
-!            call wLog("")
-!            call wLog("GENERATING BORDER RANDOM FIELDS")
-!            call wLog("-------------------------------")
-!            if(RDF%rang == 0) write(*,*)"GENERATING BORDER RANDOM FIELDS"
-!            if(RDF%rang == 0) write(*,*) "-------------------------------"
-!            call wLog("")
-!            call wLog("    ->Discovering neighbours seed")
-!            call get_neighbours_info(RDF, MSH)
-!            call wLog("    ->Discovering neighbours index")
-!            call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh)
-!            call wLog("    ->Applying Weighting Functions")
-!            call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
-!            call wLog("    ->Adding Neighbours Contribution")
-!            call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
-!        end if
-!
+
+        !RDF%randField = 0.0 ! For Tests
+
+        if(RDF%independent .and. RDF%nb_procs > 1) then
+            if(RDF%method == FFT) then
+                call wLog("    ->Applying Weighting Functions")
+                call applyWeightingFunctions_OnMatrix(RDF, MSH, partitionType)
+            else
+                !Communicating borders to neighbours
+                call wLog("")
+                call wLog("GENERATING BORDER RANDOM FIELDS")
+                call wLog("-------------------------------")
+                if(RDF%rang == 0) write(*,*)"GENERATING BORDER RANDOM FIELDS"
+                if(RDF%rang == 0) write(*,*) "-------------------------------"
+                call wLog("")
+                call wLog("    ->Discovering neighbours seed")
+                call get_neighbours_info(RDF, MSH)
+                call wLog("    ->Discovering neighbours index")
+                call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh)
+                call wLog("    ->Applying Weighting Functions")
+                call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
+                call wLog("    ->Adding Neighbours Contribution")
+                call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
+            end if
+        end if
+
         !Reverting Normalization
         call wLog(" ")
         call wLog("->Reverting Normalization")

@@ -27,7 +27,7 @@ program main_RandomField
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeFiles = .true.
     logical :: sameFolder = .true.
-    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
+    integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
 
     double precision, dimension(:), allocatable :: step_mult, step_add, step_initial
     double precision, dimension(:), allocatable :: corrL_mult, corrL_add, corrL_initial
@@ -304,28 +304,28 @@ program main_RandomField
             !write(*,*) "RDF%nb_procs = ", RDF%nb_procs
             !write(*,*) "independent  = ", independent
 
-            if(RDF%nb_procs == 1 .and. independent == 1) then
-                call wLog("WARNING!! Independent generation in a single processor.")
-                call wLog(" ")
-                call wLog("--OLD values--")
-                call wLog("RDF%independent = ")
-                call wLog(RDF%independent)
-                call wLog("MSH%independent = ")
-                call wLog(MSH%independent)
-                call wLog("MSH%overlap     = ")
-                call wLog(MSH%overlap)
-                if(RDF%independent) MSH%overlap(1) = -2.0D0
-                RDF%independent = .false.
-                MSH%independent = .false.
-                call wLog(" ")
-                call wLog("--NEW values (changed)--")
-                call wLog("RDF%independent = ")
-                call wLog(RDF%independent)
-                call wLog("MSH%independent = ")
-                call wLog(MSH%independent)
-                call wLog("MSH%overlap     = ")
-                call wLog(MSH%overlap)
-            end if
+!            if(RDF%nb_procs == 1 .and. independent == 1) then
+!                call wLog("WARNING!! Independent generation in a single processor.")
+!                call wLog(" ")
+!                call wLog("--OLD values--")
+!                call wLog("RDF%independent = ")
+!                call wLog(RDF%independent)
+!                call wLog("MSH%independent = ")
+!                call wLog(MSH%independent)
+!                call wLog("MSH%overlap     = ")
+!                call wLog(MSH%overlap)
+!                if(RDF%independent) MSH%overlap(1) = -2.0D0
+!                RDF%independent = .false.
+!                MSH%independent = .false.
+!                call wLog(" ")
+!                call wLog("--NEW values (changed)--")
+!                call wLog("RDF%independent = ")
+!                call wLog(RDF%independent)
+!                call wLog("MSH%independent = ")
+!                call wLog(MSH%independent)
+!                call wLog("MSH%overlap     = ")
+!                call wLog(MSH%overlap)
+!            end if
 
             deallocate(dataTable)
 
@@ -401,17 +401,18 @@ program main_RandomField
             call wLog(RDF%seed)
             call wLog(" ")
 
-            call wLog("-> Setting xPoints")
-            call set_XPoints(MSH, RDF, RDF%xPoints_Local)
-            call wLog("      maxval(RDF%xPoints,2) = ")
-            call wLog(maxval(RDF%xPoints,2))
-            call wLog( "      minval(RDF%xPoints,2) = ")
-            call wLog(minval(RDF%xPoints,2))
+            !if(RDF%method /= FFT) then
+                call wLog("-> Setting xPoints")
+                call set_XPoints(MSH, RDF, RDF%xPoints_Local)
+                call wLog("      maxval(RDF%xPoints,2) = ")
+                call wLog(maxval(RDF%xPoints,2))
+                call wLog( "      minval(RDF%xPoints,2) = ")
+                call wLog(minval(RDF%xPoints,2))
 
-
-            !i = size(RDF%xPoints,2)
-            !if(i>50) i = 50
-            !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
+                !i = size(RDF%xPoints,2)
+                !if(i>50) i = 50
+                !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
+            !end if
 
             call allocate_randField(RDF, RDF%randField_Local)
 
@@ -431,14 +432,16 @@ program main_RandomField
             call create_RF_Unstruct_Init (RDF, MSH)
 
             if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
-                call wLog(" ")
-                call wLog("-> Reordering Random Field")
-                if(RDF%rang == 0) write(*,*) "-> Reordering Random Field"
-                tLoc1 = MPI_Wtime()
-                call reorderRandomFieldStruct(RDF, MSH)
-                tLoc2 = MPI_Wtime()
-                call wLog("       time (s)")
-                call wLog(tLoc2 - tLoc1)
+                if(RDF%method /= FFT) then
+                    call wLog(" ")
+                    call wLog("-> Reordering Random Field")
+                    if(RDF%rang == 0) write(*,*) "-> Reordering Random Field"
+                    tLoc1 = MPI_Wtime()
+                    call reorderRandomFieldStruct(RDF, MSH)
+                    tLoc2 = MPI_Wtime()
+                    call wLog("       time (s)")
+                    call wLog(tLoc2 - tLoc1)
+                end if
             end if
 
             !i = size(RDF%xPoints,2)

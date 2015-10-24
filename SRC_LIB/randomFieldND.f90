@@ -350,14 +350,84 @@ contains
         call wLog("gen_Std_Gauss_FFT_init")
         call wLog(" ")
 
+        L = RDF%xNStep(1)
+        if(RDF%nDim >= 2) M = RDF%xNStep(2)
+        if(RDF%nDim >= 3) N = RDF%xNStep(2)
+
         if(RDF%independent) then
             call wLog("    LOCAL")
-            call set_kPoints(RDF)
-            call set_SkVec(RDF)
-            call gen_Std_Gauss_FFT_step2_monoproc(RDF, RDF%SkVec)
+
+            if(RDF%nDim == 2) then
+                alloc_local = L*M
+                cdata = fftw_alloc_real(alloc_local)
+                call c_f_pointer(cdata, data_real_2D, [L, M])
+
+            else if(RDF%nDim == 3) then
+                alloc_local = L*M*N
+                cdata = fftw_alloc_real(alloc_local)
+                call c_f_pointer(cdata, data_real_3D, [L, M, N])
+
+            else
+                stop("Inside gen_Std_Gauss_FFT dimension not yet implemented for this generation method")
+
+            end if
+
             call wLog("Defining kPoints and SkVec")
             call set_kPoints(RDF)
             call set_SkVec(RDF)
+
+            !call wLog("SkVec")
+            !do i = 1, size(RDF%SkVec)
+            !    call wLog(RDF%SkVec(i))
+            !end do
+
+            !call gen_Std_Gauss_FFT_step2_monoproc(RDF, RDF%SkVec)
+
+            allocate(gammaK(RDF%kNTotal))
+            allocate(phik(RDF%kNTotal))
+
+            call wLog("shape(gammaK)")
+            call wLog(shape(gammaK))
+            call wLog("shape(phiK)")
+            call wLog(shape(phiK))
+            call wLog("shape(RDF%SkVec)")
+            call wLog(shape(RDF%SkVec))
+
+            call random_number(gammaK(:))
+            call random_number(phiK(:))
+
+            call wLog("Not calculating Field")
+
+            gammaK       = gammaK -0.5
+            RDF%SkVec(:) = gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+            !RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+
+            if(allocated(gammaK)) deallocate(gammaK)
+            if(allocated(phik))   deallocate(phik)
+
+            if(RDF%nDim == 2) then
+                plan = fftw_plan_r2r(RDF%nDim, [int(M), int(L)], data_real_2D, data_real_2D, &
+                                        [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+                data_real_2D(:,:) = reshape(RDF%SkVec, [L, M])
+                call fftw_execute_r2r(plan, data_real_2D, data_real_2D)
+                RDF%randField(:,1) = pack(data_real_2D(1:RDF%xNStep(1), 1:RDF%xNStep(2)), .true.)
+                call fftw_destroy_plan(plan)
+
+            else if(RDF%nDim == 3) then
+                plan = fftw_plan_r2r(RDF%nDim, [int(N), int(M), int(L)], data_real_3D, data_real_3D, &
+                                        [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+                data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M,N])
+                call fftw_execute_r2r(plan, data_real_3D, data_real_3D)
+                RDF%randField(:,1) = pack(data_real_3D(1:RDF%xNStep(1), 1:RDF%xNStep(2), 1:RDF%xNStep(3)), .true.)
+                call fftw_destroy_plan(plan)
+
+            else
+                stop("No FFT method implemented only for 2D and 3D cases")
+            end if
+
+            !RDF%randField(:,1) = RDF%SkVec(:) !FOR TESTS
+            !RDF%randField(:,1) = RDF%kPoints(:) !FOR TESTS
+            !RDF%randField(:,1) = RDF%rang!FOR TESTS
 
         else
             call fftw_mpi_init()
@@ -508,128 +578,15 @@ contains
             !call gen_Std_Gauss_FFT_step2_multiproc(RDF, RDF%SkVec)
         end if
 
+        if(allocated(gammaK)) deallocate(gammaK)
+        if(allocated(phik)) deallocate(phik)
+
 
         !call gen_Std_Gauss_FFT_step2_monoproc(RDF, RDF%SkVec)
         !call gen_Std_Gauss_FFT_step2_multiproc(RDF, RDF%SkVec)
 
     end subroutine gen_Std_Gauss_FFT
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine gen_Std_Gauss_FFT_step2_multiproc(RDF, SkVec)
-
-        implicit none
-
-        !INPUT OUTPUT
-        type(RF), intent(inout) :: RDF
-        double precision, dimension(RDF%kNTotal), target :: SkVec
-        !double precision, dimension(RDF%xNTotal), target :: randFieldVec
-
-        !START EXEMPLE
-        integer(C_INTPTR_T) :: L, M, N, globDim
-        !integer(4), parameter :: Lb = 3
-        !integer(4), parameter :: Mb = 4
-        type(C_PTR) :: plan, cdata_complex, cdata_real
-        complex(C_DOUBLE_COMPLEX), pointer :: data_complex(:,:)
-        real(C_DOUBLE), pointer :: data_real_2D(:,:), data_real_3D(:,:,:)
-        integer(C_INTPTR_T) :: i, j, alloc_local, local_M, local_j_offset
-        double precision, dimension(size(RDF%kPoints,2)) :: gammaK, phiK
-        double precision :: trashNumber
-        integer :: kNLocal
-        integer, dimension(RDF%nDim) :: kNStepLocal
-        integer :: pointsPerSlice
-        double precision, dimension(12), target :: vecTest=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-
-        !call fftw_mpi_init()
-
-        !Putting away the random numbers from others k (that are in others procs)
-        do i = 1, RDF%kNInit-1
-            call random_number(trashNumber)
-        end do
-
-        kNLocal = size(RDF%kPoints,2)
-        kNStepLocal = RDF%kNStep
-        pointsPerSlice = 1
-        if(RDF%nDim > 1) pointsPerSlice = product(RDF%kNStep(1:RDF%nDim-1))
-        kNStepLocal(RDF%nDim) = kNLocal/pointsPerSlice
-
-        call random_number(gammaK(:))
-        call random_number(phiK(:))
-        gammaK   = gammaK -0.5
-        SkVec(:) =  gammak*sqrt(SkVec)*cos(2.0D0*PI*phik);
-
-        call wLog("Inside gen_Std_Gauss_FFT")
-
-        !get local data size and allocate (note dimension reversal)
-
-
-        !alloc_local = fftw_mpi_local_size_2d(M, L, MPI_COMM_WORLD, &
-        !                                     local_M, local_j_offset) !FOR MPI
-        !cdata_complex = fftw_alloc_complex(alloc_local)
-
-        !cdata_real = c_loc(SkVec)
-        !cdata_real= fftw_alloc_real(L*M)
-
-        !cdata = fftw_alloc_real(alloc_local)
-        !call c_f_pointer(cdata, data_real_2D, [L,M])
-
-        !data_real_2D => SkVec
-
-
-
-        if(RDF%nDim == 1) then
-            stop("No FFT method implemented for 1D cases")
-            L = RDF%kNStep(1)
-
-        else if(RDF%nDim == 2) then
-
-            L = RDF%kNStep(1)
-            M = kNLocal/L
-
-            cdata_real= fftw_alloc_real(L*M)
-
-!                L = RDF%kNStep(1)
-!                M = RDF%kNStep(2)
-!                alloc_local = fftw_mpi_local_size_2d(M, L, RDF%comm, &
-!                                                     local_M, local_j_offset) !FOR MPI
-!                cdata = fftw_alloc_real(alloc_local)
-!                call c_f_pointer(cdata, data_real_2D, [L,M])
-!
-!                data_real_2D => SkVec
-
-
-!            call c_f_pointer(cdata_real, data_real_2D, [L,M])
-!            !plan = fftw_plan_r2r_2d(int(M), int(L), data_real_2D, data_real_2D, FFTW_REDFT01, &
-!            !                        FFTW_REDFT01, FFTW_ESTIMATE)
-!            plan = fftw_mpi_plan_r2r(RDF%nDim, [M, L], data_real_2D, data_real_2D, &
-!                                     RDF%comm, [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
-!            !FFTW_BACKWARD
-!            call fftw_mpi_execute_r2r(plan, data_real_2D, data_real_2D)
-!            RDF%randField(:,1) = pack(data_real_2D(1:RDF%xNStep(1), 1:RDF%xNStep(2)), .true.)
-!            call fftw_destroy_plan(plan)
-!
-!        else if(RDF%nDim == 3) then
-!
-!            L = RDF%kNStep(1)
-!            M = RDF%kNStep(2)
-!            N = kNLocal/(L*M)
-!            call c_f_pointer(cdata_real, data_real_3D, [L,M,N])
-!            !plan = fftw_plan_r2r_3d(int(N), int(M), int(L), data_real_3D, data_real_3D, FFTW_REDFT01, &
-!            !                        FFTW_REDFT01, FFTW_REDFT01, FFTW_ESTIMATE)
-!            plan = fftw_mpi_plan_r2r(RDF%nDim, [N, M, L], data_real_3D, data_real_3D, &
-!                                     RDF%comm, [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
-!            call fftw_mpi_execute_r2r(plan, data_real_3D, data_real_3D)
-!            RDF%randField(:,1) = pack(data_real_3D(1:RDF%xNStep(1), 1:RDF%xNStep(2), 1:RDF%xNStep(3)), .true.)
-!            call fftw_destroy_plan(plan)
-
-        else
-            stop("No FFT method implemented only for 2D and 3D cases")
-        end if
-
-
-    end subroutine gen_Std_Gauss_FFT_step2_multiproc
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -710,6 +667,34 @@ contains
 
 
     end subroutine gen_Std_Gauss_FFT_step2_monoproc
+
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    subroutine allocate_randField(RDF, randField)
+        !INPUT AND OUTPUT
+        type(RF)   :: RDF
+        double precision, dimension(:,:), allocatable, target :: randField
+
+        if(allocated(randField)) then
+            if(.not.(size(randField,1) == RDF%xNTotal .and. size(randField,1) == RDF%Nmc)) then
+                nullify(RDF%randField)
+                deallocate(randField)
+            end if
+        end if
+
+        if(.not.allocated(randField)) then
+            allocate(randField(RDF%xNTotal, RDF%Nmc))
+            RDF%randField => randField
+            call wLog("Inside allocate_randField")
+            call wLog("RDF%xNStep = ")
+            call wLog(RDF%xNStep)
+            if(RDF%nDim == 2) RDF%RF_2D(1:RDF%xNStep(1),1:RDF%xNStep(2)) => randField
+            if(RDF%nDim == 3) RDF%RF_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3)) => randField
+        end if
+
+    end subroutine allocate_randField
 
 
 !    !-----------------------------------------------------------------------------------------------

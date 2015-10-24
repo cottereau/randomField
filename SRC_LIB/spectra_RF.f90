@@ -102,18 +102,33 @@ contains
                 end do
 
             case(FFT)
-                !RDF%kNStep(:) = 2*(RDF%xNStep(:)+1); !Number of points in k
                 RDF%kNStep(:) = RDF%xNStep(:);
                 RDF%kDelta(:) = RDF%kDelta(:)
                 RDF%kNTotal   = product(RDF%kNStep);
                 RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
 
-                kNLocal = RDF%kNEnd - RDF%kNInit + 1
-
-                allocate(RDF%kPoints(RDF%nDim, kNLocal))
-                do i = RDF%kNInit, RDF%kNEnd
-                    call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i-RDF%kNInit+1), snapExtremes = .true.);
-                end do
+                if(RDF%independent) then
+                    call wLog("RDF%kNStep = ")
+                    call wLog(RDF%kNStep)
+                    call wLog("RDF%kMax = ")
+                    call wLog(RDF%kMax)
+                    call wLog("shape(RDF%kPoints) = ")
+                    call wLog(shape(RDF%kPoints))
+                    call wLog("RDF%kNTotal = ")
+                    call wLog(int(RDF%kNTotal))
+                    !call wLog("RDF%kPoints = ")
+                    allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
+                    do i = 1, RDF%kNTotal
+                        call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
+                        !call wLog(RDF%kPoints(:, i))
+                    end do
+                else
+                    kNLocal = RDF%kNEnd - RDF%kNInit + 1
+                    allocate(RDF%kPoints(RDF%nDim, kNLocal))
+                    do i = RDF%kNInit, RDF%kNEnd
+                        call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i-RDF%kNInit+1), snapExtremes = .true.);
+                    end do
+                end if
 
         end select
 
@@ -130,6 +145,8 @@ contains
 
         !INPUT OUTPUT
         type(RF) :: RDF
+        !LOCAL
+        integer :: i
 
         if(allocated(RDF%SkVec)) deallocate(RDF%SkVec)
         allocate(RDF%SkVec(RDF%kNTotal))
@@ -138,6 +155,7 @@ contains
 
             case(cm_GAUSSIAN)
                 RDF%SkVec = exp(-sum(RDF%kPoints**(2.0D0), 1)/(4.0d0*pi))
+                !RDF%SkVec = [(i, i=1, RDF%kNTotal)] !For Tests
 
         end select
 

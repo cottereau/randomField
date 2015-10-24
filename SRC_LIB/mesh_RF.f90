@@ -51,42 +51,56 @@ contains
 
             counterXPoints = 0;
 
-            !Internal Points
-            tempXNStep = find_xNStep(MSH%xMinInt, MSH%xMaxInt, MSH%xStep)
-            do i = 1, product(tempXNStep)
-                call get_Permutation(i, MSH%xMaxInt, tempXNStep, &
-                    xPoints(:,i+counterXPoints), MSH%xMinInt,  &
-                    snapExtremes = .true.);
-            end do
-            counterXPoints = counterXPoints + product(tempXNStep);
-
-            call wLog("INTERNAL")
-            call wLog("tempXNStep")
-            call wLog(tempXNStep)
-            call wLog(" ")
-
-            !Border Points
-
-            call wLog("NEIGHBOURS")
-            do j = 1, size(MSH%xMaxNeigh, 2)
-
-                if(.not. MSH%considerNeighbour(j)) cycle
-
-                tempXNStep = find_xNStep(MSH%xMinNeigh(:,j), MSH%xMaxNeigh(:,j), MSH%xStep)
-
-                call wLog("tempXNStep")
-                call wLog(tempXNStep)
-
+            if(RDF%method == FFT) then
+                !All points at once
+                tempXNStep = find_xNStep(MSH%xMinBound, MSH%xMaxBound, MSH%xStep)
                 do i = 1, product(tempXNStep)
-                    call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, &
-                        xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), &
+                    call get_Permutation(i, MSH%xMaxBound, tempXNStep, &
+                        xPoints(:,i), MSH%xMinBound,  &
                         snapExtremes = .true.);
                 end do
 
-                MSH%indexNeigh(1, j) = counterXPoints + 1
+                if(RDF%nDim == 2) RDF%xPoints_2D(1:RDF%nDim,1:RDF%xNStep(1),1:RDF%xNStep(2)) => xPoints
+                if(RDF%nDim == 3) RDF%xPoints_3D(1:RDF%nDim,1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3)) => xPoints
+            else
+
+                !Internal Points
+                tempXNStep = find_xNStep(MSH%xMinInt, MSH%xMaxInt, MSH%xStep)
+                do i = 1, product(tempXNStep)
+                    call get_Permutation(i, MSH%xMaxInt, tempXNStep, &
+                        xPoints(:,i+counterXPoints), MSH%xMinInt,  &
+                        snapExtremes = .true.);
+                end do
                 counterXPoints = counterXPoints + product(tempXNStep);
-                MSH%indexNeigh(2,j) = counterXPoints
-            end do
+
+                call wLog("INTERNAL")
+                call wLog("tempXNStep")
+                call wLog(tempXNStep)
+                call wLog(" ")
+
+                !Border Points
+
+                call wLog("NEIGHBOURS")
+                do j = 1, size(MSH%xMaxNeigh, 2)
+
+                    if(.not. MSH%considerNeighbour(j)) cycle
+
+                    tempXNStep = find_xNStep(MSH%xMinNeigh(:,j), MSH%xMaxNeigh(:,j), MSH%xStep)
+
+                    call wLog("tempXNStep")
+                    call wLog(tempXNStep)
+
+                    do i = 1, product(tempXNStep)
+                        call get_Permutation(i, MSH%xMaxNeigh(:,j), tempXNStep, &
+                            xPoints(:,counterXPoints + i), MSH%xMinNeigh(:,j), &
+                            snapExtremes = .true.);
+                    end do
+
+                    MSH%indexNeigh(1, j) = counterXPoints + 1
+                    counterXPoints = counterXPoints + product(tempXNStep);
+                    MSH%indexNeigh(2,j) = counterXPoints
+                end do
+            end if
 
             call wLog(" ")
 
@@ -356,6 +370,7 @@ contains
 
             MSH%xNStep = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
             MSH%xNTotal = MSH%xNEnd - MSH%xNInit + 1
+            RDF%xNStep  = MSH%xNStep
             RDF%xNTotal = MSH%xNTotal
 
             call wLog("        OUT MSH%xNInit = ")
@@ -373,7 +388,6 @@ contains
 
         !INDEPENDENT CASE (For Localization)
         else if(MSH%independent) then
-
 
             !Rounding overlap
             call wLog(" ")
@@ -462,11 +476,16 @@ contains
             call wLog(MSH%xMaxInt)
 
             call wLog("-> get_overlap_geometry")
-            call get_overlap_geometry (MSH, RDF%corrL)
+            if (RDF%method == FFT) then
+                call get_overlap_geometry (MSH, RDF%corrL, fullGen=.true.)
+            else
+                call get_overlap_geometry (MSH, RDF%corrL, fullGen=.false.)
+            end if
 
             MSH%xNStep  = find_xNStep(MSH%xMinBound, MSH%xMaxBound, MSH%xStep)
             MSH%xNTotal = product(MSH%xNStep)
             RDF%xNTotal = MSH%xNTotal
+            RDF%xNStep  = MSH%xNStep
 
             call wLog("        OUT RDF%xNTotal = ")
             call wLog(int(RDF%xNTotal))
@@ -474,6 +493,8 @@ contains
             call wLog(int(MSH%xNTotal))
             call wLog("        OUT MSH%xNStep = ")
             call wLog(int(MSH%xNStep))
+            call wLog("        OUT RDF%xNStep = ")
+            call wLog(int(RDF%xNStep))
 
         end if
 
@@ -483,7 +504,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine get_overlap_geometry (MSH, corrL)
+    subroutine get_overlap_geometry (MSH, corrL, fullGen)
 
         implicit none
 
@@ -491,13 +512,15 @@ contains
         type(MESH) :: MSH
 
         !INPUT
-        double precision, dimension(:) :: corrL
+        double precision, dimension(:), intent(in) :: corrL
+        logical, intent(in) :: fullGen
 
         !LOCAL VARIABLES
         integer :: i, d
         integer :: code, neighPos;
         double precision, parameter :: notPresent = -1.0D0
         double precision, dimension(MSH%nDim) :: tempExtreme
+        double precision :: ovlpFraction
 
         call wLog(" ")
         call wLog("-> Redimensioning for Overlap")
@@ -542,25 +565,26 @@ contains
         !Dimensioning overlapping area
         call wLog("    Dimensioning neighbours limits")
 
+        ovlpFraction = 0.5
+        if(fullGen) ovlpFraction = 1.0 !The Bounding Box will have the integral overlap (Necessary for FFT)
+
         do neighPos = 1, size(MSH%neigh)
             if(MSH%neigh(neighPos) < 0) cycle
 
             where(MSH%neighShift(:,neighPos) > 0)
-                MSH%xMaxNeigh(:,neighPos) = MSH%xMaxExt - MSH%overlap*corrL/2.0D0 !- MSH%xStep
+                MSH%xMaxNeigh(:,neighPos) = MSH%xMaxExt - MSH%overlap*corrL*(1.0D0-ovlpFraction)
                 MSH%xMinNeigh(:,neighPos) = MSH%xMaxInt + MSH%xStep
                 MSH%xOrNeigh(:,neighPos)  = MSH%xMaxInt
             elsewhere(MSH%neighShift(:,neighPos) < 0)
                 MSH%xMaxNeigh(:,neighPos) = MSH%xMinInt - MSH%xStep
-                MSH%xMinNeigh(:,neighPos) = MSH%xMinExt + MSH%xStep + MSH%overlap*corrL/2.0D0
+                MSH%xMinNeigh(:,neighPos) = MSH%xMinExt + MSH%xStep + MSH%overlap*corrL*(1.0D0-ovlpFraction)
                 MSH%xOrNeigh(:,neighPos)  = MSH%xMinInt
             elsewhere
                 MSH%xMaxNeigh(:,neighPos) = MSH%xMaxInt
                 MSH%xMinNeigh(:,neighPos) = MSH%xMinInt
                 MSH%xOrNeigh(:,neighPos)  = MSH%xMinInt
             end where
-
         end do
-
 
         !Dimensioning Bounding Box
         MSH%xMinBound = MSH%xMinInt

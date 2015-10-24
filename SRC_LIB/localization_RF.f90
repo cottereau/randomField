@@ -136,6 +136,155 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    subroutine applyWeightingFunctions_OnMatrix(RDF, MSH, partitionType)
+        !INPUT:
+        type(RF), intent(in) :: RDF
+        type(MESH), intent(in) :: MSH
+        integer, intent(in) :: partitionType
+
+        !LOCAL
+        integer :: direction, i
+        double precision, dimension(1:MSH%xNTotal) :: unityPartition
+        double precision, dimension(MSH%nDim) :: originCorner
+        integer, dimension(MSH%nDim) :: minPos, maxPos
+
+        call wLog("shape(RDF%RF_2D) = ")
+        call wLog(shape(RDF%RF_2D))
+        call wLog("shape(RDF%xPoints_2D) = ")
+        call wLog(shape(RDF%xPoints_2D))
+        call wLog("RDF%xPoints_2D(:,1,1) = ")
+        call wLog(RDF%xPoints_2D(:,1,1))
+        call wLog("RDF%xPoints_2D(:,30,29) = ")
+        call wLog(RDF%xPoints_2D(:,30,29))
+
+
+!        !Modify extremes of local Random Field-------------------------------------------------------
+!        unityPartition(:) = 1
+!
+!        !Building Shape Functions in all directions
+!        do direction = 1, size(MSH%neigh)
+!
+!            if(.not. MSH%considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
+!
+!            !Finding origin
+!            originCorner = MSH%xOrNeigh(:, direction)
+!
+!            !Shape Function Generation
+!            call generateUnityPartition_OnMatrix(RDF, originCorner, MSH%overlap, &
+!                                                 MSH%neighShift(:, direction), partitionType, &
+!                                                 unityPartition, minPos, maxPos)
+!
+!        end do !Direction
+!
+!        RDF%randField(:,1) = RDF%randField(:,1) * sqrt(unityPartition(:))
+
+        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
+
+    end subroutine applyWeightingFunctions_OnMatrix
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine generateUnityPartition_OnMatrix(RDF, originCorner, overlap, neighShift, partitionType, unityPartition, minPos, maxPos)
+
+        implicit none
+
+        !INPUT
+        type(RF), intent(in) ::  RDF
+        double precision, dimension(:)  , intent(in) :: originCorner, overlap
+        integer, dimension(:)  , intent(in) :: neighShift
+        integer, intent(in) :: partitionType
+        integer, dimension(:), intent(in) :: minPos, maxPos
+
+        !OUTPUT
+        double precision, dimension(:), intent(out), target :: unityPartition
+
+        !LOCAL
+        integer :: i, nDim
+        double precision, dimension(:, :), pointer :: UP_2D
+        double precision, dimension(:, :, :), pointer :: UP_3D
+
+        nDim = size(originCorner)
+
+        if(RDF%nDim == 2) UP_2D(1:RDF%xNStep(1),1:RDF%xNStep(2)) => unityPartition
+        if(RDF%nDim == 3) UP_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3)) => unityPartition
+
+
+        unityPartition = 1.0D0
+        do i = 1, nDim
+            if(neighShift(i) == 0) cycle
+
+            if(partitionType == 1) then
+                if(nDim == 2) then
+                    UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = &
+                                        ((1.0D0 + cos(PI*(RDF%xPoints_2D(&
+                                        i,minPos(1):maxPos(1),minPos(2):maxPos(2)) &
+                                        - originCorner(i))/overlap(i)))&
+                                        / 2.0D0) &
+                                        * UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2))
+                else if (nDim == 3) then
+                    UP_3D(minPos(1):maxPos(1),minPos(2):maxPos(2), minPos(3):maxPos(3)) = &
+                                        ((1.0D0 + cos(PI*(RDF%xPoints_3D(&
+                                        i,minPos(1):maxPos(1),minPos(2):maxPos(2), minPos(3):maxPos(3))) &
+                                        - originCorner(i))/overlap(i))&
+                                        / 2.0D0) &
+                                        * UP_3D(minPos(1):maxPos(1),minPos(2):maxPos(2), minPos(3):maxPos(3))
+                else
+                    stop("Unity Partition not implemented in this Dimension (generateUnityPartition_OnMatrix)")
+                end if
+            else
+                stop('ERROR!! Inside "generateUnityPartition_OnMatrix" - partition Type not defined')
+            end if
+        end do
+
+        if(associated(UP_2D)) nullify(UP_2D)
+        if(associated(UP_3D)) nullify(UP_3D)
+
+    end subroutine generateUnityPartition_OnMatrix
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine generateUnityPartition(xPoints, originCorner, overlap, neighShift, partitionType, unityPartition)
+
+        implicit none
+
+        !INPUT
+        double precision, dimension(:,:), intent(in) ::  xPoints
+        double precision, dimension(:)  , intent(in) :: originCorner, overlap
+        integer, dimension(:)  , intent(in) :: neighShift
+        integer, intent(in) :: partitionType
+
+        !OUTPUT
+        double precision, dimension(:), intent(out) :: unityPartition
+
+        !LOCAL
+        integer :: i, nDim
+
+        nDim = size(originCorner)
+
+
+        unityPartition = 1.0D0
+        do i = 1, nDim
+            if(neighShift(i) == 0) cycle
+
+            if(partitionType == 1) then
+                unityPartition = ((1.0D0 + cos(PI*(xPoints(i,:) - originCorner(i))/overlap(i)))&
+                                 / 2.0D0) &
+                                 * unityPartition
+            else
+                stop('ERROR!! Inside "generateUnityPartition" - partition Type not defined')
+            end if
+        end do
+
+    end subroutine generateUnityPartition
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     subroutine takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
         !INPUT
         type(MESH), intent(in) :: MSH
@@ -253,43 +402,7 @@ contains
 
     end subroutine takeNeighboursContribution
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine generateUnityPartition(xPoints, originCorner, overlap, neighShift, partitionType, unityPartition)
 
-        implicit none
-
-        !INPUT
-        double precision, dimension(:,:), intent(in) ::  xPoints
-        double precision, dimension(:)  , intent(in) :: originCorner, overlap
-        integer, dimension(:)  , intent(in) :: neighShift
-        integer, intent(in) :: partitionType
-
-        !OUTPUT
-        double precision, dimension(:), intent(out) :: unityPartition
-
-        !LOCAL
-        integer :: i, nDim
-
-        nDim = size(originCorner)
-
-
-        unityPartition = 1.0D0
-        do i = 1, nDim
-            if(neighShift(i) == 0) cycle
-
-            if(partitionType == 1) then
-                unityPartition = ((1D0 + cos(PI*(xPoints(i,:) - originCorner(i))/overlap(i)))&
-                                 / 2) &
-                                 * unityPartition
-            else
-                stop('ERROR!! Inside "generateUnityPartition" - partition Type not defined')
-            end if
-        end do
-
-    end subroutine generateUnityPartition
 
 !    !-----------------------------------------------------------------------------------------------
 !    !-----------------------------------------------------------------------------------------------
