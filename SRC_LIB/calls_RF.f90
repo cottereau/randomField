@@ -159,12 +159,14 @@ contains
                 call gen_Std_Gauss_FFT(RDF)
         end select
 
-        !RDF%randField = 0.0 ! For Tests
+        RDF%randField = 0.0 ! For Tests
 
         if(RDF%independent .and. RDF%nb_procs > 1) then
             if(RDF%method == FFT) then
                 call wLog("    ->Applying Weighting Functions")
                 call applyWeightingFunctions_OnMatrix(RDF, MSH, partitionType)
+                !call wLog("    ->addNeighboursFields")
+                !call addNeighboursFields(RDF, MSH)
             else
                 !Communicating borders to neighbours
                 call wLog("")

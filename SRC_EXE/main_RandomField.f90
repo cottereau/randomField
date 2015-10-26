@@ -431,18 +431,18 @@ program main_RandomField
             call wLog("-> Generating Random Field")
             call create_RF_Unstruct_Init (RDF, MSH)
 
-            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
-                if(RDF%method /= FFT) then
-                    call wLog(" ")
-                    call wLog("-> Reordering Random Field")
-                    if(RDF%rang == 0) write(*,*) "-> Reordering Random Field"
-                    tLoc1 = MPI_Wtime()
-                    call reorderRandomFieldStruct(RDF, MSH)
-                    tLoc2 = MPI_Wtime()
-                    call wLog("       time (s)")
-                    call wLog(tLoc2 - tLoc1)
-                end if
-            end if
+!            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
+!                if(RDF%method /= FFT) then
+!                    call wLog(" ")
+!                    call wLog("-> Reordering Random Field")
+!                    if(RDF%rang == 0) write(*,*) "-> Reordering Random Field"
+!                    tLoc1 = MPI_Wtime()
+!                    call reorderRandomFieldStruct(RDF, MSH)
+!                    tLoc2 = MPI_Wtime()
+!                    call wLog("       time (s)")
+!                    call wLog(tLoc2 - tLoc1)
+!                end if
+!            end if
 
             !i = size(RDF%xPoints,2)
             !if(i>50) i = 50

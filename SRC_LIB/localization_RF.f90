@@ -136,8 +136,189 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    subroutine addNeighboursFields(RDF, MSH)
+        implicit none
+
+        !INPUT OUTPUT
+        type(RF), intent(inout) :: RDF
+
+        !INPUT
+        type(MESH), intent(in) :: MSH
+
+        !LOCAL
+        integer :: i, direction, neighPos
+        integer :: code
+        integer, dimension(RDF%nDim) :: minPos, maxPos
+        integer :: totalSize
+        integer :: testrank = 0, testrank2 = 4
+        double precision, dimension(1:MSH%xNTotal), target :: tempRandField
+        !integer, dimension(:), allocatable :: request
+        integer, dimension(:)  , allocatable :: request
+        integer, dimension(:,:), allocatable :: status
+        integer :: requestSize, countReq, stage
+        integer :: tag
+        logical :: sndRcv
+        double precision, dimension(:, :), pointer :: TRF_2D
+        double precision, dimension(:, :, :), pointer :: TRF_3D
+
+
+        call wLog ("Inside addNeighboursFields")
+
+        if(RDF%nDim == 2) TRF_2D(1:RDF%xNStep(1),1:RDF%xNStep(2)) => tempRandField
+        if(RDF%nDim == 3) TRF_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3)) => tempRandField
+
+        if(RDF%nDim == 1) then
+            requestSize = 2* (2*1)
+            stop("addNeighboursFields not yet in 1D")
+        else if(RDF%nDim == 2) then
+            requestSize = 2* (4*1 +  4*3)
+        else if(RDF%nDim == 3) then
+            requestSize = 2* (8*1 + 12*3 + 6*9)
+        else
+            stop("No requestSize for this dimension")
+        end if
+
+        countReq = 0
+        tag = 0
+
+        !Allocation
+        allocate(request(requestSize))
+        allocate(status(MPI_STATUS_SIZE, size(request)))
+
+        !Allocating Temp Random Field
+        tempRandField = 0 !Contributions over the random field
+        countReq = 0
+
+        !call show_MESH(MSH)
+        !write(*,*) "FROM Proc rank = ", MSH%rang
+
+        call show_MESHneigh(MSH, " ", onlyExisting = .true., forLog = .true.)
+
+        call wLog(" RANG = ")
+        call wLog(MSH%rang)
+
+
+        do stage = 1, 2 !Sending and then receiving
+            do direction = 1, size(MSH%neigh)
+
+                if(MSH%neigh(direction) < 0) cycle !Check if this direction exists
+
+                minPos = nint((MSH%xMinNeigh(:, direction) - MSH%xMinBound(:))/MSH%xStep) + 1
+                maxPos = nint((MSH%xMaxNeigh(:, direction) - MSH%xMinBound(:))/MSH%xStep) + 1
+                totalSize = (product(maxPos - minPos) + 1)
+                call wLog(" ")
+                call wLog(" ")
+                call wLog(" DIRECTION =========================================")
+                call wLog(direction)
+                call wLog(" minPos    = ")
+                call wLog(minPos)
+                call wLog(" maxPos    = ")
+                call wLog(maxPos)
+                call wLog(" totalsize = ")
+                call wLog(totalSize)
+
+                do neighPos = 1, size(MSH%neigh)
+                    if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
+
+
+                    !minPos = MSH%indexNeigh(1,direction)
+                    !maxPos = MSH%indexNeigh(2,direction)
+
+
+                    sndRcv = .true.
+
+                    do i = 1, MSH%nDim
+                        if(       (MSH%neighShift(i, neighPos) /= 0) &
+                            .and. (MSH%neighShift(i, neighPos) /= MSH%neighShift(i, direction))) then
+                            sndRcv = .false.
+                            exit
+                        end if
+                    end do
+
+                    if (sndRcv) then
+
+                        if(stage == 1) then
+                            countReq = countReq + 1
+                            tag = findTag(MSH, neighPos, direction, send = .true.)
+                            !if (MSH%rang == testrank2 .or. MSH%rang == testrank) then
+                                call wLog(" --------------------")
+
+                                call wLog(" Tag send in dir ")
+                                call wLog(direction)
+                                call wLog(" TAG ")
+                                call wLog(tag)
+                                call wLog("    TO  rang ")
+                                call wLog(MSH%neigh(neighPos))
+                            !end if
+                            !call MPI_ISEND (RDF%randField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
+                            !                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+                            if(RDF%nDim == 2) then
+                                call MPI_ISEND (RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+                                                totalSize, MPI_DOUBLE_PRECISION, &
+                                                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+                            else if(RDF%nDim == 3) then
+                                call MPI_ISEND (RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                                                totalSize, MPI_DOUBLE_PRECISION, &
+                                                MSH%neigh(neighPos), tag, RDF%comm, request(countReq), code)
+                            end if
+
+                        else if(stage == 2) then
+                            countReq = countReq + 1
+                            tag = findTag(MSH, neighPos, direction, send = .false.)
+                            if (MSH%rang == testrank2 .or. MSH%rang == testrank) then
+                                call wLog(" --------------------")
+                                call wLog("Tag rcv in dir ")
+                                call wLog(direction)
+                                call wLog(" TAG ")
+                                call wLog(tag)
+                                call wLog("    FROM  rang ")
+                                call wLog(MSH%neigh(neighPos))
+                            end if
+
+                            !call MPI_RECV (tempRandField(minPos:maxPos,1), totalSize, MPI_DOUBLE_PRECISION, &
+                            !               MSH%neigh(neighPos), tag, RDF%comm, status(:,countReq), code)
+                            if(RDF%nDim == 2) then
+                                call MPI_RECV (TRF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+                                               totalSize, MPI_DOUBLE_PRECISION, &
+                                               MSH%neigh(neighPos), tag, RDF%comm, status(:,countReq), code)
+                                !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + tempRandField(minPos:maxPos,1)
+                                RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = &
+                                                            TRF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) &
+                                                          + RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2))
+                            else if(RDF%nDim == 3) then
+                                call MPI_RECV (TRF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                                               totalSize, MPI_DOUBLE_PRECISION, &
+                                               MSH%neigh(neighPos), tag, RDF%comm, status(:,countReq), code)
+                                !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + tempRandField(minPos:maxPos,1)
+                                RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)) = &
+                                                            TRF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)) &
+                                                          + RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3))
+                            end if
+                        end if
+                    end if
+                end do
+            end do
+        end do
+
+        !write(*,*) "WAITING"
+        !call MPI_WAITALL (countReq, request(1:countReq), status(:,1:countReq), code)
+        !if(MSH%rang == testrank) write(*,*) "RDF%randField(:,1) = ", RDF%randField(:,1)
+
+        if(allocated(request)) deallocate(request)
+        if(allocated(status))  deallocate(status)
+
+        if(associated(TRF_2D)) nullify(TRF_2D)
+        if(associated(TRF_3D)) nullify(TRF_3D)
+
+
+    end subroutine addNeighboursFields
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     subroutine applyWeightingFunctions_OnMatrix(RDF, MSH, partitionType)
-        !INPUT:
+        !INPUT
         type(RF), intent(in) :: RDF
         type(MESH), intent(in) :: MSH
         integer, intent(in) :: partitionType
@@ -148,37 +329,50 @@ contains
         double precision, dimension(MSH%nDim) :: originCorner
         integer, dimension(MSH%nDim) :: minPos, maxPos
 
-        call wLog("shape(RDF%RF_2D) = ")
-        call wLog(shape(RDF%RF_2D))
-        call wLog("shape(RDF%xPoints_2D) = ")
-        call wLog(shape(RDF%xPoints_2D))
-        call wLog("RDF%xPoints_2D(:,1,1) = ")
-        call wLog(RDF%xPoints_2D(:,1,1))
-        call wLog("RDF%xPoints_2D(:,30,29) = ")
-        call wLog(RDF%xPoints_2D(:,30,29))
+        !call wLog("shape(RDF%RF_2D) = ")
+        !call wLog(shape(RDF%RF_2D))
+        !call wLog("shape(RDF%xPoints_2D) = ")
+        !call wLog(shape(RDF%xPoints_2D))
+        !call wLog("RDF%xPoints_2D(:,1,1) = ")
+        !call wLog(RDF%xPoints_2D(:,1,1))
+        !call wLog("RDF%xPoints_2D(:,30,29) = ")
+        !call wLog(RDF%xPoints_2D(:,30,29))
 
 
-!        !Modify extremes of local Random Field-------------------------------------------------------
-!        unityPartition(:) = 1
-!
-!        !Building Shape Functions in all directions
-!        do direction = 1, size(MSH%neigh)
-!
-!            if(.not. MSH%considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
-!
-!            !Finding origin
-!            originCorner = MSH%xOrNeigh(:, direction)
-!
-!            !Shape Function Generation
-!            call generateUnityPartition_OnMatrix(RDF, originCorner, MSH%overlap, &
-!                                                 MSH%neighShift(:, direction), partitionType, &
-!                                                 unityPartition, minPos, maxPos)
-!
-!        end do !Direction
-!
-!        RDF%randField(:,1) = RDF%randField(:,1) * sqrt(unityPartition(:))
+        !Modify extremes of local Random Field-------------------------------------------------------
+        unityPartition(:) = 1
 
-        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
+        !Building Shape Functions in all directions
+        do direction = 1, size(MSH%neigh)
+
+            if(.not. MSH%considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
+
+            if(sum(abs(MSH%neighShift(:, direction)))/=1) cycle !We need only the "pure directions"
+
+            !Finding origin
+            originCorner = MSH%xOrNeigh(:, direction)
+            minPos = nint((MSH%xMinNeigh(:, direction) - MSH%xMinBound(:))/MSH%xStep) + 1
+            maxPos = nint((MSH%xMaxNeigh(:, direction) - MSH%xMinBound(:))/MSH%xStep) + 1
+
+            call wLog("DIRECTION")
+            call wLog(direction)
+            call wLog("originCorner")
+            call wLog(originCorner)
+            call wLog("minPos = ")
+            call wLog(minPos)
+            call wLog("maxPos")
+            call wLog(maxPos)
+
+            !Shape Function Generation
+            call generateUnityPartition_OnMatrix(RDF, originCorner, MSH%overlap, &
+                                                 MSH%neighShift(:, direction), partitionType, &
+                                                 unityPartition, minPos, maxPos)
+
+        end do !Direction
+
+        !RDF%randField(:,1) = RDF%randField(:,1) * sqrt(unityPartition(:))
+
+        RDF%randField(:,1) = unityPartition(:) !TEST
 
     end subroutine applyWeightingFunctions_OnMatrix
 
@@ -211,12 +405,21 @@ contains
         if(RDF%nDim == 3) UP_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3)) => unityPartition
 
 
-        unityPartition = 1.0D0
         do i = 1, nDim
+        !do i = 1, 1 !For Tests
             if(neighShift(i) == 0) cycle
+            call wLog("Dimension = ")
+            call wLog(i)
 
             if(partitionType == 1) then
                 if(nDim == 2) then
+                    call wLog("Point in minimal position = ")
+                    call wLog(RDF%xPoints_2D(i,minPos(1),minPos(2)))
+                    call wLog("Point in maximal position = ")
+                    call wLog(RDF%xPoints_2D(i,maxPos(1),maxPos(2)))
+                    call wLog("originCorner(i) = ")
+                    call wLog(originCorner(i))
+                    !UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = 1
                     UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = &
                                         ((1.0D0 + cos(PI*(RDF%xPoints_2D(&
                                         i,minPos(1):maxPos(1),minPos(2):maxPos(2)) &
