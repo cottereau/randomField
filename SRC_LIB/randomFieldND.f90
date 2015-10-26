@@ -396,8 +396,6 @@ contains
             call random_number(gammaK(:))
             call random_number(phiK(:))
 
-            call wLog("Not calculating Field")
-
             gammaK       = gammaK -0.5
             RDF%SkVec(:) = gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
             !RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);

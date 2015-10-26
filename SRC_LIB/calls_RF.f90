@@ -116,6 +116,7 @@ contains
         !logical, dimension(size(MSH%neigh)) :: considerNeighbour
         !integer, dimension(16) :: testVec
         integer :: partitionType = 1
+        integer, dimension(RDF%nDim) :: minPos, maxPos
 
         !testVec = [(i, i = 1, 16)]
 
@@ -159,16 +160,33 @@ contains
                 call gen_Std_Gauss_FFT(RDF)
         end select
 
-        RDF%randField = 0.0 ! For Tests
+        !RDF%randField = 1.0 ! For Tests
 
         if(RDF%independent .and. RDF%nb_procs > 1) then
             if(RDF%method == FFT) then
+                !RDF%randField = 1.0 ! For Tests
+                !if(RDF%rang == 0) write(*,*) "    ->Applying Weighting Functions"
                 call wLog("    ->Applying Weighting Functions")
                 call applyWeightingFunctions_OnMatrix(RDF, MSH, partitionType)
-                !call wLog("    ->addNeighboursFields")
-                !call addNeighboursFields(RDF, MSH)
+                if(RDF%rang == 0) write(*,*) "    ->addNeighboursFields"
+                call wLog("    ->addNeighboursFields")
+                call addNeighboursFields(RDF, MSH)
+!                ! START For Tests
+!                minPos = nint((MSH%xMinInt-MSH%xMinExt)/MSH%xStep) + 1
+!                maxPos = nint((MSH%xMaxInt-MSH%xMinExt)/MSH%xStep)
+!                call wLog("minPos = ")
+!                call wLog(minPos)
+!                call wLog("maxPos = ")
+!                call wLog(maxPos)
+!                if(RDF%nDim == 2) RDF%RF_2D(minPos(1):maxPos(1), &
+!                                            minPos(2):maxPos(2)) = 0
+!                if(RDF%nDim == 3) RDF%RF_3D(minPos(1):maxPos(1), &
+!                                            minPos(2):maxPos(2), &
+!                                            minPos(3):maxPos(3)) = 0
+!                ! END For Tests
             else
                 !Communicating borders to neighbours
+                !RDF%randField = 0.0 ! For Tests
                 call wLog("")
                 call wLog("GENERATING BORDER RANDOM FIELDS")
                 call wLog("-------------------------------")
