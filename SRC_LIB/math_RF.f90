@@ -18,7 +18,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine get_Permutation(pos, qmax, nStep, pVec, qmin, snapExtremes)
+    subroutine get_Permutation(pos, qmax, nStep, pVec, qmin, snapExtremes, verbose)
 
         implicit none
 
@@ -28,6 +28,7 @@ contains
         double precision, dimension(1:), intent(in), optional :: qmin;
         integer,          dimension(1:), intent(in)           :: nStep;
         logical, optional, intent(in) :: snapExtremes
+        logical, optional, intent(in) :: verbose
         !OUTPUT
         double precision, dimension(1:), intent(out) :: pVec;
         !LOCAL VARIABLES

@@ -25,7 +25,7 @@ program main_RandomField
     integer :: step_nIter, nmc_nIter, corrL_nIter
     integer :: nmc_initial, corrL_pointsPerCorrL
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
-    logical :: writeFiles = .true.
+    logical :: writeFiles = .false.
     logical :: sameFolder = .true.
     integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
 

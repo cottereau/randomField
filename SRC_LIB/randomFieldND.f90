@@ -13,7 +13,6 @@ module randomFieldND
     use writeResultFile_RF
     use fftw3
     !use blas
-    !use, intrinsic :: iso_c_binding
     implicit none
 
 
@@ -478,6 +477,16 @@ contains
             RDF%kExtent = RDF%xNStep
             RDF%kExtent(RDF%nDim) = int(local_LastDim)
 
+            call wLog("RDF%origin")
+            call wLog(RDF%origin)
+            call wLog("RDF%origin (IDEAL)")
+            call wLog([1, 1, int(local_j_offset) + 1])
+            call wLog("RDF%kExtent")
+            call wLog(RDF%kExtent)
+            call wLog("RDF%kExtent (IDEAL)")
+            call wLog([int(L), int(M), int(local_LastDim)])
+
+
             call set_kPoints(RDF)
             call set_SkVec(RDF)
 
@@ -485,8 +494,6 @@ contains
             !call wLog(RDF%kPoints)
             !call wLog("RDF%SkVec")
             !call wLog(RDF%SkVec)
-
-
 
             kNLocal = size(RDF%kPoints,2)
             !kNStepLocal = RDF%kNStep
@@ -513,7 +520,7 @@ contains
                 call random_number(trashNumber)
             end do
             call random_number(phiK(:))
-
+!
             call wLog("shape(gammaK)")
             call wLog(shape(gammaK))
             call wLog("shape(phiK)")
@@ -523,7 +530,7 @@ contains
 
             gammaK       = gammaK -0.5
             RDF%SkVec(:) =  gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
-            !RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+!            !RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
 
             if(allocated(gammaK)) deallocate(gammaK)
             if(allocated(phik))   deallocate(phik)

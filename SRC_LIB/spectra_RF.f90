@@ -123,10 +123,23 @@ contains
                         !call wLog(RDF%kPoints(:, i))
                     end do
                 else
+                    call wLog("RDF%kNInit = ")
+                    call wLog(RDF%kNInit)
+                    call wLog("RDF%kNEnd = ")
+                    call wLog(RDF%kNEnd)
                     kNLocal = RDF%kNEnd - RDF%kNInit + 1
                     allocate(RDF%kPoints(RDF%nDim, kNLocal))
+                    call wLog("kNLocal = ")
+                    call wLog(kNLocal)
+                    call wLog("shape(RDF%kPoints) = ")
+                    call wLog(shape(RDF%kPoints))
                     do i = RDF%kNInit, RDF%kNEnd
-                        call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i-RDF%kNInit+1), snapExtremes = .true.);
+                        if(i>541000) call wLog(i)
+                        !RDF%kPoints(:, i-RDF%kNInit+1) = 1
+                        call get_Permutation(i, RDF%kMax, RDF%kNStep, &
+                                             RDF%kPoints(:, i-RDF%kNInit+1), &
+                                             snapExtremes = .true., &
+                                             verbose = .true.);
                     end do
                 end if
 
@@ -149,7 +162,7 @@ contains
         integer :: i
 
         if(allocated(RDF%SkVec)) deallocate(RDF%SkVec)
-        allocate(RDF%SkVec(RDF%kNTotal))
+        allocate(RDF%SkVec(size(RDF%kPoints,2)))
 
         select case(RDF%corrMod)
 

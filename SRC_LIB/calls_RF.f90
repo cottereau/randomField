@@ -157,6 +157,8 @@ contains
             case(RANDOMIZATION)
                 call gen_Std_Gauss_Randomization(RDF)
             case(FFT)
+                call wLog(" FFT")
+                if(RDF%rang == 0) write(*,*)"FFT"
                 call gen_Std_Gauss_FFT(RDF)
         end select
 
