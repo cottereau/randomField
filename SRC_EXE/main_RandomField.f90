@@ -25,9 +25,9 @@ program main_RandomField
     integer :: step_nIter, nmc_nIter, corrL_nIter
     integer :: nmc_initial, corrL_pointsPerCorrL
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
-    logical :: writeFiles = .false.
+    logical :: writeFiles = .true.
     logical :: sameFolder = .true.
-    integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
+    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
 
     double precision, dimension(:), allocatable :: step_mult, step_add, step_initial
     double precision, dimension(:), allocatable :: corrL_mult, corrL_add, corrL_initial
@@ -80,7 +80,8 @@ program main_RandomField
     !write(get_fileId(),*) "-> Reading inputs"
 
     if(rang == 0) write(*,*) "-> MPI_communications started"
-    if(rang == 0) write(*,*) "         nb_procs = ", nb_procs
+    if(rang == 0) write(*,*) "         nb_procs    = ", nb_procs
+    if(rang == 0) write(*,*) "         outputStyle = ", outputStyle
 
     !Initializing folders
     if(rang == 0) write(*,*)  "-> Initialize Folders"
@@ -292,6 +293,10 @@ program main_RandomField
             call read_DataTable(dataTable, "corrL"      , RDF%corrL)
             call read_DataTable(dataTable, "independent", independent)
 
+            if(rang == 0) write(*,*) "         nDim        = ", RDF%nDim
+            if(rang == 0) write(*,*) "         method      = ", RDF%method
+            if(rang == 0) write(*,*) "         independent = ", RDF%independent
+
             if(independent == 1) then
                 RDF%independent = .true.
                 MSH%independent = .true.
@@ -431,18 +436,18 @@ program main_RandomField
             call wLog("-> Generating Random Field")
             call create_RF_Unstruct_Init (RDF, MSH)
 
-!            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
-!                if(RDF%method /= FFT) then
-!                    call wLog(" ")
-!                    call wLog("-> Reordering Random Field")
-!                    if(RDF%rang == 0) write(*,*) "-> Reordering Random Field"
-!                    tLoc1 = MPI_Wtime()
-!                    call reorderRandomFieldStruct(RDF, MSH)
-!                    tLoc2 = MPI_Wtime()
-!                    call wLog("       time (s)")
-!                    call wLog(tLoc2 - tLoc1)
-!                end if
-!            end if
+            if(outputStyle == 1 .and. MSH%meshMod == "automatic" .and. RDF%independent) then
+                if(RDF%method /= FFT) then
+                    call wLog(" ")
+                    call wLog("-> Reordering Random Field")
+                    if(RDF%rang == 0) write(*,*) "-> Reordering Random Field"
+                    tLoc1 = MPI_Wtime()
+                    call reorderRandomFieldStruct(RDF, MSH)
+                    tLoc2 = MPI_Wtime()
+                    call wLog("       time (s)")
+                    call wLog(tLoc2 - tLoc1)
+                end if
+           end if
 
             !i = size(RDF%xPoints,2)
             !if(i>50) i = 50
@@ -487,7 +492,6 @@ program main_RandomField
 
             call write_generation_spec(MSH, RDF, single_path, "singleGen", &
                                        [all_t1,all_t2,all_t3])
-
 
         end subroutine single_realization
 

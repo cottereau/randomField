@@ -414,9 +414,11 @@ contains
 
             !Size of the non-overlapping areas
             ovlp      = MSH%overlap*RDF%corrL
+            ovlp_Tot  = ovlp*dble(MSH%procPerDim-1) +2.0D0*(ovlp-MSH%xStep) !We consider an overlap -1 in each extreme
+            where(MSH%procPerDim == 1) ovlp = 0
+            where(MSH%procPerDim == 1) ovlp_Tot = 0
             call wLog("        OVERLAP = ")
             call wLog(ovlp)
-            ovlp_Tot  = ovlp*dble(MSH%procPerDim-1) +2.0D0*(ovlp-MSH%xStep) !We consider an overlap -1 in each extreme
             call wLog("        OVERLAP TOTAL = ")
             call wLog(ovlp_Tot)
             Novlp_Tot = (MSH%xMaxGlob - MSH%xMinGlob) - ovlp_Tot
@@ -429,8 +431,6 @@ contains
             call wLog("        NON-OVERLAP TOTAL (Round) = ")
             call wLog(Novlp_Tot)
             Novlp = Novlp_Tot/dble(MSH%procPerDim)
-            where(MSH%procPerDim == 1) ovlp = 0
-            where(MSH%procPerDim == 1) ovlp_Tot = 0
 
             call wLog("        NON-OVERLAP TOTAL = ")
             call wLog(Novlp_Tot)
@@ -445,6 +445,7 @@ contains
 
             !Extent of a proc
             delta_Proc = (Novlp_Tot)/dble(MSH%procPerDim) + 2.0D0*ovlp - 2*MSH%xStep
+            where(MSH%procPerDim == 1)  delta_Proc = (Novlp_Tot)/dble(MSH%procPerDim)
             stepProc   =  Novlp + ovlp
             call wLog("        delta_Proc = ")
             call wLog(delta_Proc)

@@ -351,7 +351,7 @@ contains
 
         L = RDF%xNStep(1)
         if(RDF%nDim >= 2) M = RDF%xNStep(2)
-        if(RDF%nDim >= 3) N = RDF%xNStep(2)
+        if(RDF%nDim >= 3) N = RDF%xNStep(3)
 
         if(RDF%independent) then
             call wLog("    LOCAL")

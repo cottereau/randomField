@@ -9,9 +9,9 @@ module writeResultFile_RF
     use type_RF
     use type_MESH
     use hdf5_RF
+    use mesh_RF
 
 contains
-
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -754,6 +754,7 @@ contains
         integer :: tmp_val
         integer(HSIZE_T), dimension(:,:), allocatable :: localSlab
         double precision, dimension(MSH%nDim) :: orig
+        integer, dimension(MSH%nDim) :: minPos, maxPos
 
 
 
@@ -784,7 +785,6 @@ contains
         call wLog(int(dims))
 
 
-
         call wLog(" -> h5 creation")
         call h5open_f(error) ! Initialize FORTRAN interface.
         call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error) !NEW plist_id (for file)
@@ -797,18 +797,39 @@ contains
         call h5sclose_f(filespace, error) !CLOSE filespace
 
         if(RDF%independent) then
+            offset = RDF%origin - 1!Lines Offset to start writing
+
+            if(RDF%method == FFT) then
+                minPos = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep)
+                maxPos = find_xNStep(MSH%xMinGlob, MSH%xMaxBound , MSH%xStep)
+                countND = maxPos - minPos + 1
+                offset = minPos - 1
+                call wLog("countND")
+                call wLog(int(countND))
+                call wLog("offset")
+                call wLog(int(offset))
+                call wLog("minPos")
+                call wLog(minPos)
+                call wLog("maxPos")
+                call wLog(maxPos)
+                call wLog("dims")
+                call wLog(int(dims))
+                !dims = maxPos - minPos + 1
+                !call wLog("dims = ")
+                !call wLog(int(dims))
+            end if
 
             !CHOOSING SPACE IN MEMORY FOR THIS PROC
             call wLog("countND = ")
             call wLog(int(countND))
+            call wLog("offset = ")
+            call wLog(int(offset))
             call h5screate_simple_f(rank, countND, memspace, error)  !NEW memspace
 
             !CHOOSING SPACE IN FILE FOR THIS PROC
             call h5dget_space_f(dset_id, filespace, error) !GET filespace
             ! Select hyperslab in the file.
-            offset = RDF%origin - 1!Lines Offset to start writing
-            call wLog("offset = ")
-            call wLog(int(offset))
+
             call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
 
         else
@@ -861,9 +882,24 @@ contains
 
 
         ! Write dataset
-        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, RDF%randField, dims, error, &
-            file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace
+        if(RDF%method == FFT) then
+            if(RDF%nDim == 2) then
+                call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+                                RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+                                dims, error, &
+                                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace
 
+            else if (RDF%nDim == 3) then
+                call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+                                RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                                dims, error, &
+                                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write ds
+
+            end if
+        else
+            call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, RDF%randField, dims, error, &
+                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace
+        end if
 
         ! Close dataspaces.
         call h5sclose_f(filespace, error) !CLOSE filespace
