@@ -26,20 +26,23 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine init_log_file(filename, rang)
+    subroutine init_log_file(filename, rang, log_ID)
         implicit none
         !INPUT
         character(len=*), intent(in) :: filename
         integer         , intent(in) :: rang
+        !OUTPUT
+        integer         , intent(out) :: log_ID
         !LOCAL
         integer :: fileId
-        integer :: cte = 1001
+        integer :: cte = 100001
         character(len=300) :: fullName
 
         fullName = stringNumb_join(filename, rang)
 
         fileId = cte+rang
         log_file_RF_ID = fileId
+        log_ID = fileId
 
         open (unit=fileId , file=fullName, action='write')
 
@@ -55,38 +58,6 @@ contains
         close(log_file_RF_ID)
 
     end subroutine finalize_log_file
-
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    function get_fileId (rang) result(fileId)
-!        !INPUT
-!        integer, intent(in), optional :: rang
-!        integer, save :: counter = 0, saved_Rang = -1
-!        !OUTPUT
-!        integer :: fileId
-!        !LOCAL
-!        integer :: cte = 1001
-!
-!        !write(*,*) "Inside get_fileId"
-!
-!        if(counter == 0 .and. present(rang)) then
-!            saved_Rang = rang
-!            counter = counter + 1
-!            fileId = cte + saved_Rang
-!        else if(.not. saved_Rang == -1) then
-!            fileId = cte + saved_Rang
-!        else if (present(rang)) then
-!            write(*,*) "WARNING!!! get_fileId tryed to initialize rang twice"
-!            write(*,*) "old value = ", saved_Rang
-!            write(*,*) "new_value (not attributed) = ", rang
-!        else
-!            write(*,*) "ERROR!!! rang is a mandatory variable on the first call of get_fileId"
-!            stop
-!        end if
-!
-!    end function get_fileId
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

@@ -2,6 +2,9 @@ module type_RF
 
     use mpi
     use charFunctions
+    use type_inputRF
+    use type_MESH
+    use type_inputRF
 
     implicit none
 
@@ -55,16 +58,20 @@ module type_RF
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine init_RF(RF_a, nDim, Nmc, comm, rang, nb_procs)
+        subroutine init_RF(RF_a, IPT)
+
+            implicit none
+            !INPUT
+            type(IPT_RF), intent(in) :: IPT
+            !OUTPUT
             type(RF) :: RF_a
-            integer :: nDim, Nmc, comm, rang, nb_procs
+            !LOCAL
+            integer :: nDim, Nmc
             integer :: n
 
-            RF_a%nDim     = nDim
-            RF_a%Nmc      = Nmc
-            RF_a%comm     = comm
-            RF_a%rang     = rang
-            RF_a%nb_procs = nb_procs
+            nDim = IPT%nDim_gen
+            Nmc = IPT%Nmc
+
             allocate(RF_a%corrL(nDim))
             allocate(RF_a%kMax(nDim))
             allocate(RF_a%kNStep(nDim))
@@ -81,7 +88,25 @@ module type_RF
             allocate(RF_a%seed(n))
             allocate(RF_a%neighSeed(n,(3**nDim)-1))
             allocate(RF_a%neighRange(nDim,(3**nDim)-1))
-            RF_a%corrL  = -1
+
+            RF_a%log_ID   = IPT%log_ID
+            RF_a%nDim     = IPT%nDim_gen
+            RF_a%Nmc      = IPT%Nmc
+            RF_a%comm     = IPT%comm
+            RF_a%rang     = IPT%rang
+            RF_a%nb_procs = IPT%nb_procs
+            RF_a%Nmc      = IPT%Nmc
+            RF_a%corrMod  = IPT%corrMod
+            RF_a%margiFirst  = IPT%margiFirst
+            RF_a%fieldAvg    = IPT%fieldAvg
+            RF_a%fieldVar    = IPT%fieldVar
+            RF_a%method      = IPT%method
+            RF_a%seedStart   = IPT%seedStart
+            RF_a%corrL       = IPT%corrL
+            RF_a%independent = IPT%independent
+            RF_a%seedStart   = IPT%seedStart
+
+
             RF_a%kMax   = -1
             RF_a%kDelta = -1
             RF_a%seed   = -1

@@ -677,26 +677,32 @@ contains
     !---------------------------------------------------------------------------------
     !---------------------------------------------------------------------------------
     !---------------------------------------------------------------------------------
-    subroutine allocate_randField(RDF, randField)
+    subroutine allocate_randField(RDF, xNstep, randField)
         !INPUT AND OUTPUT
         type(RF)   :: RDF
         double precision, dimension(:,:), allocatable, target :: randField
+        !INPUT
+        integer, dimension(:), intent(in) :: xNstep
+        !LOCAL
+        integer(kind=8) :: xNTotal
+
+        xNTotal = product(xNStep)
 
         if(allocated(randField)) then
-            if(.not.(size(randField,1) == RDF%xNTotal .and. size(randField,1) == RDF%Nmc)) then
+            if(.not.(size(randField,1) == xNTotal .and. size(randField,1) == RDF%Nmc)) then
                 nullify(RDF%randField)
                 deallocate(randField)
             end if
         end if
 
         if(.not.allocated(randField)) then
-            allocate(randField(RDF%xNTotal, RDF%Nmc))
+            allocate(randField(xNTotal, RDF%Nmc))
             RDF%randField => randField
-            call wLog("Inside allocate_randField")
-            call wLog("RDF%xNStep = ")
-            call wLog(RDF%xNStep)
-            if(RDF%nDim == 2) RDF%RF_2D(1:RDF%xNStep(1),1:RDF%xNStep(2)) => randField
-            if(RDF%nDim == 3) RDF%RF_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3)) => randField
+            call wLog(" Inside allocate_randField")
+            call wLog("     IN xNStep = ")
+            call wLog(xNStep)
+            if(RDF%nDim == 2) RDF%RF_2D(1:xNStep(1),1:xNStep(2)) => randField
+            if(RDF%nDim == 3) RDF%RF_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => randField
         end if
 
     end subroutine allocate_randField

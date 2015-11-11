@@ -16,60 +16,59 @@ module calls_RF
     implicit none
 
     interface createRandomField
-       module procedure create_RF_Unstruct_noInit,   &
-                        create_RF_Unstruct_Init
+       module procedure create_RF_Unstruct_Init
     end interface createRandomField
 
 contains
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine create_RF_Unstruct_noInit (xPoints, corrL, corrMod, Nmc,   &
-                                          randField, method, seedStart,   &
-                                          margiFirst, fieldAvg, fieldVar, &
-                                          comm, rang, nb_procs, calculate, MSH)
-        !INPUT
-        double precision, dimension(1:, 1:), intent(in), target :: xPoints;
-        double precision, dimension(1:)    , intent(in) :: corrL;
-        integer                            , intent(in) :: corrMod;
-        integer                            , intent(in) :: Nmc;
-        integer                            , intent(in) :: method
-        integer                            , intent(in) :: seedStart
-        integer                            , intent(in) :: margiFirst;
-        double precision                   , intent(in) :: fieldAvg
-        double precision                   , intent(in) :: fieldVar;
-        integer                            , intent(in) :: comm, rang, nb_procs
-        logical, dimension(1:), optional   , intent(in) :: calculate
-        type(MESH), intent(inout) :: MSH
-
-        !OUTPUT
-        double precision, dimension(:, :), intent(out), target :: randField;
-
-        !LOCAL
-        type(RF) :: RDF
-
-        write(*,*) "Inside create_RF_Unstruct_noInit"
-
-        !Initializing RF
-        call init_RF(RDF, size(corrL), Nmc, comm, rang, nb_procs)
-        RDF%xPoints   => xPoints
-        RDF%randField => randField
-        RDF%xNTotal    = size(RDF%xPoints, 2)
-        RDF%corrL      = corrL
-        RDF%corrMod    = corrMod
-        RDF%Nmc        = Nmc
-        RDF%method     = method
-        RDF%seedStart  = seedStart
-        RDF%margiFirst = margiFirst
-        RDF%fieldAvg   = fieldAvg
-        RDF%fieldVar   = fieldVar
-        if(present(calculate)) RDF%calculate  = calculate
-
-        call create_RF_Unstruct_Init(RDF, MSH)
-
-    end subroutine create_RF_Unstruct_noInit
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine create_RF_Unstruct_noInit (xPoints, corrL, corrMod, Nmc,   &
+!                                          randField, method, seedStart,   &
+!                                          margiFirst, fieldAvg, fieldVar, &
+!                                          comm, rang, nb_procs, calculate, MSH)
+!        !INPUT
+!        double precision, dimension(1:, 1:), intent(in), target :: xPoints;
+!        double precision, dimension(1:)    , intent(in) :: corrL;
+!        integer                            , intent(in) :: corrMod;
+!        integer                            , intent(in) :: Nmc;
+!        integer                            , intent(in) :: method
+!        integer                            , intent(in) :: seedStart
+!        integer                            , intent(in) :: margiFirst;
+!        double precision                   , intent(in) :: fieldAvg
+!        double precision                   , intent(in) :: fieldVar;
+!        integer                            , intent(in) :: comm, rang, nb_procs
+!        logical, dimension(1:), optional   , intent(in) :: calculate
+!        type(MESH), intent(inout) :: MSH
+!
+!        !OUTPUT
+!        double precision, dimension(:, :), intent(out), target :: randField;
+!
+!        !LOCAL
+!        type(RF) :: RDF
+!
+!        write(*,*) "Inside create_RF_Unstruct_noInit"
+!
+!        !Initializing RF
+!        call init_RF(RDF, size(corrL), Nmc, comm, rang, nb_procs)
+!        RDF%xPoints   => xPoints
+!        RDF%randField => randField
+!        RDF%xNTotal    = size(RDF%xPoints, 2)
+!        RDF%corrL      = corrL
+!        RDF%corrMod    = corrMod
+!        RDF%Nmc        = Nmc
+!        RDF%method     = method
+!        RDF%seedStart  = seedStart
+!        RDF%margiFirst = margiFirst
+!        RDF%fieldAvg   = fieldAvg
+!        RDF%fieldVar   = fieldVar
+!        if(present(calculate)) RDF%calculate  = calculate
+!
+!        call create_RF_Unstruct_Init(RDF, MSH)
+!
+!    end subroutine create_RF_Unstruct_noInit
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

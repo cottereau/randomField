@@ -589,103 +589,103 @@ contains
         type(RF) :: tmpRDF
 
 
-        !Taking the contributions from neighbours------------------------------------------------------
-        !write(get_fileId(), *) "   Taking the contributions from neighbours "
-        call init_RF(tmpRDF, RDF%nDim, RDF%Nmc, RDF%comm, RDF%rang, RDF%nb_procs)
-        call copy_RF_properties(RDF, tmpRDF)
-
-        do direction = 1, size(MSH%neigh)
-
-            if(.not. MSH%considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
-
-            call wLog(" ------------------------------------------- ")
-            call wLog("   DIRECTION      = ")
-            call wLog(direction)
-
-            !Preparing the xPoints of a given direction
-            call copy_RF_xPoints(MSH, RDF, tmpRDF, tmpRDF%xPoints_Local, direction)
-            call allocate_randField(tmpRDF, tmpRDF%randField_Local)
-            minPos = MSH%indexNeigh(1,direction)
-            maxPos = MSH%indexNeigh(2,direction)
-            originCorner = MSH%xOrNeigh(:, direction)
-            !originCorner = MSH%xMinNeigh(:, direction)
-            !where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
-
-            call wLog("   Neighbour Rank = ")
-            call wLog(MSH%neigh(direction))
-            call wLog("   MSH%neighShift(:, direction) = ")
-            call wLog(MSH%neighShift(:, direction))
-            call wLog("   originCorner = ")
-            call wLog(originCorner)
-
-
-            do neighPos = 1, size(MSH%neigh)
-
-                if(.not. MSH%considerNeighbour(neighPos)) cycle !Don't consider Neighbours in this direction
-
-                sndRcv = .true.
-
-                !Checking if this neighbour should be taking into account in this part of the field
-                do i = 1, MSH%nDim
-                    if(       (MSH%neighShift(i, neighPos) /= 0) &
-                        .and. (MSH%neighShift(i, neighPos) /= MSH%neighShift(i, direction))) then
-                        sndRcv = .false.
-                        exit
-                    end if
-                end do
-
-                call wLog("    neighPos = ")
-                call wLog(neighPos)
-                call wLog("    MSH%neighShift(:, neighPos) = ")
-                call wLog(MSH%neighShift(:, neighPos))
-                call wLog("    sndRcv = ")
-                call wLog(sndRcv)
-
-                !if(neighPos /= 2) cycle
-
-                !From this point we know that we want the contribution of this neighbour in this direction
-                if (sndRcv) then
-
-                    call wLog("    CONTRIBUTION ACCEPTED ")
-
-                    tmpRDF%xMinExt = 0.0D0
-                    tmpRDF%xMaxExt = RDF%neighRange(:,neighPos)
-                    tmpRDF%seed    = RDF%neighSeed(:,neighPos)
-
-                    !Generating Standard Gaussian Field
-                    select case (tmpRDF%method)
-                        case(SHINOZUKA)
-                            call gen_Std_Gauss_Shinozuka(tmpRDF)
-                        case(ISOTROPIC)
-                            call gen_Std_Gauss_Isotropic(tmpRDF)
-                        case(RANDOMIZATION)
-                            call gen_Std_Gauss_Randomization(tmpRDF)
-                    end select
-
-                    !Finding origin for Shape Function
-                    neighOrCorner = originCorner + MSH%overlap*MSH%neighShift(:, neighPos)
-
-                    call wLog("    neighOrCorner = ")
-                    call wLog(neighOrCorner)
-
-                    !Shape Function Generation
-                    call generateUnityPartition(tmpRDF%xPoints(:, :), neighOrCorner, MSH%overlap, &
-                                        MSH%neighShift(:, direction), partitionType, &
-                                        unityPartition(minPos:maxPos))
-
-
-                    !Sum of the contribution
-
-                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
-                                                     (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
-
-                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
-                else
-                    call wLog("    CONTRIBUTION NOT ACCEPTED ")
-                end if
-            end do !Neighbours
-        end do !Directions
-        call finalize_RF(tmpRDF)
+!        !Taking the contributions from neighbours------------------------------------------------------
+!        !write(get_fileId(), *) "   Taking the contributions from neighbours "
+!        call init_RF(tmpRDF, RDF%nDim, RDF%Nmc, RDF%comm, RDF%rang, RDF%nb_procs)
+!        call copy_RF_properties(RDF, tmpRDF)
+!
+!        do direction = 1, size(MSH%neigh)
+!
+!            if(.not. MSH%considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
+!
+!            call wLog(" ------------------------------------------- ")
+!            call wLog("   DIRECTION      = ")
+!            call wLog(direction)
+!
+!            !Preparing the xPoints of a given direction
+!            call copy_RF_xPoints(MSH, RDF, tmpRDF, tmpRDF%xPoints_Local, direction)
+!            call allocate_randField(tmpRDF, tmpRDF%randField_Local)
+!            minPos = MSH%indexNeigh(1,direction)
+!            maxPos = MSH%indexNeigh(2,direction)
+!            originCorner = MSH%xOrNeigh(:, direction)
+!            !originCorner = MSH%xMinNeigh(:, direction)
+!            !where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
+!
+!            call wLog("   Neighbour Rank = ")
+!            call wLog(MSH%neigh(direction))
+!            call wLog("   MSH%neighShift(:, direction) = ")
+!            call wLog(MSH%neighShift(:, direction))
+!            call wLog("   originCorner = ")
+!            call wLog(originCorner)
+!
+!
+!            do neighPos = 1, size(MSH%neigh)
+!
+!                if(.not. MSH%considerNeighbour(neighPos)) cycle !Don't consider Neighbours in this direction
+!
+!                sndRcv = .true.
+!
+!                !Checking if this neighbour should be taking into account in this part of the field
+!                do i = 1, MSH%nDim
+!                    if(       (MSH%neighShift(i, neighPos) /= 0) &
+!                        .and. (MSH%neighShift(i, neighPos) /= MSH%neighShift(i, direction))) then
+!                        sndRcv = .false.
+!                        exit
+!                    end if
+!                end do
+!
+!                call wLog("    neighPos = ")
+!                call wLog(neighPos)
+!                call wLog("    MSH%neighShift(:, neighPos) = ")
+!                call wLog(MSH%neighShift(:, neighPos))
+!                call wLog("    sndRcv = ")
+!                call wLog(sndRcv)
+!
+!                !if(neighPos /= 2) cycle
+!
+!                !From this point we know that we want the contribution of this neighbour in this direction
+!                if (sndRcv) then
+!
+!                    call wLog("    CONTRIBUTION ACCEPTED ")
+!
+!                    tmpRDF%xMinExt = 0.0D0
+!                    tmpRDF%xMaxExt = RDF%neighRange(:,neighPos)
+!                    tmpRDF%seed    = RDF%neighSeed(:,neighPos)
+!
+!                    !Generating Standard Gaussian Field
+!                    select case (tmpRDF%method)
+!                        case(SHINOZUKA)
+!                            call gen_Std_Gauss_Shinozuka(tmpRDF)
+!                        case(ISOTROPIC)
+!                            call gen_Std_Gauss_Isotropic(tmpRDF)
+!                        case(RANDOMIZATION)
+!                            call gen_Std_Gauss_Randomization(tmpRDF)
+!                    end select
+!
+!                    !Finding origin for Shape Function
+!                    neighOrCorner = originCorner + MSH%overlap*MSH%neighShift(:, neighPos)
+!
+!                    call wLog("    neighOrCorner = ")
+!                    call wLog(neighOrCorner)
+!
+!                    !Shape Function Generation
+!                    call generateUnityPartition(tmpRDF%xPoints(:, :), neighOrCorner, MSH%overlap, &
+!                                        MSH%neighShift(:, direction), partitionType, &
+!                                        unityPartition(minPos:maxPos))
+!
+!
+!                    !Sum of the contribution
+!
+!                    RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + &
+!                                                     (tmpRDF%randField(:,1) * sqrt(unityPartition(minPos:maxPos)))
+!
+!                    !RDF%randField(minPos:maxPos,1) = RDF%randField(minPos:maxPos,1) + unityPartition(minPos:maxPos) !TEST
+!                else
+!                    call wLog("    CONTRIBUTION NOT ACCEPTED ")
+!                end if
+!            end do !Neighbours
+!        end do !Directions
+!        call finalize_RF(tmpRDF)
 
     end subroutine takeNeighboursContribution
 

@@ -18,6 +18,8 @@ module constants_RF
     !First-order Marginal Density
     integer, parameter :: fom_GAUSSIAN = 1, &
                           fom_LOGNORMAL = 2
+    !Mesh Mode
+    integer, parameter :: msh_AUTO = 1, msh_UNV = 2
 
     integer, parameter :: SCREEN=6
 

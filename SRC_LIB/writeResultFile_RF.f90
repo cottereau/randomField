@@ -50,7 +50,7 @@ contains
         select case (style)
             case(1)
                 select case (MSH%meshMod)
-                    case("unv")
+                    case(msh_UNV)
                         fileName2 = "samples"
                         call write_pHDF5_Unstr(double_Data=RDF%randField, &
                                                fileName=fileName2, &
@@ -74,7 +74,7 @@ contains
                                                communicator=communicator, &
                                                HDF5Name=HDF5Names(3), xSz=xSz(3), ySz=ySz(3), transp = .false.)
 
-                    case("automatic")
+                    case(msh_AUTO)
                         fileName2 = "samples"                     
                         call write_pHDF5_Str(  MSH=MSH, &
                                                RDF=RDF, &
@@ -106,11 +106,11 @@ contains
         select case (style)
             case(1)
                 select case (MSH%meshMod)
-                    case("unv")
+                    case(msh_UNV)
                         call write_pHDF5_Unstr_XMF(HDF5Names, xSz, ySz, XMFName, &
                                                rang, trim(adjustL(folderPath))//"/xmf", &
                                                communicator, "../h5")
-                    case("automatic")
+                    case(msh_AUTO)
                         call write_pHDF5_Str_XMF(HDF5Name, MSH, fileName, &
                                                  rang, trim(adjustL(folderPath))//"/xmf", &
                                                  communicator, "../h5")
@@ -745,7 +745,7 @@ contains
         integer(SIZE_T) :: nElem1D
 
         !LOCAL VARIABLES
-        integer :: yDim, xDim, i
+        integer :: yDim, xDim, i, j, k
         integer :: nb_procs
         character (len=12) :: numberStr, rangStr;
         integer(kind=8), dimension(MSH%nDim) :: total_xNStep
@@ -755,6 +755,7 @@ contains
         integer(HSIZE_T), dimension(:,:), allocatable :: localSlab
         double precision, dimension(MSH%nDim) :: orig
         integer, dimension(MSH%nDim) :: minPos, maxPos
+        double precision, dimension(:), allocatable :: randFieldLinear
 
 
 
@@ -883,19 +884,46 @@ contains
 
         ! Write dataset
         if(RDF%method == FFT) then
-            if(RDF%nDim == 2) then
-                call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
-                                RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
-                                dims, error, &
-                                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace
+            allocate(randFieldLinear(product(countND)))
 
+
+            if(RDF%nDim == 2) then
+                randFieldLinear = pack(RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), .true.)
             else if (RDF%nDim == 3) then
-                call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
-                                RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
-                                dims, error, &
-                                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write ds
+                !do i = 1, countND(1)
+                !    do j = 1, countND(2)
+                !        do k = 1, countND(3)
+                !            !randFieldLinear(i
+                !        end do
+                !    end do
+                !end do
+                randFieldLinear = pack(RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), .true.)
+                !randFieldLinear = pack(&
+                !RESHAPE( source=RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                !shape=[countND(3), countND(2), countND(1)], &
+                !order=(/ 3, 2,1 /) ), &
+                !.true.)
 
             end if
+
+            !    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+            !                    RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+            !                    dims, error, &
+            !                    file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace!
+
+            !else if (RDF%nDim == 3) then
+            !    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+            !                    RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+            !                    dims, error, &
+            !                    file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write ds
+            !
+            !
+            !end if
+            call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+                                randFieldLinear, &
+                                dims, error, &
+                                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+            if (allocated(randFieldLinear)) deallocate(randFieldLinear)
         else
             call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, RDF%randField, dims, error, &
                 file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace

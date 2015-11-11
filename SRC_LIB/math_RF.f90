@@ -7,11 +7,6 @@ module math_RF
 
     !All logic and math routines
 
-!    interface set_Extremes
-!       module procedure set_ExtremesStructured,   &
-!           set_ExtremesUnstruct
-!    end interface set_Extremes
-
 contains
 
     !-----------------------------------------------------------------------------------------------
@@ -70,55 +65,49 @@ contains
 
     end subroutine get_Permutation
 
+
+
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_procPerDim (nb_procs, nDim, procPerDim)
+    function find_xNStep(xMinExt, xMaxExt, xStep) result (xNStep)
         implicit none
 
         !INPUT
-        integer, intent(in) :: nb_procs, nDim
+        double precision, dimension(:), intent(in) :: xMaxExt, xStep;
+        double precision, dimension(:), intent(in), optional :: xMinExt
 
         !OUTPUT
-        integer, dimension(:) :: procPerDim
+        integer, dimension(:), allocatable :: xNStep
+        integer :: i
 
-        !LOCAL VARIABLES
-        integer :: i, j;
-        double  precision :: procRootDim, logProc2;
+        allocate(xNStep(size(xStep)))
 
-        if(size(procPerDim)/=nDim) then
-            write(*,*) "Error inside 'set_procPerDim', dimensions are not compatible"
-            write(*,*) "size(procPerDim) = ", size(procPerDim)
-            write(*,*) "nDim             = ", nDim
-            stop(" ")
-        end if
-
-        procRootDim = dble(nb_procs)**(1/dble(nDim))
-        logProc2   = log(dble(nb_procs))/log(2.0D0)
-
-        if (areEqual(procRootDim, dble(nint(procRootDim)))) then
-            call wLog("    Exact Division")
-            procPerDim(:) = nint(dble(nb_procs)**(1.0d0/nDim))
-
-        else if(areEqual(logProc2, dble(nint(logProc2)))) then
-            call wLog("    Power of two")
-
-            procPerDim(:) = 1
-            if(nb_procs /= 1) then
-                do j = 1, nint(logProc2)
-                    i = cyclicMod(j, nDim)
-                    procPerDim(i) = procPerDim(i)*2
-                end do
-            end if
+        if(present(xMinExt)) then
+            xNStep = 1 + nint((xMaxExt-xMinExt)/(xStep));
         else
-            stop "ERROR, no mesh division algorithm for this number of procs"
+            !write(*,*) "xMin not present"
+            xNStep = 1 + nint(xMaxExt/xStep);
         end if
 
-        call wLog("    procPerDim = ")
-        call wLog(procPerDim)
 
-    end subroutine set_procPerDim
+
+        do i = 1, size(xStep)
+            if(xNStep(i) < 1) then
+                write(*,*) "ERROR!!! Inside find_xNStep, xMinExt is greater than xMaxExt"
+                write(*,*) "xNStep = ", xNStep
+
+                !write(get_fileId(),*) "ERROR!!! Inside find_xNStep, xMinExt is greater than xMaxExt"
+                !write(get_fileId(),*) " xMaxExt = ", xMaxExt
+                !write(get_fileId(),*) " xMinExt = ", xMinExt
+                !write(get_fileId(),*) " xStep = ", xStep
+                !write(get_fileId(),*) " xNStep = ", xNStep
+                stop(" ")
+            end if
+        end do
+
+    end function find_xNStep
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -200,6 +189,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine DGEMM_simple(A, B, C, transA_in, transB_in, alpha_in, beta_in)
+
         !INPUT
         double precision, dimension(:,:), intent(in) :: A, B
         character, optional :: transA_in, transB_in
@@ -258,6 +248,7 @@ contains
             write(*,*) "Nc = ", Nc
             stop
         else
+            !C = alpha*op( A )*op( B ) + beta*C,
             call DGEMM ( transA, transB, M, N, K, &
                          alpha, &
                          A, LDA, &
