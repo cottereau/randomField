@@ -602,43 +602,45 @@ contains
     end subroutine Disp2Dbool
 
 
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!
-!    subroutine Disp3Ddble(matrix, title, format, nColumns, mpi, comm, unit_in)
-!        ! Displays 1D Matrix (Vector)
-!
-!        implicit none
-!
-!        !INPUT
-!        double precision , dimension(:,:,:),          intent(in) :: matrix
-!        character (len=*),                  optional, intent(in) :: title, format
-!        integer,                            optional, intent(in) :: nColumns
-!        logical                           , optional, intent(in) :: mpi
-!        integer                           , optional, intent(in) :: comm
-!        integer          , optional, intent(in) :: unit_in
-!
-!        !LOCAL VARIABLES
-!        integer :: i
-!        integer :: effectComm
-!        integer :: unit
-!
-!        unit = SCREEN !Screen
-!        if(present(unit_in)) unit = unit_in
-!
-!        if(present(comm))       effectComm = comm
-!        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
-!
-!        do i = 1, size(matrix, 3)
-!            write(unit,*) "---------Slice ", i, "----------"
-!            if(present(mpi)) then
-!                call Disp2Ddble(matrix(:,:,i), title, format, nColumns, mpi, effectComm, unit_in = unit);
-!            else
-!                call Disp2Ddble(matrix(:,:,i), title, format, nColumns, unit_in = unit);
-!            end if
-!        end do
-!
-!    end subroutine Disp3Ddble
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+
+    subroutine Disp3Ddble(matrix, title, format, nColumns, mpi, comm, unit_in)
+        ! Displays 1D Matrix (Vector)
+
+        implicit none
+
+        !INPUT
+        double precision , dimension(:,:,:),          intent(in) :: matrix
+        character (len=*),                  optional, intent(in) :: title, format
+        integer,                            optional, intent(in) :: nColumns
+        logical                           , optional, intent(in) :: mpi
+        integer                           , optional, intent(in) :: comm
+        integer          , optional, intent(in) :: unit_in
+
+        !LOCAL VARIABLES
+        integer :: i
+        integer :: effectComm
+        integer :: unit
+
+        unit = SCREEN !Screen
+        if(present(unit_in)) unit = unit_in
+
+        if(present(comm))       effectComm = comm
+        if(.not. present(comm)) effectComm = MPI_COMM_WORLD
+
+        do i = 1, size(matrix, 3)
+            write(unit,*) "---------Slice ", i, "----------"
+            if(present(mpi)) then
+                call Disp2Ddble(matrix(:,:,i), title, format, nColumns, mpi, effectComm, unit_in = unit);
+            else
+                call Disp2Ddble(matrix(:,:,i), title, format, nColumns, unit_in = unit);
+            end if
+        end do
+
+    end subroutine Disp3Ddble
 
 end module displayCarvalhol
 !! Local Variables:

@@ -14,54 +14,54 @@ module localization_RF
 
 contains
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine get_neighbours_info (RDF, MSH)
-        implicit none
-
-        !INPUT OUTPUT
-        type(RF), intent(inout) :: RDF
-
-        !INPUT
-        type(MESH), intent(in) :: MSH
-
-        !LOCAL
-        integer :: neighPos, stage, direction
-        integer, allocatable, dimension(:) :: tempSeed
-        integer :: request, code, tag
-        integer, dimension(MPI_STATUS_SIZE) :: status
-
-        do neighPos = 1, size(MSH%neigh)
-            if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
-            call calculate_random_seed(tempSeed, RDF%seedStart+MSH%neigh(neighPos))
-            RDF%neighSeed(:,neighPos) = tempSeed
-        end do
-
-        do stage = 1, 2 !Sending and then receiving
-
-            do neighPos = 1, size(MSH%neigh)
-
-                if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
-
-                if(stage == 1) then
-                    tag = findTag(MSH, neighPos, neighPos, send = .true.)
-                    call MPI_ISEND (RDF%xMaxExt(:)-RDF%xMinExt(:), RDF%nDim, MPI_DOUBLE_PRECISION, &
-                        MSH%neigh(neighPos), tag, RDF%comm, request, code)
-                else if(stage == 2) then
-                    tag = findTag(MSH, neighPos, neighPos, send = .false.)
-                    call MPI_RECV (RDF%neighRange(:,neighPos), RDF%nDim, MPI_DOUBLE_PRECISION, &
-                        MSH%neigh(neighPos), tag, RDF%comm, status, code)
-                end if
-
-            end do
-
-        end do
-
-        deallocate(tempSeed)
-
-    end subroutine get_neighbours_info
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine get_neighbours_info (RDF, MSH)
+!        implicit none
+!
+!        !INPUT OUTPUT
+!        type(RF), intent(inout) :: RDF
+!
+!        !INPUT
+!        type(MESH), intent(in) :: MSH
+!
+!        !LOCAL
+!        integer :: neighPos, stage, direction
+!        integer, allocatable, dimension(:) :: tempSeed
+!        integer :: request, code, tag
+!        integer, dimension(MPI_STATUS_SIZE) :: status
+!
+!        do neighPos = 1, size(MSH%neigh)
+!            if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
+!            call calculate_random_seed(tempSeed, RDF%seedStart+MSH%neigh(neighPos))
+!            RDF%neighSeed(:,neighPos) = tempSeed
+!        end do
+!
+!        do stage = 1, 2 !Sending and then receiving
+!
+!            do neighPos = 1, size(MSH%neigh)
+!
+!                if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
+!
+!                if(stage == 1) then
+!                    tag = findTag(MSH, neighPos, neighPos, send = .true.)
+!                    call MPI_ISEND (RDF%xRange(:), RDF%nDim, MPI_DOUBLE_PRECISION, &
+!                        MSH%neigh(neighPos), tag, RDF%comm, request, code)
+!                else if(stage == 2) then
+!                    tag = findTag(MSH, neighPos, neighPos, send = .false.)
+!                    call MPI_RECV (RDF%neighRange(:,neighPos), RDF%nDim, MPI_DOUBLE_PRECISION, &
+!                        MSH%neigh(neighPos), tag, RDF%comm, status, code)
+!                end if
+!
+!            end do
+!
+!        end do
+!
+!        deallocate(tempSeed)
+!
+!    end subroutine get_neighbours_info
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -84,53 +84,53 @@ contains
 
     end subroutine getNeighIndexRange
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
-        !INPUT:
-        type(RF), intent(in) :: RDF
-        type(MESH), intent(in) :: MSH
-        integer, intent(in) :: minIndexNeigh, maxIndexNeigh
-        !logical, dimension(:), intent(in) ::considerNeighbour
-        integer, intent(in) :: partitionType
-
-        !LOCAL
-        integer :: direction, minPos, maxPos, i
-        double precision, dimension(minIndexNeigh:maxIndexNeigh) :: unityPartition
-        double precision, dimension(MSH%nDim) :: originCorner
-
-        !Modify extremes of local Random Field-------------------------------------------------------
-
-        !Building Shape Functions in all directions
-        do direction = 1, size(MSH%neigh)
-
-            if(.not. MSH%considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
-
-            !Positions in temp Vector
-            minPos = MSH%indexNeigh(1,direction)
-            maxPos = MSH%indexNeigh(2,direction)
-
-            !Finding origin
-            originCorner = MSH%xOrNeigh(:, direction)
-            !originCorner = MSH%xMinNeigh(:, direction)
-            !where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
-
-
-            !Shape Function Generation
-            call generateUnityPartition(RDF%xPoints(:, minPos:maxPos), originCorner, MSH%overlap, &
-                                        MSH%neighShift(:, direction), partitionType, &
-                                        unityPartition(minPos:maxPos))
-
-        end do !Direction
-
-        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
-                                                       * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
-
-        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
-
-    end subroutine applyWeightingFunctions
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
+!        !INPUT:
+!        type(RF), intent(in) :: RDF
+!        type(MESH), intent(in) :: MSH
+!        integer, intent(in) :: minIndexNeigh, maxIndexNeigh
+!        !logical, dimension(:), intent(in) ::considerNeighbour
+!        integer, intent(in) :: partitionType
+!
+!        !LOCAL
+!        integer :: direction, minPos, maxPos, i
+!        double precision, dimension(minIndexNeigh:maxIndexNeigh) :: unityPartition
+!        double precision, dimension(MSH%nDim) :: originCorner
+!
+!        !Modify extremes of local Random Field-------------------------------------------------------
+!
+!        !Building Shape Functions in all directions
+!        do direction = 1, size(MSH%neigh)
+!
+!            if(.not. MSH%considerNeighbour(direction)) cycle !Don't consider Neighbours in this direction
+!
+!            !Positions in temp Vector
+!            minPos = MSH%indexNeigh(1,direction)
+!            maxPos = MSH%indexNeigh(2,direction)
+!
+!            !Finding origin
+!            originCorner = MSH%xOrNeigh(:, direction)
+!            !originCorner = MSH%xMinNeigh(:, direction)
+!            !where(MSH%neighShift(:, direction) == -1) originCorner = MSH%xMaxNeigh(:, direction)
+!
+!
+!            !Shape Function Generation
+!            call generateUnityPartition(RDF%xPoints(:, minPos:maxPos), originCorner, MSH%overlap, &
+!                                        MSH%neighShift(:, direction), partitionType, &
+!                                        unityPartition(minPos:maxPos))
+!
+!        end do !Direction
+!
+!        RDF%randField(minIndexNeigh:maxIndexNeigh,1) = RDF%randField(minIndexNeigh:maxIndexNeigh,1) &
+!                                                       * sqrt(unityPartition(minIndexNeigh:maxIndexNeigh))
+!
+!        !RDF%randField(minIndexNeigh:maxIndexNeigh,1) = unityPartition(minIndexNeigh:maxIndexNeigh) !TEST
+!
+!    end subroutine applyWeightingFunctions
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -165,8 +165,8 @@ contains
 
         call wLog ("Inside addNeighboursFields")
 
-        if(RDF%nDim == 2) TRF_2D(1:RDF%xNStep(1),1:RDF%xNStep(2)) => tempRandField
-        if(RDF%nDim == 3) TRF_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3)) => tempRandField
+        if(RDF%nDim == 2) TRF_2D(1:MSH%xNStep(1),1:MSH%xNStep(2)) => tempRandField
+        if(RDF%nDim == 3) TRF_3D(1:MSH%xNStep(1),1:MSH%xNStep(2),1:MSH%xNStep(3)) => tempRandField
 
         if(RDF%nDim == 1) then
             requestSize = 2* (2*1)
@@ -442,7 +442,7 @@ contains
             call wLog(maxPos)
 
             !Shape Function Generation
-            call generateUnityPartition_OnMatrix(RDF, originCorner, MSH%overlap, &
+            call generateUnityPartition_OnMatrix(RDF, MSH%xNStep, originCorner, MSH%overlap, &
                                                  MSH%neighShift(:, direction), partitionType, &
                                                  unityPartition, minPos, maxPos)
 
@@ -458,12 +458,14 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine generateUnityPartition_OnMatrix(RDF, originCorner, overlap, neighShift, partitionType, unityPartition, minPos, maxPos)
+    subroutine generateUnityPartition_OnMatrix(RDF, xNStep, originCorner, overlap, neighShift, &
+                                               partitionType, unityPartition, minPos, maxPos)
 
         implicit none
 
         !INPUT
         type(RF), intent(in) ::  RDF
+        integer, dimension(:), intent(in) ::  xNStep
         double precision, dimension(:)  , intent(in) :: originCorner, overlap
         integer, dimension(:)  , intent(in) :: neighShift
         integer, intent(in) :: partitionType
@@ -473,38 +475,49 @@ contains
         double precision, dimension(:), intent(out), target :: unityPartition
 
         !LOCAL
-        integer :: i, nDim
+        integer :: i
         double precision, dimension(:, :), pointer :: UP_2D
         double precision, dimension(:, :, :), pointer :: UP_3D
 
-        nDim = size(originCorner)
+        if(RDF%nDim == 2) UP_2D(1:xNStep(1),1:xNStep(2)) => unityPartition
+        if(RDF%nDim == 3) UP_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => unityPartition
 
-        if(RDF%nDim == 2) UP_2D(1:RDF%xNStep(1),1:RDF%xNStep(2)) => unityPartition
-        if(RDF%nDim == 3) UP_3D(1:RDF%xNStep(1),1:RDF%xNStep(2),1:RDF%xNStep(3)) => unityPartition
+        !call wLog("shape(unityPartition) = ")
+        !call wLog(shape(unityPartition))
+        call wLog("shape(UP_2D) = ")
+        call wLog(shape(UP_2D))
+        call wLog("shape(RDF%xPoints_2D) = ")
+        call wLog(shape(RDF%xPoints_2D))
+
+!        call wLog("Point in minimal position = ")
+!        call wLog(RDF%xPoints_2D(1:2,minPos(1),minPos(2)))
+!        call wLog("Point in maximal position = ")
+!        call wLog(RDF%xPoints_2D(1:2,maxPos(1),maxPos(2)))
 
 
-        do i = 1, nDim
+
+        do i = 1, RDF%nDim
         !do i = 1, 1 !For Tests
             if(neighShift(i) == 0) cycle
             call wLog("Dimension = ")
             call wLog(i)
 
             if(partitionType == 1) then
-                if(nDim == 2) then
+                if(RDF%nDim == 2) then
                     call wLog("Point in minimal position = ")
                     call wLog(RDF%xPoints_2D(i,minPos(1),minPos(2)))
                     call wLog("Point in maximal position = ")
                     call wLog(RDF%xPoints_2D(i,maxPos(1),maxPos(2)))
                     call wLog("originCorner(i) = ")
                     call wLog(originCorner(i))
-                    !UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = 1
+                    !UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = 1 !For Tests
                     UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = &
                                         ((1.0D0 + cos(PI*(RDF%xPoints_2D(&
                                         i,minPos(1):maxPos(1),minPos(2):maxPos(2)) &
                                         - originCorner(i))/overlap(i)))&
                                         / 2.0D0) &
                                         * UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2))
-                else if (nDim == 3) then
+                else if (RDF%nDim == 3) then
                     call wLog("Point in minimal position = ")
                     call wLog(RDF%xPoints_3D(i,minPos(1),minPos(2),minPos(3)))
                     call wLog("Point in maximal position = ")
@@ -568,27 +581,27 @@ contains
 
     end subroutine generateUnityPartition
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
-        !INPUT
-        type(MESH), intent(in) :: MSH
-        integer, intent(in) :: minIndexNeigh, maxIndexNeigh
-        !logical, dimension(:), intent(in) ::considerNeighbour
-        integer, intent(in) :: partitionType
-        !OUTPUT
-        type(RF), intent(inout) :: RDF
-        !LOCAL
-        double precision, dimension(MSH%nDim) :: neighOrCorner, originCorner
-        logical :: sndRcv
-        integer :: i, direction, neighPos, minPos, maxPos
-        double precision, dimension(minIndexNeigh:maxIndexNeigh) :: unityPartition
-        !double precision, dimension(minIndexNeigh:maxIndexNeigh) :: power !For Tests
-        type(RF) :: tmpRDF
-
-
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
+!        !INPUT
+!        type(MESH), intent(in) :: MSH
+!        integer, intent(in) :: minIndexNeigh, maxIndexNeigh
+!        !logical, dimension(:), intent(in) ::considerNeighbour
+!        integer, intent(in) :: partitionType
+!        !OUTPUT
+!        type(RF), intent(inout) :: RDF
+!        !LOCAL
+!        double precision, dimension(MSH%nDim) :: neighOrCorner, originCorner
+!        logical :: sndRcv
+!        integer :: i, direction, neighPos, minPos, maxPos
+!        double precision, dimension(minIndexNeigh:maxIndexNeigh) :: unityPartition
+!        !double precision, dimension(minIndexNeigh:maxIndexNeigh) :: power !For Tests
+!        type(RF) :: tmpRDF
+!
+!
 !        !Taking the contributions from neighbours------------------------------------------------------
 !        !write(get_fileId(), *) "   Taking the contributions from neighbours "
 !        call init_RF(tmpRDF, RDF%nDim, RDF%Nmc, RDF%comm, RDF%rang, RDF%nb_procs)
@@ -686,8 +699,8 @@ contains
 !            end do !Neighbours
 !        end do !Directions
 !        call finalize_RF(tmpRDF)
-
-    end subroutine takeNeighboursContribution
+!
+!    end subroutine takeNeighboursContribution
 
 
 
@@ -787,7 +800,7 @@ contains
         integer :: ind1D
         integer :: i
 
-        orig  = (dble(RDF%origin-1)*MSH%xStep + MSH%xMinGlob)
+        orig  = (dble(MSH%origin-1)*MSH%xStep + MSH%xMinGlob)
         xStep = MSH%xStep
 
         call wLog("xStep")
@@ -878,39 +891,39 @@ contains
 
     end function findTag
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine copy_RF_xPoints(MSH, orRDF, destRDF, destXPoints, direction)
-        implicit none
-
-        !INPUT AND OUTPUT
-        type(MESH), intent(in) :: MSH
-        type(RF), intent(in)   :: orRDF
-        type(RF) ::destRDF
-        integer, intent(in) :: direction
-        double precision, dimension(:, :), allocatable, intent(out), target :: destXPoints;
-
-        !LOCAL
-        integer :: i, j, totalSize
-
-        totalSize = MSH%indexNeigh(2,direction) - MSH%indexNeigh(1,direction) + 1
-
-        if(allocated(destXPoints)) then
-            if(size(destXPoints) /= totalSize) then
-                nullify(destRDF%xPoints)
-                deallocate(destXPoints)
-            end if
-        end if
-
-        if(.not.allocated(destXPoints)) allocate(destXPoints(MSH%nDim, 1:totalSize))
-
-        destRDF%xPoints => destXPoints
-
-        destRDF%xPoints(:,:) = orRDF%xPoints(:, MSH%indexNeigh(1,direction):MSH%indexNeigh(2,direction))
-        destRDF%xNTotal = totalSize
-
-    end subroutine copy_RF_xPoints
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine copy_RF_xPoints(MSH, orRDF, destRDF, destXPoints, direction)
+!        implicit none
+!
+!        !INPUT AND OUTPUT
+!        type(MESH), intent(in) :: MSH
+!        type(RF), intent(in)   :: orRDF
+!        type(RF) ::destRDF
+!        integer, intent(in) :: direction
+!        double precision, dimension(:, :), allocatable, intent(out), target :: destXPoints;
+!
+!        !LOCAL
+!        integer :: i, j, totalSize
+!
+!        totalSize = MSH%indexNeigh(2,direction) - MSH%indexNeigh(1,direction) + 1
+!
+!        if(allocated(destXPoints)) then
+!            if(size(destXPoints) /= totalSize) then
+!                nullify(destRDF%xPoints)
+!                deallocate(destXPoints)
+!            end if
+!        end if
+!
+!        if(.not.allocated(destXPoints)) allocate(destXPoints(MSH%nDim, 1:totalSize))
+!
+!        destRDF%xPoints => destXPoints
+!
+!        destRDF%xPoints(:,:) = orRDF%xPoints(:, MSH%indexNeigh(1,direction):MSH%indexNeigh(2,direction))
+!        destRDF%xNTotal = totalSize
+!
+!    end subroutine copy_RF_xPoints
 
 end module localization_RF

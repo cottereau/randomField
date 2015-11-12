@@ -777,9 +777,9 @@ contains
 
         info = MPI_INFO_NULL
         rank = MSH%nDim
-        countND = RDF%xNStep
+        countND = MSH%xNStep
         rank1D = 1
-        count1D = RDF%xNTotal
+        count1D = MSH%xNTotal
         total_xNStep = nint((MSH%xMaxGlob - MSH%xMinGlob)/MSH%xStep, 8) + 1
         dims = total_xNStep
         call wLog("dims = ")
@@ -798,7 +798,7 @@ contains
         call h5sclose_f(filespace, error) !CLOSE filespace
 
         if(RDF%independent) then
-            offset = RDF%origin - 1!Lines Offset to start writing
+            offset = MSH%origin - 1!Lines Offset to start writing
 
             if(RDF%method == FFT) then
                 minPos = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep)
@@ -845,7 +845,7 @@ contains
                 !CHOOSING SPACE IN FILE FOR THIS PROC
                 call h5dget_space_f(dset_id, filespace, error) !GET filespace
                 ! Select hyperslab in the file.
-                offset = RDF%origin - 1!Lines Offset to start writing
+                offset = MSH%origin - 1!Lines Offset to start writing
                 call wLog("offset = ")
                 call wLog(int(offset))
                 write(*,*) "offset = ", offset
@@ -855,14 +855,14 @@ contains
                 !CHOOSING SPACE IN MEMORY FOR THIS PROC
                 call wLog("count1D = ")
                 call wLog(int(count1D))
-                call wLog("RDF%origin = ")
-                call wLog(int(RDF%origin))
+                call wLog("MSH%origin = ")
+                call wLog(int(MSH%origin))
                 call h5screate_simple_f(rank1D, count1D, memspace, error)  !NEW memspace
 
                 !CHOOSING SPACE IN FILE FOR THIS PROC
                 call h5dget_space_f(dset_id, filespace, error) !GET filespace
                 ! Select hyperslab in the file.
-                allocate(localSlab(RDF%nDim, RDF%xNTotal))
+                allocate(localSlab(RDF%nDim, MSH%xNTotal))
                 do i = 1, MSH%nDim
                     localSlab(i,:) = nint((RDF%xPoints(i,:)-MSH%xMinGlob(i))/MSH%xStep(i)) + 1
                 end do
@@ -870,7 +870,7 @@ contains
                 !call wLog("localSlab = ")
                 !call wLog(int(localSlab))
 
-                count1D = RDF%xNTotal
+                count1D = MSH%xNTotal
                 call h5sselect_elements_f(filespace, H5S_SELECT_SET_F, RDF%nDim, count1D(1), &
                                           localSlab, error) !SET filespace (to the portion in the list hyperslab)
                 deallocate(localSlab)
@@ -1140,7 +1140,7 @@ contains
         character (len=40) :: doubleFmt
         integer(kind=8) :: sum_xNTotal, sum_kNTotal
 
-        call MPI_REDUCE (RDF%xNTotal,sum_xNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
+        call MPI_REDUCE (MSH%xNTotal,sum_xNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
         call MPI_REDUCE (RDF%kNTotal,sum_kNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
 
         if(RDF%rang == 0) then
@@ -1166,7 +1166,7 @@ contains
             write(fileId,*) "--kMax_Loc-----------------------"
             write(fileId,fmt = doubleFmt) RDF%kMax
             write(fileId,*) "--xNTotal_Loc-----------------------"
-            write(fileId,fmt = "(I20)") RDF%xNTotal
+            write(fileId,fmt = "(I20)") MSH%xNTotal
             write(fileId,*) "--kNTotal_Loc-----------------------"
             write(fileId,fmt = "(I20)") RDF%kNTotal
             write(fileId,*) "--xStep-----------------------"

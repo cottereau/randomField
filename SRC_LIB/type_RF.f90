@@ -18,7 +18,7 @@ module type_RF
         !GENERATION VARIABLES
             !nDim independent
         integer :: nDim = -1!, xNTotal = -1, kNTotal = -1;
-        integer(kind=8) :: xNTotal = -1, kNTotal = -1;
+        integer(kind=8) :: kNTotal = -1;
         integer, dimension(:)  , allocatable :: seed
         integer :: seedStart = -1
         double precision   :: fieldAvg = -1, fieldVar = -1;
@@ -33,16 +33,16 @@ module type_RF
         double precision, dimension(:)   , allocatable :: corrL, kMax, kDelta;
         double precision, dimension(:, :), allocatable :: kPoints;
         double precision, dimension(:)   , allocatable :: SkVec;
+        double precision, dimension(:)   , allocatable :: xRange
         double precision, dimension(:, :), allocatable :: xPoints_Local
         double precision, dimension(:, :), allocatable :: randField_Local
-        integer, dimension(:)  , allocatable :: kNStep, xNStep
+        integer, dimension(:)  , allocatable :: kNStep
         integer :: kNInit, kNEnd
         integer, dimension(:)  , allocatable :: kExtent
-        integer, dimension(:)  , allocatable :: origin
         integer, dimension(:,:), allocatable :: neighSeed
-        double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
+        !double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:,:), allocatable :: neighRange;
-        double precision, dimension(:), allocatable :: xMaxExt, xMinExt;
+        !double precision, dimension(:), allocatable :: xMaxExt, xMinExt;
         double precision, pointer :: xPoints(:,:)
         double precision, pointer :: randField(:,:)
         double precision, dimension(:,:)    , pointer :: RF_2D
@@ -75,19 +75,14 @@ module type_RF
             allocate(RF_a%corrL(nDim))
             allocate(RF_a%kMax(nDim))
             allocate(RF_a%kNStep(nDim))
-            allocate(RF_a%xNStep(nDim))
             allocate(RF_a%kDelta(nDim))
-            allocate(RF_a%xMinGlob(nDim))
-            allocate(RF_a%xMaxGlob(nDim))
             allocate(RF_a%calculate(Nmc))
-            allocate(RF_a%xMaxExt(nDim))
-            allocate(RF_a%xMinExt(nDim))
-            allocate(RF_a%origin(nDim))
             allocate(RF_a%kExtent(nDim))
             call random_seed(size = n)
             allocate(RF_a%seed(n))
             allocate(RF_a%neighSeed(n,(3**nDim)-1))
             allocate(RF_a%neighRange(nDim,(3**nDim)-1))
+            allocate(RF_a%xRange(nDim))
 
             RF_a%log_ID   = IPT%log_ID
             RF_a%nDim     = IPT%nDim_gen
@@ -107,16 +102,12 @@ module type_RF
             RF_a%seedStart   = IPT%seedStart
 
 
+            RF_a%xRange = -1.0D0
             RF_a%kMax   = -1
             RF_a%kDelta = -1
             RF_a%seed   = -1
-            RF_a%xMinGlob = -1
-            RF_a%xMaxGlob = -1
-            RF_a%xMinExt = -1
-            RF_a%xMaxExt = -1
             RF_a%kNStep = -1
             RF_a%kExtent = -1
-            RF_a%xNStep = -1
             RF_a%gen_CPU_Time = -1
             RF_a%calculate(:) = .true.
             RF_a%init  = .true.
@@ -193,12 +184,6 @@ module type_RF
                     write(unit,*) "|  Process--"
                     write(unit,*) "|  |"
                     write(unit,*) "|  |xPOINTS"
-                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMinGlob   = ", RF_a%xMinGlob
-                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxGlob   = ", RF_a%xMaxGlob
-                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMinExt  = ", RF_a%xMinExt
-                    write(unit,"(A,("//dblFmt//"))") " |  |  |xMaxExt  = ", RF_a%xMaxExt
-                    write(unit,*) "|  |  |xNTotal                    = ", RF_a%xNTotal
-                    write(unit,*) "|  |  |xNStep                     = ", RF_a%xNStep
                     write(unit,*) "|  |  |associated(xPoints)        = ", associated(RF_a%xPoints)
                     if(associated(RF_a%xPoints)) &
                         write(unit,*) "|  |  |shape(xPoints)             = ", shape(RF_a%xPoints)
@@ -254,7 +239,6 @@ module type_RF
             RF_a%rang      = -1
             RF_a%nb_procs  = -1
             RF_a%nDim      = -1
-            RF_a%xNTotal   = -1
             RF_a%kNTotal   = -1
             RF_a%seedStart = -1
             RF_a%fieldAvg  = -1
@@ -272,17 +256,12 @@ module type_RF
             if(allocated(RF_a%kMax))      deallocate(RF_a%kMax)
             if(allocated(RF_a%kPoints))   deallocate(RF_a%kPoints)
             if(allocated(RF_a%SkVec))     deallocate(RF_a%SkVec)
-            if(allocated(RF_a%xMinGlob))  deallocate(RF_a%xMinGlob)
-            if(allocated(RF_a%xMaxGlob))  deallocate(RF_a%xMaxGlob)
             if(allocated(RF_a%calculate)) deallocate(RF_a%calculate)
-            if(allocated(RF_a%xMaxExt)) deallocate(RF_a%xMaxExt)
-            if(allocated(RF_a%xMinExt)) deallocate(RF_a%xMinExt)
             if(allocated(RF_a%neighSeed)) deallocate(RF_a%neighSeed)
             if(allocated(RF_a%neighRange)) deallocate(RF_a%neighRange)
             if(allocated(RF_a%kNStep))     deallocate(RF_a%kNStep)
-            if(allocated(RF_a%xNStep))     deallocate(RF_a%xNStep)
             if(allocated(RF_a%kDelta))     deallocate(RF_a%kDelta)
-            if(allocated(RF_a%origin))     deallocate(RF_a%origin)
+            if(allocated(RF_a%xRange))     deallocate(RF_a%xRange)
             if(associated(RF_a%xPoints))    nullify(RF_a%xPoints)
             if(associated(RF_a%randField))  nullify(RF_a%randField)
             if(associated(RF_a%RF_2D))      nullify(RF_a%RF_2D)
@@ -293,34 +272,34 @@ module type_RF
 
         end subroutine finalize_RF
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine copy_RF_properties(orRDF, destRDF)
-        implicit none
-
-        !INPUT AND OUTPUT
-        type(RF), intent(in)   :: orRDF
-        type(RF) ::destRDF
-
-        destRDF%nDim     = orRDF%nDim
-        destRDF%Nmc      = orRDF%Nmc
-        destRDF%comm     = orRDF%comm
-        destRDF%rang     = orRDF%rang
-        destRDF%nb_procs = orRDF%nb_procs
-        destRDF%corrL    = orRDF%corrL
-        destRDF%corrMod  = orRDF%corrMod
-        destRDF%kMax     = orRDF%kMax
-        destRDF%xMinGlob = orRDF%xMinGlob
-        destRDF%xMaxGlob = orRDF%xMaxGlob
-        destRDF%calculate   = orRDF%calculate
-        destRDF%method      = orRDF%method
-        destRDF%corrL       = orRDF%corrL
-        destRDF%kMax        = orRDF%kMax
-        destRDF%independent =  orRDF%independent
-        destRDF%margiFirst  =  orRDF%margiFirst
-
-    end subroutine copy_RF_properties
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine copy_RF_properties(orRDF, destRDF)
+!        implicit none
+!
+!        !INPUT AND OUTPUT
+!        type(RF), intent(in)   :: orRDF
+!        type(RF) ::destRDF
+!
+!        destRDF%nDim     = orRDF%nDim
+!        destRDF%Nmc      = orRDF%Nmc
+!        destRDF%comm     = orRDF%comm
+!        destRDF%rang     = orRDF%rang
+!        destRDF%nb_procs = orRDF%nb_procs
+!        destRDF%corrL    = orRDF%corrL
+!        destRDF%corrMod  = orRDF%corrMod
+!        destRDF%kMax     = orRDF%kMax
+!        destRDF%xMinGlob = orRDF%xMinGlob
+!        destRDF%xMaxGlob = orRDF%xMaxGlob
+!        destRDF%calculate   = orRDF%calculate
+!        destRDF%method      = orRDF%method
+!        destRDF%corrL       = orRDF%corrL
+!        destRDF%kMax        = orRDF%kMax
+!        destRDF%independent =  orRDF%independent
+!        destRDF%margiFirst  =  orRDF%margiFirst
+!
+!    end subroutine copy_RF_properties
 
 end module type_RF

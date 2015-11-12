@@ -81,17 +81,7 @@ contains
         !LOCAL
         logical, dimension(:), allocatable :: effectCalc;
 
-
         if(RDF%rang == 0) write(*,*) "Inside create_RF_Unstruct_Init"
-
-        !Discovering Global Extremes
-        RDF%xMinGlob  = MSH%xMinGlob
-        RDF%xMaxGlob  = MSH%xMaxGlob
-        RDF%xMinExt = MSH%xMinExt
-        RDF%xMaxExt = MSH%xMaxExt
-
-        !Getting Mesh Information
-        RDF%xNStep = MSH%xNStep
 
         !Generating standard Gaussian Field
         call gen_Std_Gauss(RDF, MSH)
@@ -124,14 +114,14 @@ contains
         call wLog("->Normalizing Coordinates")
         call wLog(" ")
         do i = 1, RDF%nDim
-            RDF%xPoints(i,:) = RDF%xPoints(i,:)/RDF%corrL(i)
-            RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
-            RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)/RDF%corrL(i)
-            RDF%xMinExt(i) = RDF%xMinExt(i)/RDF%corrL(i)
-            RDF%xMaxExt(i) = RDF%xMaxExt(i)/RDF%corrL(i)
-            RDF%xMinGlob(i)  = RDF%xMinGlob(i)/RDF%corrL(i)
-            RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)/RDF%corrL(i)
+            RDF%xPoints(i,:)   = RDF%xPoints(i,:)/RDF%corrL(i)
 
+            MSH%xMinInt(i)     = MSH%xMinInt(i)/RDF%corrL(i)
+            MSH%xMaxInt(i)     = MSH%xMaxInt(i)/RDF%corrL(i)
+            MSH%xMinExt(i)     = MSH%xMinExt(i)/RDF%corrL(i)
+            MSH%xMaxExt(i)     = MSH%xMaxExt(i)/RDF%corrL(i)
+            MSH%xMinGlob(i)    = MSH%xMinGlob(i)/RDF%corrL(i)
+            MSH%xMaxGlob(i)    = MSH%xMaxGlob(i)/RDF%corrL(i)
             MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)/RDF%corrL(i)
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)/RDF%corrL(i)
             MSH%xMaxBound(i)   = MSH%xMaxBound(i)/RDF%corrL(i)
@@ -139,8 +129,13 @@ contains
             MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)/RDF%corrL(i)
         end do
 
-        !Generating Standard Gaussian Field
+        if(RDF%independent) then
+            RDF%xRange = MSH%xMaxExt - MSH%xMinExt !Delta max in between two wave numbers to avoid periodicity
+        else
+            RDF%xRange = MSH%xMaxGlob - MSH%xMinGlob !Delta max in between two wave numbers to avoid periodicity
+        end if
 
+        !Generating Standard Gaussian Field
         call wLog("")
         call wLog("GENERATING INTERNAL RANDOM FIELD")
         call wLog("-------------------------------")
@@ -150,71 +145,63 @@ contains
 
         select case (RDF%method)
             case(ISOTROPIC)
-                call gen_Std_Gauss_Isotropic(RDF)
+                call wLog(" ISOTROPIC")
+                if(RDF%rang == 0) write(*,*)"ISOTROPIC"
+                call gen_Std_Gauss_Isotropic(RDF, MSH)
             case(SHINOZUKA)
-                call gen_Std_Gauss_Shinozuka(RDF)
+                call wLog(" SHINOZUKA")
+                if(RDF%rang == 0) write(*,*)"SHINOZUKA"
+                call gen_Std_Gauss_Shinozuka(RDF, MSH)
             case(RANDOMIZATION)
-                call gen_Std_Gauss_Randomization(RDF)
+                call wLog(" RANDOMIZATION")
+                if(RDF%rang == 0) write(*,*)"RANDOMIZATION"
+                call gen_Std_Gauss_Randomization(RDF, MSH)
             case(FFT)
                 call wLog(" FFT")
                 if(RDF%rang == 0) write(*,*)"FFT"
-                call gen_Std_Gauss_FFT(RDF)
+                call gen_Std_Gauss_FFT(RDF, MSH)
         end select
 
         !RDF%randField = 1.0 ! For Tests
 
         if(RDF%independent .and. RDF%nb_procs > 1) then
-            if(RDF%method == FFT) then
-                !RDF%randField = 1.0 ! For Tests
-                !if(RDF%rang == 0) write(*,*) "    ->Applying Weighting Functions"
-                call wLog("    ->Applying Weighting Functions")
-                call applyWeightingFunctions_OnMatrix(RDF, MSH, partitionType)
-                if(RDF%rang == 0) write(*,*) "    ->addNeighboursFields"
-                call wLog("    ->addNeighboursFields")
-                call addNeighboursFields(RDF, MSH)
-!                ! START For Tests
-!                minPos = nint((MSH%xMinInt-MSH%xMinExt)/MSH%xStep) + 1
-!                maxPos = nint((MSH%xMaxInt-MSH%xMinExt)/MSH%xStep)
-!                call wLog("minPos = ")
-!                call wLog(minPos)
-!                call wLog("maxPos = ")
-!                call wLog(maxPos)
-!                if(RDF%nDim == 2) RDF%RF_2D(minPos(1):maxPos(1), &
-!                                            minPos(2):maxPos(2)) = 0
-!                if(RDF%nDim == 3) RDF%RF_3D(minPos(1):maxPos(1), &
-!                                            minPos(2):maxPos(2), &
-!                                            minPos(3):maxPos(3)) = 0
-!                ! END For Tests
-            else
-                !Communicating borders to neighbours
-                !RDF%randField = 0.0 ! For Tests
-                call wLog("")
-                call wLog("GENERATING BORDER RANDOM FIELDS")
-                call wLog("-------------------------------")
-                if(RDF%rang == 0) write(*,*)"GENERATING BORDER RANDOM FIELDS"
-                if(RDF%rang == 0) write(*,*) "-------------------------------"
-                call wLog("")
-                call wLog("    ->Discovering neighbours seed")
-                call get_neighbours_info(RDF, MSH)
-                call wLog("    ->Discovering neighbours index")
-                call getNeighIndexRange(MSH, minIndexNeigh, maxIndexNeigh)
-                call wLog("    ->Applying Weighting Functions")
-                call applyWeightingFunctions(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
-                call wLog("    ->Adding Neighbours Contribution")
-                call takeNeighboursContribution(RDF, MSH, minIndexNeigh, maxIndexNeigh, partitionType)
-            end if
+
+            !RDF%randField = 1.0 ! For Tests
+            if(RDF%rang == 0) write(*,*) "    ->Applying Weighting Functions"
+            call wLog("    ->Applying Weighting Functions on Field")
+            call applyWeightingFunctions_OnMatrix(RDF, MSH, partitionType)
+            if(RDF%rang == 0) write(*,*) "    ->addNeighboursFields"
+            call wLog("    ->addNeighboursFields")
+            call addNeighboursFields(RDF, MSH)
+
+!            ! START For Tests
+!            minPos = nint((MSH%xMinInt-MSH%xMinExt)/MSH%xStep) + 1
+!            maxPos = nint((MSH%xMaxInt-MSH%xMinExt)/MSH%xStep)
+!            call wLog("minPos = ")
+!            call wLog(minPos)
+!            call wLog("maxPos = ")
+!            call wLog(maxPos)
+!            if(RDF%nDim == 2) RDF%RF_2D(minPos(1):maxPos(1), &
+!                                        minPos(2):maxPos(2)) = 0
+!            if(RDF%nDim == 3) RDF%RF_3D(minPos(1):maxPos(1), &
+!                                        minPos(2):maxPos(2), &
+!                                        minPos(3):maxPos(3)) = 0
+!            ! END For Tests
+
         end if
 
         !Reverting Normalization
         call wLog(" ")
         call wLog("->Reverting Normalization")
         do i = 1, RDF%nDim
-            RDF%xPoints(i,:) = RDF%xPoints(i,:)*RDF%corrL(i)
-            RDF%xMinGlob(i)  = RDF%xMinGlob(i)*RDF%corrL(i)
-            RDF%xMaxGlob(i)  = RDF%xMaxGlob(i)*RDF%corrL(i)
-            RDF%xMinExt(i) = RDF%xMinExt(i)*RDF%corrL(i)
-            RDF%xMaxExt(i) = RDF%xMaxExt(i)*RDF%corrL(i)
+            RDF%xPoints(i,:)   = RDF%xPoints(i,:)*RDF%corrL(i)
 
+            MSH%xMinInt(i)     = MSH%xMinInt(i)*RDF%corrL(i)
+            MSH%xMaxInt(i)     = MSH%xMaxInt(i)*RDF%corrL(i)
+            MSH%xMinExt(i)     = MSH%xMinExt(i)*RDF%corrL(i)
+            MSH%xMaxExt(i)     = MSH%xMaxExt(i)*RDF%corrL(i)
+            MSH%xMinGlob(i)    = MSH%xMinGlob(i)*RDF%corrL(i)
+            MSH%xMaxGlob(i)    = MSH%xMaxGlob(i)*RDF%corrL(i)
             MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)*RDF%corrL(i)
             MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
             MSH%xMaxBound(i)   = MSH%xMaxBound(i)*RDF%corrL(i)

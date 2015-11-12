@@ -48,11 +48,13 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_kPoints(RDF);
+    subroutine set_kPoints(RDF, xStep);
         implicit none
 
         !INPUT OUTPUT
         type(RF) :: RDF
+        !INPUT
+        double precision, dimension(:), intent(in) :: xStep
 
         !LOCAL
         integer :: i
@@ -64,13 +66,22 @@ contains
         if(allocated(RDF%kPoints)) deallocate(RDF%kPoints)
 
         call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
+        RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xRange))
+
         !write(get_fileId(),*) " RDF%kMax1 = ", RDF%kMax
 
-        if(RDF%independent) then
-            RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxExt - RDF%xMinExt)) !Delta max in between two wave numbers to avoid periodicity
-        else
-            RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
-        end if
+!        if(RDF%independent) then
+!            xRange = RDF%xMaxExt - RDF%xMinExt !Delta max in between two wave numbers to avoid periodicity
+!        else
+!            xRange = RDF%xMaxGlob - RDF%xMinGlob !Delta max in between two wave numbers to avoid periodicity
+!        end if
+
+
+        !if(RDF%independent) then
+        !    RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxExt - RDF%xMinExt)) !Delta max in between two wave numbers to avoid periodicity
+        !else
+        !    RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
+        !end if
 
         select case (RDF%method)
             case(ISOTROPIC)
@@ -102,7 +113,8 @@ contains
                 end do
 
             case(FFT)
-                RDF%kNStep(:) = RDF%xNStep(:);
+                RDF%kNStep(:) = find_xNStep(xMaxExt = RDF%xRange, xStep=xStep)
+                !RDF%kNStep(:) = RDF%xNStep(:);
                 RDF%kDelta(:) = RDF%kDelta(:)
                 RDF%kNTotal   = product(RDF%kNStep);
                 RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)

@@ -28,10 +28,20 @@ contains
         xPoints = dble(meshGridInt(MSH%xNStep,0))
 
         do d = 1, MSH%nDim
-            xPoints(d,:) = MSH%xMinGlob(d) + MSH%xStep(d)*xPoints(d,:)
+            xPoints(d,:) = MSH%xMinBound(d) + MSH%xStep(d)*xPoints(d,:)
         end do
 
         RDF%xPoints => xPoints
+
+        !call DispCarvalhol(xPoints, "xPoints", unit_in=RDF%log_ID)
+
+        if(RDF%nDim == 2) then
+            RDF%xPoints_2D(1:MSH%nDim, 1:MSH%xNStep(1), 1:MSH%xNStep(2)) => xPoints
+            !call DispCarvalhol(RDF%xPoints_2D(1,:,:), "RDF%xPoints_2D 1", unit_in=RDF%log_ID)
+            !call DispCarvalhol(RDF%xPoints_2D(2,:,:), "RDF%xPoints_2D 2", unit_in=RDF%log_ID)
+        else if(RDF%nDim == 3) then
+            RDF%xPoints_3D(1:MSH%nDim, 1:MSH%xNStep(1), 1:MSH%xNStep(2), 1:MSH%xNStep(3)) => xPoints
+        end if
 
     end subroutine set_XPoints
 
@@ -48,7 +58,8 @@ contains
         !OUTPUT
         integer, dimension(:,:), allocatable :: intMatrix
         !LOCAL
-        integer :: totalSize, nDim
+        integer(kind=8) :: totalSize
+        integer :: nDim
         integer :: sizePattern, unityMult, patternMult
         integer :: start, end, i, d
         integer :: nStart
@@ -106,32 +117,35 @@ contains
 !
 !    end subroutine snap_to_grid
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine allocate_xPoints(MSH, RDF, xPoints)
-        implicit none
-
-        !INPUT AND OUTPUT
-        type(MESH) :: MSH
-        type(RF)   :: RDF
-        double precision, dimension(:, :), allocatable, intent(out), target :: xPoints;
-
-        !LOCAL VARIABLES
-
-        !write(get_fileId(),*) "-> Allocating xPoints";
-
-        !write(get_fileId(),*) "-> Finding xNStep";
-        MSH%xNStep = find_xNStep(MSH%xMinInt, MSH%xMaxInt, MSH%xStep)
-        MSH%xNTotal = product(MSH%xNStep)
-        RDF%xNTotal = MSH%xNTotal
-
-        allocate(xPoints(MSH%nDim, MSH%xNTotal))
-
-        RDF%xPoints => xPoints
-
-    end subroutine allocate_xPoints
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine allocate_xPoints(MSH, RDF, xPoints)
+!        implicit none
+!
+!        !INPUT AND OUTPUT
+!        type(MESH) :: MSH
+!        type(RF)   :: RDF
+!        double precision, dimension(:, :), allocatable, intent(out), target :: xPoints;
+!
+!        !LOCAL VARIABLES
+!
+!        !write(get_fileId(),*) "-> Allocating xPoints";
+!
+!        !write(get_fileId(),*) "-> Finding xNStep";
+!        MSH%xNStep = find_xNStep(MSH%xMinInt, MSH%xMaxInt, MSH%xStep)
+!        MSH%xNTotal = product(MSH%xNStep)
+!
+!        !call wLog(" MSH%xNTotal = ")
+!        !call wLog(MSH%xNTotal)
+!        write(*,*) " MSH%xNTotal = ", MSH%xNTotal
+!
+!        allocate(xPoints(MSH%nDim, MSH%xNTotal))
+!
+!        RDF%xPoints => xPoints
+!
+!    end subroutine allocate_xPoints
 
 
 end module mesh_RF

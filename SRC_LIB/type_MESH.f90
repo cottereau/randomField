@@ -18,7 +18,9 @@ module type_MESH
             !nDim independent
         integer :: meshMod, method
         integer :: nDim = -1
-        integer :: xNTotal = -1, xNInit = -1, xNEnd = -1, xNGlob = -1
+        integer(kind=8) :: xNTotal
+        !integer :: xNTotal
+        !integer :: xNTotal = -1, xNInit = -1, xNEnd = -1, xNGlob = -1
         logical :: independent
             !nDim dependent
         integer         , dimension(:), allocatable :: xNStep, procPerDim;
@@ -35,6 +37,7 @@ module type_MESH
         integer         , dimension(:,:), allocatable :: indexNeigh, neighShift
         logical, dimension(:), allocatable :: considerNeighbour
         double precision, dimension(:), allocatable :: overlap !Size of the overlap (in corrL)
+        integer, dimension(:)  , allocatable :: origin
         logical :: init = .false.
 
     end type MESH
@@ -77,6 +80,7 @@ module type_MESH
             allocate(MESH_a%overLap(nDim))
             allocate(MESH_a%pointsPerCorrL(nDim))
             allocate(MESH_a%corrL(nDim))
+            allocate(MESH_a%origin(nDim))
 
             MESH_a%log_ID   = IPT%log_ID
             MESH_a%nDim     = IPT%nDim_mesh
@@ -304,7 +308,8 @@ module type_MESH
             if (allocated(MESH_a%overlap))    deallocate(MESH_a%overlap)
             if (allocated(MESH_a%pointsPerCorrL)) deallocate(MESH_a%pointsPerCorrL)
             if (allocated(MESH_a%considerNeighbour)) deallocate(MESH_a%considerNeighbour)
-            if (allocated(MESH_a%corrL)) deallocate(MESH_a%corrL)
+            if (allocated(MESH_a%corrL))  deallocate(MESH_a%corrL)
+            if (allocated(MESH_a%origin)) deallocate(MESH_a%origin)
 
 
             MESH_a%init = .false.

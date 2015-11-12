@@ -180,7 +180,8 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_local_bounding_box (MSH, procStart, procExtent, xMinBound, xMaxBound, xNStep)
+    subroutine set_local_bounding_box (MSH, procStart, procExtent, xMinBound, xMaxBound, &
+                                       xNStep, xNTotal, origin)
 
         implicit none
 
@@ -188,7 +189,8 @@ contains
         double precision, dimension(:), intent(in) :: procStart, procExtent
         !INPUT AND OUTPUT
         double precision, dimension(:), intent(out) :: xMinBound, xMaxBound
-        integer         , dimension(:), intent(out) :: xNStep
+        integer         , dimension(:), intent(out) :: xNStep, origin
+        integer(kind=8) , intent(out) :: xNTotal
 
         !FFTW
         integer(C_INTPTR_T) :: L, M, N
@@ -244,14 +246,21 @@ contains
             end if
         end if
 
-        xNStep = find_xNStep(xMinBound, xMaxBound, MSH%xStep)
-
         call wLog("        OUT xMinBound = ")
         call wLog(xMinBound)
         call wLog("        OUT xMaxBound = ")
         call wLog(xMaxBound)
+
+        xNStep = find_xNStep(xMinBound, xMaxBound, MSH%xStep)
+        origin = find_xNStep(MSH%xMinGlob, xMinBound , MSH%xStep)
+        xNTotal = product(xNStep)
+
         call wLog("        OUT xNStep = ")
         call wLog(xNStep)
+        call wLog("        OUT xNTotal = ")
+        call wLog(int(xNTotal))
+        call wLog("        OUT origin = ")
+        call wLog(origin)
 
     end subroutine set_local_bounding_box
 
@@ -276,84 +285,111 @@ contains
         integer :: neighPos
 
 
-        call wLog(" ")
-        call wLog("-> Redimensioning for Overlap")
-        call wLog(" ")
-        call wLog(" IN MSH%xMinBound")
-        call wLog(MSH%xMinBound)
-        call wLog(" IN MSH%xMaxBound")
-        call wLog(MSH%xMaxBound)
 
-        !Finding External Extremes
-        call wLog(" ")
-        call wLog("    Finding External Extremes")
+        if(.not. MSH%independent) then
+            call wLog("    ")
+            call wLog("     GLOBAL GENERATION")
+            call wLog(" ")
+            call wLog("-> Copy Global Limits")
+            call wLog(" ")
+            call wLog(" IN MSH%xMinGlob")
+            call wLog(MSH%xMinGlob)
+            call wLog(" IN MSH%xMaxGlob")
+            call wLog(MSH%xMaxGlob)
 
-        xMinExt = MSH%xMinBound
-        xMaxExt = MSH%xMaxBound
+            xMinExt = MSH%xMinGlob
+            xMaxExt = MSH%xMaxGlob
+            xMinInt = xMinExt
+            xMaxInt = xMaxExt
 
-        do neighPos = 1, 2*MSH%nDim
+            call wLog(" OUT xMinInt")
+            call wLog(xMinInt)
+            call wLog(" OUT xMaxInt")
+            call wLog(xMaxInt)
+            call wLog(" OUT xMinExt")
+            call wLog(xMinExt)
+            call wLog(" OUT xMaxExt")
+            call wLog(xMaxExt)
 
-            if(MSH%neigh(neighPos) < 0) cycle
+        else if(MSH%independent) then
+            call wLog("    ")
+            call wLog("     LOCAL GENERATION")
+            call wLog(" ")
+            call wLog("-> Redimensioning for Overlap")
+            call wLog(" ")
+            call wLog(" IN MSH%xMinBound")
+            call wLog(MSH%xMinBound)
+            call wLog(" IN MSH%xMaxBound")
+            call wLog(MSH%xMaxBound)
+            !Finding External Extremes
+            call wLog(" ")
+            call wLog("    Finding External Extremes")
 
-            where(MSH%neighShift(:,neighPos) < 0)
-                xMinExt = MSH%xMinBound - MSH%xStep
-            elsewhere(MSH%neighShift(:,neighPos) > 0)
-                xMaxExt = MSH%xMaxBound + MSH%xStep
-            end where
+            xMinExt = MSH%xMinBound
+            xMaxExt = MSH%xMaxBound
 
-        end do
+            do neighPos = 1, 2*MSH%nDim
 
-        call wLog(" OUT xMinExt")
-        call wLog(xMinExt)
-        call wLog(" OUT xMaxExt")
-        call wLog(xMaxExt)
+                if(MSH%neigh(neighPos) < 0) cycle
+
+                where(MSH%neighShift(:,neighPos) < 0)
+                    xMinExt = MSH%xMinBound - MSH%xStep
+                elsewhere(MSH%neighShift(:,neighPos) > 0)
+                    xMaxExt = MSH%xMaxBound + MSH%xStep
+                end where
+
+            end do
+
+            call wLog(" OUT xMinExt")
+            call wLog(xMinExt)
+            call wLog(" OUT xMaxExt")
+            call wLog(xMaxExt)
 
 
-        !Redimensioning the internal part
-        call wLog("    Redimensioning the internal part")
-        xMinInt = xMinExt
-        xMaxInt = xMaxExt
+            !Redimensioning the internal part
+            call wLog("    Redimensioning the internal part")
+            xMinInt = xMinExt
+            xMaxInt = xMaxExt
 
-        do neighPos = 1, 2*MSH%nDim
+            do neighPos = 1, 2*MSH%nDim
 
-            if(MSH%neigh(neighPos) < 0) cycle
+                if(MSH%neigh(neighPos) < 0) cycle
 
-            where(MSH%neighShift(:,neighPos) < 0)
-                xMinInt = xMinExt + MSH%overlap*MSH%corrL
-            elsewhere(MSH%neighShift(:,neighPos) > 0)
-                xMaxInt = xMaxExt - MSH%overlap*MSH%corrL
-            end where
+                where(MSH%neighShift(:,neighPos) < 0)
+                    xMinInt = xMinExt + MSH%overlap*MSH%corrL
+                elsewhere(MSH%neighShift(:,neighPos) > 0)
+                    xMaxInt = xMaxExt - MSH%overlap*MSH%corrL
+                end where
 
-        end do
+            end do
 
-        call wLog(" OUT xMinInt")
-        call wLog(xMinInt)
-        call wLog(" OUT xMaxInt")
-        call wLog(xMaxInt)
+            call wLog(" OUT xMinInt")
+            call wLog(xMinInt)
+            call wLog(" OUT xMaxInt")
+            call wLog(xMaxInt)
 
-        !Dimensioning overlapping area
-        call wLog("    Dimensioning neighbours limits")
+            !Dimensioning overlapping area
+            call wLog("    Dimensioning neighbours limits")
 
-        do neighPos = 1, size(MSH%neigh)
-            if(MSH%neigh(neighPos) < 0) cycle
+            do neighPos = 1, size(MSH%neigh)
+                if(MSH%neigh(neighPos) < 0) cycle
 
-            where(MSH%neighShift(:,neighPos) > 0)
-                !MSH%xMaxNeigh(:,neighPos) = MSH%xMaxExt - MSH%xStep - MSH%overlap*corrL*(1.0D0-ovlpFraction)
-                xMaxNeigh(:,neighPos) = MSH%xMaxBound
-                xMinNeigh(:,neighPos) = MSH%xMaxInt + MSH%xStep
-                xOrNeigh(:,neighPos)  = MSH%xMaxInt
-            elsewhere(MSH%neighShift(:,neighPos) < 0)
-                xMaxNeigh(:,neighPos) = MSH%xMinInt - MSH%xStep
-                xMinNeigh(:,neighPos) = MSH%xMinBound
-                xOrNeigh(:,neighPos)  = MSH%xMinInt
-            elsewhere
-                xMaxNeigh(:,neighPos) = MSH%xMaxBound
-                xMinNeigh(:,neighPos) = MSH%xMinBound
-                xOrNeigh(:,neighPos)  = MSH%xMinInt
-            end where
-        end do
+                where(MSH%neighShift(:,neighPos) > 0)
+                    !MSH%xMaxNeigh(:,neighPos) = MSH%xMaxExt - MSH%xStep - MSH%overlap*corrL*(1.0D0-ovlpFraction)
+                    xMaxNeigh(:,neighPos) = MSH%xMaxBound
+                    xMinNeigh(:,neighPos) = MSH%xMaxInt + MSH%xStep
+                    xOrNeigh(:,neighPos)  = MSH%xMaxInt
+                elsewhere(MSH%neighShift(:,neighPos) < 0)
+                    xMaxNeigh(:,neighPos) = MSH%xMinInt - MSH%xStep
+                    xMinNeigh(:,neighPos) = MSH%xMinBound
+                    xOrNeigh(:,neighPos)  = MSH%xMinInt
+                elsewhere
+                    xMaxNeigh(:,neighPos) = MSH%xMaxBound
+                    xMinNeigh(:,neighPos) = MSH%xMinBound
+                    xOrNeigh(:,neighPos)  = MSH%xMinInt
+                end where
+            end do
 
-        if(MSH%independent) then
             call show_MESHneigh(MSH, " ", onlyExisting = .true., forLog = .true.)
         end if
 
@@ -709,25 +745,25 @@ contains
 !
 !    end subroutine define_generation_geometry
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine get_XPoints_globCoords(RDF, MSH)
-        implicit none
-
-        !INPUT AND OUTPUT
-        type(RF)  , intent(inout) :: RDF
-        type(MESH), intent(inout) :: MSH
-
-        call wLog("MSH%xMinGlob = ")
-        call wLog(MSH%xMinGlob)
-        call wLog("MSH%xMinBound = ")
-        call wLog(MSH%xMinBound)
-
-        RDF%origin = find_xNStep(MSH%xMinGlob, MSH%xMinBound , MSH%xStep)
-
-    end subroutine get_XPoints_globCoords
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine get_xPoints_globCoords(MSH)
+!        implicit none
+!
+!        !INPUT AND OUTPUT
+!        type(RF)  , intent(inout) :: RDF
+!        type(MESH), intent(inout) :: MSH
+!
+!        call wLog("MSH%xMinGlob = ")
+!        call wLog(MSH%xMinGlob)
+!        call wLog("MSH%xMinBound = ")
+!        call wLog(MSH%xMinBound)
+!
+!        RDF%origin = find_xNStep(MSH%xMinGlob, MSH%xMinBound , MSH%xStep)
+!
+!    end subroutine get_xPoints_globCoords
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -997,10 +1033,11 @@ contains
             stop(" ")
         end if
 
-        if(MSH%method == FFT) then
+        if(MSH%method == FFT .and. (.not. MSH%independent)) then
 
             procPerDim(:) = 1
-            procPerDim(MSH%nDim) = MSH%nb_procs
+            !procPerDim(MSH%nDim) = MSH%nb_procs
+            procPerDim(1) = MSH%nb_procs
 
         else
 
