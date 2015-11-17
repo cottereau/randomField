@@ -231,9 +231,9 @@ contains
                 end if
 
                 call wLog("local_LastDim = ")
-                call wLog(int(local_LastDim))
+                call wLog(local_LastDim)
                 call wLog("local_j_offset = ")
-                call wLog(int(local_j_offset))
+                call wLog(local_j_offset)
 
                 xMinBound = MSH%xMinGlob
                 xMinBound(MSH%nDim) = MSH%xMinGlob(MSH%nDim) + dble(local_j_offset)*MSH%xStep(MSH%nDim)
@@ -258,7 +258,7 @@ contains
         call wLog("        OUT xNStep = ")
         call wLog(xNStep)
         call wLog("        OUT xNTotal = ")
-        call wLog(int(xNTotal))
+        call wLog(xNTotal)
         call wLog("        OUT origin = ")
         call wLog(origin)
 
@@ -269,7 +269,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine set_overlap_geometry (MSH, xMinInt, xMaxInt, xMinExt, xMaxExt, &
-                                     xMaxNeigh, xMinNeigh, xOrNeigh)
+                                     xMaxNeigh, xMinNeigh, xOrNeigh, nOvlpPoints)
 
         implicit none
 
@@ -279,6 +279,7 @@ contains
         !OUTPUT
         double precision, dimension(:)  , intent(out) :: xMinInt, xMaxInt, xMinExt, xMaxExt
         double precision, dimension(:,:), intent(out) :: xMaxNeigh, xMinNeigh, xOrNeigh
+        integer(kind=8), intent(out) :: nOvlpPoints
 
         !LOCAL VARIABLES
         double precision :: ovlpFraction = 1.0D0
@@ -370,6 +371,7 @@ contains
 
             !Dimensioning overlapping area
             call wLog("    Dimensioning neighbours limits")
+            nOvlpPoints = 0
 
             do neighPos = 1, size(MSH%neigh)
                 if(MSH%neigh(neighPos) < 0) cycle
@@ -388,9 +390,14 @@ contains
                     xMinNeigh(:,neighPos) = MSH%xMinBound
                     xOrNeigh(:,neighPos)  = MSH%xMinInt
                 end where
+
+                nOvlpPoints = nOvlpPoints + &
+                              product(find_xNStep(xMinNeigh(:,neighPos), xMaxNeigh(:,neighPos), MSH%xStep))
             end do
 
             call show_MESHneigh(MSH, " ", onlyExisting = .true., forLog = .true.)
+            call wLog(" OUT nOvlpPoints")
+            call wLog(nOvlpPoints)
         end if
 
     end subroutine set_overlap_geometry
@@ -594,9 +601,9 @@ contains
 !                end if
 !
 !                call wLog("local_LastDim = ")
-!                call wLog(int(local_LastDim))
+!                call wLog(local_LastDim)
 !                call wLog("local_j_offset = ")
-!                call wLog(int(local_j_offset))
+!                call wLog(local_j_offset)
 !
 !                MSH%xNGlob = product(xNStepGlob)
 !                MSH%xNInit = local_j_offset + 1
@@ -626,17 +633,17 @@ contains
 !            RDF%xNTotal = MSH%xNTotal
 !
 !            call wLog("        OUT MSH%xNInit = ")
-!            call wLog(int(MSH%xNInit))
+!            call wLog(MSH%xNInit)
 !            call wLog("        OUT MSH%xNEnd = ")
-!            call wLog(int(MSH%xNEnd))
+!            call wLog(MSH%xNEnd)
 !            call wLog("        OUT MSH%xNTotal = ")
-!            call wLog(int(MSH%xNTotal))
+!            call wLog(MSH%xNTotal)
 !            call wLog("        OUT RDF%xNTotal = ")
-!            call wLog(int(RDF%xNTotal))
+!            call wLog(RDF%xNTotal)
 !            call wLog("        OUT MSH%xNTotal = ")
-!            call wLog(int(MSH%xNTotal))
+!            call wLog(MSH%xNTotal)
 !            call wLog("        OUT MSH%xNStep = ")
-!            call wLog(int(MSH%xNStep))
+!            call wLog(MSH%xNStep)
 !
 !        !INDEPENDENT CASE (For Localization)
 !        else if(MSH%independent) then
@@ -733,13 +740,13 @@ contains
 !            RDF%xNStep  = MSH%xNStep
 !
 !            call wLog("        OUT RDF%xNTotal = ")
-!            call wLog(int(RDF%xNTotal))
+!            call wLog(RDF%xNTotal)
 !            call wLog("        OUT MSH%xNTotal = ")
-!            call wLog(int(MSH%xNTotal))
+!            call wLog(MSH%xNTotal)
 !            call wLog("        OUT MSH%xNStep = ")
-!            call wLog(int(MSH%xNStep))
+!            call wLog(MSH%xNStep)
 !            call wLog("        OUT RDF%xNStep = ")
-!            call wLog(int(RDF%xNStep))
+!            call wLog(RDF%xNStep)
 !
 !        end if
 !
@@ -1036,8 +1043,8 @@ contains
         if(MSH%method == FFT .and. (.not. MSH%independent)) then
 
             procPerDim(:) = 1
-            !procPerDim(MSH%nDim) = MSH%nb_procs
-            procPerDim(1) = MSH%nb_procs
+            procPerDim(MSH%nDim) = MSH%nb_procs !1D Data Division
+            !procPerDim(1) = MSH%nb_procs
 
         else
 

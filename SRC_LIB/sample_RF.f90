@@ -69,7 +69,7 @@ contains
                                         MSH%xMinBound, MSH%xMaxBound, &
                                         MSH%xNStep, MSH%xNTotal, MSH%origin)
             call set_overlap_geometry (MSH, MSH%xMinInt, MSH%xMaxInt, MSH%xMinExt, MSH%xMaxExt, &
-                                       MSH%xMaxNeigh, MSH%xMinNeigh, MSH%xOrNeigh)
+                                       MSH%xMaxNeigh, MSH%xMinNeigh, MSH%xOrNeigh, MSH%nOvlpPoints)
 
 
             call wLog("-> Initializing Random Seed")
@@ -174,9 +174,9 @@ contains
                 call wLog ("    Writing Files CPU Time (s)")
                 call wLog (all_t3 - all_t2)
             end if
-!
-!            call write_generation_spec(MSH, RDF, single_path, "singleGen", &
-!                                       [all_t1,all_t2,all_t3])
+
+            call write_generation_spec(MSH, RDF, single_path, "singleGen", &
+                                       [all_t1,all_t2,all_t3])
 
             call finalize_MESH(MSH)
             call finalize_RF(RDF)

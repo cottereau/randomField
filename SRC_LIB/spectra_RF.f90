@@ -127,7 +127,7 @@ contains
                     call wLog("shape(RDF%kPoints) = ")
                     call wLog(shape(RDF%kPoints))
                     call wLog("RDF%kNTotal = ")
-                    call wLog(int(RDF%kNTotal))
+                    call wLog(RDF%kNTotal)
                     !call wLog("RDF%kPoints = ")
                     allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
                     do i = 1, RDF%kNTotal
@@ -146,7 +146,7 @@ contains
                     call wLog("shape(RDF%kPoints) = ")
                     call wLog(shape(RDF%kPoints))
                     do i = RDF%kNInit, RDF%kNEnd
-                        if(i>541000) call wLog(i)
+                        !if(i>541000) call wLog(i)
                         !RDF%kPoints(:, i-RDF%kNInit+1) = 1
                         call get_Permutation(i, RDF%kMax, RDF%kNStep, &
                                              RDF%kPoints(:, i-RDF%kNInit+1), &

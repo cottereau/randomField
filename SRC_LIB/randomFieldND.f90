@@ -345,7 +345,7 @@ contains
         !LOCAL
         integer(C_INTPTR_T) :: L, M, N
         integer(C_INTPTR_T) :: local_LastDim
-        integer(C_INTPTR_T) :: local_j_offset
+        integer(C_INTPTR_T) :: local_LD_offset
         real(C_DOUBLE), pointer :: data_real_2D(:,:), data_real_3D(:,:,:)
         type(C_PTR) :: cdata, plan
         integer(C_INTPTR_T) :: alloc_local
@@ -355,6 +355,7 @@ contains
         double precision, dimension(:), allocatable :: gammaK, phiK
         integer :: i, j, k, ind
         double precision :: trashNumber
+        integer, dimension(RDF%nDim) :: xNStepGlob
 
         call wLog("gen_Std_Gauss_FFT_init")
         call wLog(" ")
@@ -437,23 +438,25 @@ contains
             !RDF%randField(:,1) = RDF%rang!FOR TESTS
 
         else
-            call fftw_mpi_init()
             call wLog("    GLOBAL")
+            call fftw_mpi_init()
+
+            xNStepGlob = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
 
             if(RDF%nDim == 2) then
-                L = MSH%xNStep(1)
-                M = MSH%xNStep(2)
+                L = xNStepGlob(1)
+                M = xNStepGlob(2)
                 alloc_local = fftw_mpi_local_size_2d(M, L, RDF%comm, &
-                                                     local_LastDim, local_j_offset) !FOR MPI
+                                                     local_LastDim, local_LD_offset) !FOR MPI
                 cdata = fftw_alloc_real(alloc_local)
                 call c_f_pointer(cdata, data_real_2D, [L, local_LastDim])
 
             else if(RDF%nDim == 3) then
-                L = MSH%xNStep(1)
-                M = MSH%xNStep(2)
-                N = MSH%xNStep(3)
+                L = xNStepGlob(1)
+                M = xNStepGlob(2)
+                N = xNStepGlob(3)
                 alloc_local = fftw_mpi_local_size_3d(N, M, L, RDF%comm, &
-                                                     local_LastDim, local_j_offset) !FOR MPI
+                                                     local_LastDim, local_LD_offset) !FOR MPI
                 cdata = fftw_alloc_real(alloc_local)
                 call c_f_pointer(cdata, data_real_3D, [L, M, local_LastDim])
 
@@ -463,17 +466,17 @@ contains
             end if
 
             !Defining kInit and kEnd
-            RDF%kNInit = local_j_offset + 1
+            RDF%kNInit = local_LD_offset + 1
             RDF%kNEnd  = RDF%kNInit + local_LastDim - 1
-            call wLog("local_j_offset")
-            call wLog(int(local_j_offset))
+            call wLog("local_LD_offset")
+            call wLog(local_LD_offset)
             call wLog("local_LastDim")
-            call wLog(int(local_LastDim))
+            call wLog(local_LastDim)
 
             call wLog("RDF%kNInit")
-            call wLog(int(RDF%kNInit))
+            call wLog(RDF%kNInit)
             call wLog("RDF%kNEnd")
-            call wLog(int(RDF%kNEnd))
+            call wLog(RDF%kNEnd)
 
             sliceSize = 1
             if(RDF%nDim > 1) sliceSize = product(MSH%xNStep(1:RDF%nDim -1))
@@ -481,34 +484,36 @@ contains
             RDF%kNEnd  = RDF%kNEnd *sliceSize
 
             call wLog("RDF%kNInit")
-            call wLog(int(RDF%kNInit))
+            call wLog(RDF%kNInit)
             call wLog("RDF%kNEnd")
-            call wLog(int(RDF%kNEnd))
+            call wLog(RDF%kNEnd)
 
-            !RDF%origin  = [1, int(local_j_offset) + 1]
+            !RDF%origin  = [1, int(local_LD_offset) + 1]
             !RDF%kExtent = [L , local_M]
             !RDF%origin = 1
-            !RDF%origin(RDF%nDim) = int(local_j_offset) + 1
+            !RDF%origin(RDF%nDim) = int(local_LD_offset) + 1
             RDF%kExtent = MSH%xNStep
             RDF%kExtent(RDF%nDim) = int(local_LastDim)
 
             call wLog("MSH%origin")
             call wLog(MSH%origin)
             call wLog("MSH%origin (IDEAL)")
-            call wLog([1, 1, int(local_j_offset) + 1])
+            if(MSH%nDim==2) call wLog([1, int(local_LD_offset) + 1])
+            if(MSH%nDim==3) call wLog([1, 1, int(local_LD_offset) + 1])
             call wLog("RDF%kExtent")
             call wLog(RDF%kExtent)
             call wLog("RDF%kExtent (IDEAL)")
-            call wLog([int(L), int(M), int(local_LastDim)])
+            if(MSH%nDim==2) call wLog([int(L), int(local_LastDim)])
+            if(MSH%nDim==3) call wLog([int(L), int(M), int(local_LastDim)])
 
 
             call set_kPoints(RDF, MSH%xStep)
             call set_SkVec(RDF)
 
-            call wLog("RDF%kPoints")
-            call DispCarvalhol(RDF%kPoints, unit_in = RDF%log_ID)
-            call wLog("RDF%SkVec")
-            call DispCarvalhol(RDF%SkVec, unit_in = RDF%log_ID)
+            !call wLog("RDF%kPoints")
+            !call DispCarvalhol(RDF%kPoints, unit_in = RDF%log_ID)
+            !call wLog("RDF%SkVec")
+            !call DispCarvalhol(RDF%SkVec, unit_in = RDF%log_ID)
 
             kNLocal = size(RDF%kPoints,2)
             !kNStepLocal = RDF%kNStep
@@ -568,10 +573,6 @@ contains
                 RDF%randField(:,1) = pack(data_real_3D(1:L, 1:M, 1:local_LastDim), .true.)
             end if
 
-            !call wLog("L")
-            !call wLog(int(L))
-            !call wLog("local_LastDim")
-            !call wLog(int(local_LastDim))
             call wLog("shape(RDF%SkVec)")
             call wLog(shape(RDF%SkVec))
             call wLog("shape(RDF%randField)")
@@ -582,17 +583,17 @@ contains
             call fftw_free(cdata)
 
             call wLog("L")
-            call wLog(int(L))
+            call wLog(L)
             call wLog("M")
-            call wLog(int(M))
+            call wLog(M)
             call wLog("local_LastDim")
-            call wLog(int(local_LastDim))
-            call wLog("local_j_offset")
-            call wLog(int(local_j_offset))
+            call wLog(local_LastDim)
+            call wLog("local_LD_offset")
+            call wLog(local_LD_offset)
             call wLog("RDF%kNInit")
-            call wLog(int(RDF%kNInit))
+            call wLog(RDF%kNInit)
             call wLog("RDF%kNEnd")
-            call wLog(int(RDF%kNEnd))
+            call wLog(RDF%kNEnd)
         end if
 
         if(allocated(gammaK)) deallocate(gammaK)

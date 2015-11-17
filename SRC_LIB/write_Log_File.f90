@@ -7,6 +7,7 @@ module write_Log_File
 
     interface wLog
         module procedure wLogString
+        module procedure wLogLongInt
         module procedure wLogInt
         module procedure wLogDouble
         module procedure wLogBool
@@ -81,6 +82,17 @@ contains
         write(log_file_RF_ID,*) number
 #endif
     end subroutine wLogInt
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine wLogLongInt(number)
+        integer (kind=8), intent(in) :: number
+#ifdef MAKELOG
+        write(log_file_RF_ID,*) number
+#endif
+    end subroutine wLogLongInt
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

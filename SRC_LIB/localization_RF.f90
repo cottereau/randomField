@@ -187,7 +187,8 @@ contains
         overEst = 10
         call MPI_TYPE_SIZE(MPI_DOUBLE_PRECISION,double_size,code)
         overHead = int(1+(MPI_BSEND_OVERHEAD*1.)/double_size)
-        allocate(buffer(overEst*(MSH%xNTotal+overHead)))
+        !allocate(buffer(overEst*(MSH%xNTotal+overHead)))
+        allocate(buffer(overEst*(MSH%nOvlpPoints+overHead)))
         call MPI_BUFFER_ATTACH(buffer, overEst*double_size*(MSH%xNTotal+overHead),code)
 
         !Allocation

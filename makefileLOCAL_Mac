@@ -47,8 +47,11 @@ RF_OBJ += ./main_RandomField.o \
 ./mesh_RF.o \
 ./type_MESH.o \
 ./type_RF.o \
+./topography_RF.o \
 ./readUNV_RF.o \
 ./localization_RF.o \
+./type_inputRF.o \
+./sample_RF.o \
 ./calls_RF.o \
 ./ranlib.o \
 ./rnglib.o \
@@ -95,8 +98,10 @@ main_RandomField.o   : calls_RF.o \
 			           randomFieldND.o \
 			           readFile_RF.o \
 			           readUNV_RF.o \
+			           sample_RF.o \
 			           systemUt_RF.o \
                        statistics_RF.o \
+                       type_inputRF.o \
 			           type_MESH.o \
 			           type_RF.o \
 			           write_Log_File.o \
@@ -125,6 +130,21 @@ calls_RF.o           : constants_RF.o \
 			           type_RF.o \
 			           write_Log_File.o \
 			           writeResultFile_RF.o
+sample_RF.o          : calls_RF.o \
+					   constants_RF.o \
+			           common_variables_RF.o \
+			           displayCarvalhol.o \
+			           dgemm.o \
+			           localization_RF.o \
+			           math_RF.o \
+			           mesh_RF.o \
+			           randomFieldND.o \
+			           ranlib.o \
+			           type_MESH.o \
+			           type_RF.o \
+                       topography_RF.o \
+			           write_Log_File.o \
+			           writeResultFile_RF.o			           
 randomFieldND.o      : constants_RF.o \
                        common_variables_RF.o \
                        displayCarvalhol.o \
@@ -151,11 +171,17 @@ mesh_RF.o            : fftw3.o \
 			           type_MESH.o \
                        type_RF.o \
 			           write_Log_File.o
+topography_RF.o      : fftw3.o \
+                       math_RF.o \
+			           type_MESH.o \
+                       type_RF.o \
+			           write_Log_File.o			           
 writeResultFile_RF.o : displayCarvalhol.o \
 			           math_RF.o \
 			           statistics_RF.o \
 			           write_Log_File.o \
 			           constants_RF.o \
+			           mesh_RF.o \
 					   type_RF.o \
 			           type_MESH.o \
 			           hdf5_RF.o
@@ -181,8 +207,14 @@ systemUt_RF.o        : write_Log_File.o
 write_Log_File.o     : charFunctions.o
 displayCarvalhol.o   : constants_RF.o \
                        write_Log_File.o
-type_RF.o            : charFunctions.o
-type_MESH.o          : charFunctions.o
+type_RF.o            : charFunctions.o \
+                       type_inputRF.o \
+                       type_inputRF.o \
+                       type_MESH.o 
+type_MESH.o          : charFunctions.o \
+					   type_inputRF.o
+type_inputRF.o       : readFile_RF.o \
+                       readUNV_RF.o
 dgemm.o              : lsame.o xerbla.o
 dger.o               : xerbla.o
 ranlib.o             : rnglib.o
@@ -232,27 +264,28 @@ cdfnor.o             : dinvnr.o \
 	@echo ' '	
 	
 # All Target
-all: randomField statistics
+# all: randomField statistics
+all: randomField
 
 # Tool invocations
 randomField: $(RF_OBJ) $(COMM_OBJ)
-	@echo 'Building target: $@'
-	@echo 'Invoking: Fortran Linker'
-	$(FC) -o $(EXEC) $(FFLAGS) $(RF_OBJ) $(COMM_OBJ) $(INCLUDE) $(LIBS)
-	@echo 'Finished building target: $@'
-	@echo ' '	
+		@echo 'Building target: $@'
+		@echo 'Invoking: Fortran Linker'
+		$(FC) -o $(EXEC) $(FFLAGS) $(RF_OBJ) $(COMM_OBJ) $(INCLUDE) $(LIBS)
+		@echo 'Finished building target: $@'
+		@echo ' '	
 	
 statistics: $(STAT_OBJ) $(COMM_OBJ)
-	@echo 'Building target: $@'
-	@echo 'Invoking: Fortran Linker'
-	$(FC) -o $(EXEC2) $(FFLAGS) $(STAT_OBJ) $(COMM_OBJ) $(INCLUDE) $(LIBS)
-	@echo 'Finished building target: $@'
-	@echo ' '
+		@echo 'Building target: $@'
+		@echo 'Invoking: Fortran Linker'
+		$(FC) -o $(EXEC2) $(FFLAGS) $(STAT_OBJ) $(COMM_OBJ) $(INCLUDE) $(LIBS)
+		@echo 'Finished building target: $@'
+		@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXEC) $(EXEC2) $(RF_OBJ) $(STAT_OBJ) $(COMM_OBJ) *.mod
-	-@echo 'Finished excluding'
+		-$(RM) $(EXEC) $(EXEC2) $(RF_OBJ) $(STAT_OBJ) $(COMM_OBJ) *.mod
+		-@echo 'Finished excluding'
 
 .PHONY: all clean dependents
 .SECONDARY:
