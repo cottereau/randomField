@@ -483,17 +483,20 @@ contains
         if(RDF%nDim == 2) UP_2D(1:xNStep(1),1:xNStep(2)) => unityPartition
         if(RDF%nDim == 3) UP_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => unityPartition
 
-        !call wLog("shape(unityPartition) = ")
-        !call wLog(shape(unityPartition))
-        call wLog("shape(UP_2D) = ")
-        call wLog(shape(UP_2D))
-        call wLog("shape(RDF%xPoints_2D) = ")
-        call wLog(shape(RDF%xPoints_2D))
+        call wLog("shape(unityPartition) = ")
+        call wLog(shape(unityPartition))
+        !call wLog("shape(UP_2D) = ")
+        !call wLog(shape(UP_2D))
+        !call wLog("shape(RDF%xPoints_2D) = ")
+        !call wLog(shape(RDF%xPoints_2D))
+        call wLog("shape(UP_3D) = ")
+        call wLog(shape(UP_3D))
+        call wLog("shape(RDF%xPoints_3D) = ")
+        call wLog(shape(RDF%xPoints_3D))
 
-!        call wLog("Point in minimal position = ")
-!        call wLog(RDF%xPoints_2D(1:2,minPos(1),minPos(2)))
-!        call wLog("Point in maximal position = ")
-!        call wLog(RDF%xPoints_2D(1:2,maxPos(1),maxPos(2)))
+        !call wLog("Point in minimal position = ")
+        !call wLog(RDF%xPoints_3D(:,22,1,1))
+        !call wLog(RDF%xPoints_3D(:,minPos(1),minPos(2),minPos(3)))
 
 
 

@@ -25,15 +25,27 @@ contains
         !LOCAL
         integer :: d
 
-        xPoints = dble(meshGridInt(MSH%xNStep,0))
+        allocate(xPoints(MSH%nDim, MSH%xNTotal))
 
-        do d = 1, MSH%nDim
-            xPoints(d,:) = MSH%xMinBound(d) + MSH%xStep(d)*xPoints(d,:)
-        end do
+        call wLog("MSH%xMinBound = ")
+        call wLog(MSH%xMinBound)
+        call wLog("MSH%xStep = ")
+        call wLog(MSH%xStep)
+        call wLog("MSH%xNStep = ")
+        call wLog(MSH%xNStep)
+        call wLog("MSH%xNTotal = ")
+        call wLog(MSH%xNTotal)
+
+        call setGrid(xPoints, MSH%xMinBound, MSH%xStep, MSH%xNStep)
+
+!        xPoints = dble(meshGridInt(MSH%xNStep,0))
+
+!
+!        do d = 1, MSH%nDim
+!            xPoints(d,:) = MSH%xMinBound(d) + MSH%xStep(d)*xPoints(d,:)
+!        end do
 
         RDF%xPoints => xPoints
-
-        !call DispCarvalhol(xPoints, "xPoints", unit_in=RDF%log_ID)
 
         if(RDF%nDim == 2) then
             RDF%xPoints_2D(1:MSH%nDim, 1:MSH%xNStep(1), 1:MSH%xNStep(2)) => xPoints
@@ -41,7 +53,11 @@ contains
             !call DispCarvalhol(RDF%xPoints_2D(2,:,:), "RDF%xPoints_2D 2", unit_in=RDF%log_ID)
         else if(RDF%nDim == 3) then
             RDF%xPoints_3D(1:MSH%nDim, 1:MSH%xNStep(1), 1:MSH%xNStep(2), 1:MSH%xNStep(3)) => xPoints
+            !call wLog("Point in minimal position = ")
+            !call wLog(RDF%xPoints_3D(:,22,1,1))
         end if
+
+        !call DispCarvalhol(transpose(RDF%xPoints), "transpose(RDF%xPoints)", unit_in=RDF%log_ID)
 
     end subroutine set_XPoints
 
@@ -49,25 +65,32 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    function meshGridInt(xNStep, nStart) result(intMatrix)
+    subroutine setGrid(xPoints, xMinBound, xStep, xNStep)
 
         implicit none
 
         !INPUT
-        integer, dimension(:), intent(in)   :: xNStep
+        double precision, dimension(:)  , intent(in) :: xMinBound
+        integer, dimension(:), intent(in) :: xNStep
+        double precision, dimension(:), intent(in) :: xStep
         !OUTPUT
-        integer, dimension(:,:), allocatable :: intMatrix
+        double precision, dimension(:,:), intent(out) :: xPoints
+
         !LOCAL
         integer(kind=8) :: totalSize
         integer :: nDim
-        integer :: sizePattern, unityMult, patternMult
+        integer(kind=8) :: sizePattern, unityMult, patternMult
         integer :: start, end, i, d
-        integer :: nStart
 
         totalSize = product(xNStep)
-        nDim      = size(xNStep)
+        nDim = size(xNStep)
 
-        allocate(intMatrix(nDim, totalSize))
+        if(product(xNStep) /= size(xPoints,2)) then
+            write(*,*) "ERROR, inside set Grid shape(xPoints) and xNStep are different"
+            write(*,*) "shape(xPoints) = ", shape(xPoints)
+            write(*,*) "xNStep         = ", xNStep
+            stop(" ")
+        end if
 
         do d = 1, nDim
             sizePattern = product(xNStep(1:d))
@@ -78,74 +101,19 @@ contains
             do i=1, xNStep(d)
                 start = (i-1)*unityMult + 1
                 end   = start + unityMult - 1
-                intMatrix(d, start:end) = i -1 + nStart
+                xPoints(d, start:end) = xMinBound(d) + xStep(d)*dble(i -1)
             end do
 
             !Replicating the pattern
             do i=2, patternMult
                 start = (i-1)*sizePattern + 1
                 end   = start + sizePattern - 1
-                intMatrix(d, start:end) = intMatrix(d, 1:sizePattern)
+                xPoints(d, start:end) = xPoints(d, 1:sizePattern)
             end do
         end do
 
 
-    end function meshGridInt
-
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    subroutine snap_to_grid(MSH, extInf,extSup)
-!        implicit none
-!
-!        !INPUT AND OUTPUT
-!        type(MESH) :: MSH
-!
-!        !OUTPUT
-!        double precision, dimension(:), intent(inout) :: extSup, extInf
-!
-!        !LOCAL VARIABLES
-!        integer :: i
-!
-!        do i = 1, MSH%nDim
-!            extInf(i) = (MSH%xStep(i) * dble(nint((extInf(i) - MSH%xMinGlob(i))/MSH%xStep(i)))) &
-!                         + MSH%xMinGlob(i)
-!            extSup(i) = (MSH%xStep(i) * dble(nint((extSup(i) - MSH%xMinGlob(i))/MSH%xStep(i)))) &
-!                         + MSH%xMinGlob(i)
-!        end do
-!
-!    end subroutine snap_to_grid
-
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    subroutine allocate_xPoints(MSH, RDF, xPoints)
-!        implicit none
-!
-!        !INPUT AND OUTPUT
-!        type(MESH) :: MSH
-!        type(RF)   :: RDF
-!        double precision, dimension(:, :), allocatable, intent(out), target :: xPoints;
-!
-!        !LOCAL VARIABLES
-!
-!        !write(get_fileId(),*) "-> Allocating xPoints";
-!
-!        !write(get_fileId(),*) "-> Finding xNStep";
-!        MSH%xNStep = find_xNStep(MSH%xMinInt, MSH%xMaxInt, MSH%xStep)
-!        MSH%xNTotal = product(MSH%xNStep)
-!
-!        !call wLog(" MSH%xNTotal = ")
-!        !call wLog(MSH%xNTotal)
-!        write(*,*) " MSH%xNTotal = ", MSH%xNTotal
-!
-!        allocate(xPoints(MSH%nDim, MSH%xNTotal))
-!
-!        RDF%xPoints => xPoints
-!
-!    end subroutine allocate_xPoints
+    end subroutine setGrid
 
 
 end module mesh_RF

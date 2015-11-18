@@ -130,16 +130,17 @@ contains
         end do
 
         if(RDF%independent) then
-            RDF%xRange = MSH%xMaxExt - MSH%xMinExt !Delta max in between two wave numbers to avoid periodicity
+            !RDF%xRange = MSH%xMaxExt - MSH%xMinExt !Delta max in between two wave numbers to avoid periodicity
+            RDF%xRange = MSH%xMaxBound - MSH%xMinBound !Delta max in between two wave numbers to avoid periodicity
         else
             RDF%xRange = MSH%xMaxGlob - MSH%xMinGlob !Delta max in between two wave numbers to avoid periodicity
         end if
 
         !Generating Standard Gaussian Field
         call wLog("")
-        call wLog("GENERATING INTERNAL RANDOM FIELD")
+        call wLog("GENERATING RANDOM FIELDS")
         call wLog("-------------------------------")
-        if(RDF%rang == 0) write(*,*)"GENERATING INTERNAL RANDOM FIELD"
+        if(RDF%rang == 0) write(*,*)"GENERATING RANDOM FIELDS"
         if(RDF%rang == 0) write(*,*) "-------------------------------"
         call wLog("")
 
@@ -165,6 +166,12 @@ contains
         !RDF%randField = 1.0 ! For Tests
 
         if(RDF%independent .and. RDF%nb_procs > 1) then
+            call wLog("")
+            call wLog("GENERATING OVERLAP")
+            call wLog("-------------------------------")
+            if(RDF%rang == 0) write(*,*)"GENERATING OVERLAP"
+            if(RDF%rang == 0) write(*,*) "-------------------------------"
+            call wLog("")
 
             !RDF%randField = 1.0 ! For Tests
             if(RDF%rang == 0) write(*,*) "    ->Applying Weighting Functions"
