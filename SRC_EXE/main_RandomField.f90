@@ -25,7 +25,7 @@ program main_RandomField
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeFiles = .true.
     logical :: sameFolder = .true.
-    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
+    integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
 
 	!LOCAL VARIABLES
     logical            :: file_exist
@@ -98,15 +98,16 @@ program main_RandomField
     !Validating Inputs----------------------------------------------
     call wLog("    Validating Inputs")
     call validate_input(IPT)
+#ifdef MAKELOG
     call show_IPT_RF(IPT, forLog_in=.true.)
-
+#endif
     !Initial allocation---------------------------------------------
     call allocate_init()
 
     !SINGLE REALIZATION
     if(rang == 0) write(*,*)  "-> Single realization"
     call wLog("-> Single realization")
-    call single_realization(IPT)
+    call single_realization(IPT, writeFiles, outputStyle, sameFolder)
 
 	!Deallocating
 	call deallocate_all()

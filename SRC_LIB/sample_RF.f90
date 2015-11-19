@@ -25,12 +25,14 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
 
-        subroutine single_realization(IPT)
+        subroutine single_realization(IPT, writeFiles, outputStyle, sameFolder)
 
             implicit none
             !INPUT
             type(IPT_RF), intent(in) :: IPT
-            !integer, intent(inout) :: commIPT
+            logical, intent(in) :: writeFiles
+            logical, intent(in) :: sameFolder
+            integer, intent(in) :: outputStyle
             !LOCAL
             type(RF)      :: RDF
             type(MESH)    :: MSH
@@ -39,9 +41,6 @@ contains
             double precision :: tLoc1, tLoc2
             double precision :: t1, t2, t3, t4, t5, t6;
             double precision :: all_t1, all_t2, all_t3, all_t4, all_t5, all_t6;
-            logical :: writeFiles = .true.
-            logical :: sameFolder = .true.
-            integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
             integer :: code
             integer :: all_xNTotal
             integer :: i
