@@ -13,6 +13,7 @@ module type_MESH
         integer :: nb_procs = -1
         integer :: topComm = -1
         integer :: log_ID = -1
+        logical :: validProc
 
         !MESH VARIABLES
             !nDim independent
@@ -47,10 +48,11 @@ module type_MESH
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine init_MESH(MESH_a, IPT)
+        subroutine init_MESH(MESH_a, IPT, comm, nb_procs, rang)
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
+            integer, intent(in) :: comm, nb_procs, rang
             !OUTPUT
             type(MESH) :: MESH_a
             !LOCAL
@@ -84,9 +86,9 @@ module type_MESH
 
             MESH_a%log_ID   = IPT%log_ID
             MESH_a%nDim     = IPT%nDim_mesh
-            MESH_a%comm     = IPT%comm
-            MESH_a%rang     = IPT%rang
-            MESH_a%nb_procs = IPT%nb_procs
+            MESH_a%comm     = comm
+            MESH_a%nb_procs = nb_procs
+            MESH_a%rang     = rang
             MESH_a%meshMod  = IPT%meshMod
             MESH_a%xMaxGlob = IPT%xMaxGlob
             MESH_a%xMinGlob = IPT%xMinGlob
@@ -116,6 +118,7 @@ module type_MESH
             MESH_a%neighShift(:,:) = 0
             MESH_a%considerNeighbour = .true.
             MESH_a%init = .true.
+            MESH_a%validProc = .true.
 
         end subroutine init_MESH
 

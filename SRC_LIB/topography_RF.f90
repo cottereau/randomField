@@ -5,6 +5,7 @@ module topography_RF
     use write_Log_File
     use type_RF
     use type_MESH
+    use type_inputRF
     use fftw3
 
     implicit none
@@ -181,7 +182,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine set_local_bounding_box (MSH, procStart, procExtent, xMinBound, xMaxBound, &
-                                       xNStep, xNTotal, origin)
+                                       xNStep, xNTotal, origin, validProc)
 
         implicit none
 
@@ -191,16 +192,19 @@ contains
         double precision, dimension(:), intent(out) :: xMinBound, xMaxBound
         integer         , dimension(:), intent(out) :: xNStep, origin
         integer(kind=8) , intent(out) :: xNTotal
+        logical, intent(inout) :: validProc
 
         !FFTW
         integer(C_INTPTR_T) :: L, M, N
         integer(C_INTPTR_T) :: local_LastDim
-        integer(C_INTPTR_T) :: local_j_offset
+        integer(C_INTPTR_T) :: local_LD_offset
         integer(C_INTPTR_T) :: alloc_local
         integer, dimension(MSH%nDim) :: xNStepGlob
 
         xMinBound = procStart
         xMaxBound = procStart + procExtent
+
+        validProc = .true.
 
         !GLOBAL FFT
         if(.not. MSH%independent) then
@@ -219,24 +223,29 @@ contains
                     L = xNStepGlob(1)
                     M = xNStepGlob(2)
                     alloc_local = fftw_mpi_local_size_2d(M, L, MSH%comm, &
-                                                         local_LastDim, local_j_offset) !FOR MPI
+                                                         local_LastDim, local_LD_offset) !FOR MPI
                 else if(MSH%nDim == 3) then
                     L = xNStepGlob(1)
                     M = xNStepGlob(2)
                     N = xNStepGlob(3)
                     alloc_local = fftw_mpi_local_size_3d(N, M, L, MSH%comm, &
-                                                         local_LastDim, local_j_offset) !FOR MPI
+                                                         local_LastDim, local_LD_offset) !FOR MPI
                 else
                     stop("Inside set_local_extremes no mesh division for FFT in this dimension")
                 end if
 
                 call wLog("local_LastDim = ")
                 call wLog(local_LastDim)
-                call wLog("local_j_offset = ")
-                call wLog(local_j_offset)
+                call wLog("local_LD_offset = ")
+                call wLog(local_LD_offset)
+
+                if(local_LastDim == 0) then
+                    validProc = .false.
+                    call wLog("PROCESSOR IGNORED BY FFTW DECOMPOSITION")
+                end if
 
                 xMinBound = MSH%xMinGlob
-                xMinBound(MSH%nDim) = MSH%xMinGlob(MSH%nDim) + dble(local_j_offset)*MSH%xStep(MSH%nDim)
+                xMinBound(MSH%nDim) = MSH%xMinGlob(MSH%nDim) + dble(local_LD_offset)*MSH%xStep(MSH%nDim)
                 xMaxBound = MSH%xMaxGlob
                 xMaxBound(MSH%nDim) = xMinBound(MSH%nDim) + dble(local_LastDim-1)*MSH%xStep(MSH%nDim)
 
@@ -246,21 +255,23 @@ contains
             end if
         end if
 
-        call wLog("        OUT xMinBound = ")
-        call wLog(xMinBound)
-        call wLog("        OUT xMaxBound = ")
-        call wLog(xMaxBound)
+        if(validProc) then
+            call wLog("        OUT xMinBound = ")
+            call wLog(xMinBound)
+            call wLog("        OUT xMaxBound = ")
+            call wLog(xMaxBound)
 
-        xNStep = find_xNStep(xMinBound, xMaxBound, MSH%xStep)
-        origin = find_xNStep(MSH%xMinGlob, xMinBound , MSH%xStep)
-        xNTotal = product(xNStep)
+            xNStep = find_xNStep(xMinBound, xMaxBound, MSH%xStep)
+            origin = find_xNStep(MSH%xMinGlob, xMinBound , MSH%xStep)
+            xNTotal = product(xNStep)
 
-        call wLog("        OUT xNStep = ")
-        call wLog(xNStep)
-        call wLog("        OUT xNTotal = ")
-        call wLog(xNTotal)
-        call wLog("        OUT origin = ")
-        call wLog(origin)
+            call wLog("        OUT xNStep = ")
+            call wLog(xNStep)
+            call wLog("        OUT xNTotal = ")
+            call wLog(xNTotal)
+            call wLog("        OUT origin = ")
+            call wLog(origin)
+        end if
 
     end subroutine set_local_bounding_box
 
@@ -401,6 +412,119 @@ contains
         end if
 
     end subroutine set_overlap_geometry
+
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    subroutine validateProc(validProc, IPT, newComm, newNbProcs, newRang)
+
+        implicit none
+        !INPUT
+        type(IPT_RF), intent(in) :: IPT
+        !OUTPUT
+        integer, intent(inout) :: newComm, newNbProcs, newRang
+        logical, intent(out) :: validProc
+        !LOCAL
+        !integer, dimension(IPT%nDim_gen) :: procPerDim
+        integer :: i, j, procTotal;
+        double  precision :: procRootDim, logProc2, diff1, diff2;
+        integer :: code, color
+
+        validProc = .false.
+        procTotal = IPT%nb_procs
+        procRootDim = dble(IPT%nb_procs)**(1/dble(IPT%nDim_gen))
+        logProc2    = log(dble(IPT%nb_procs))/log(2.0D0)
+
+        call wLog("procRootDim = ")
+        call wLog(procRootDim)
+        call wLog("logProc2 = ")
+        call wLog(logProc2)
+
+        if((.not. areEqual(procRootDim, dble(nint(procRootDim)))) .and. &
+           (.not. areEqual(logProc2, dble(nint(logProc2))))) then
+            diff1 = procRootDim - dble(int(procRootDim))
+            diff2 = logProc2 - dble(int(logProc2))
+            call wLog("diff1 = ")
+            call wLog(diff1)
+            call wLog("diff2 = ")
+            call wLog(diff2)
+
+            !Round down the number of processors
+            if(diff1 < diff2) then
+                call wLog("    Exact Division")
+                procTotal =  nint(floor(procRootDim)**dble(IPT%nDim_gen))
+            else
+                call wLog("    Power of two")
+                procTotal =  nint(2.0D0**floor(logProc2))
+            end if
+
+        end if
+
+        call wLog("procTotal = ")
+        call wLog(procTotal)
+
+
+        if(IPT%rang < procTotal) then
+            color = 1
+            validProc = .true.
+        else
+            color = 0
+            call wLog("PROCESSOR IGNORED BY PROC MULTIPLICITY")
+        end if
+
+        call MPI_COMM_SPLIT(IPT%comm, color, IPT%rang, newComm, code)
+        call MPI_COMM_SIZE(newComm, newNbProcs, code)
+        call MPI_COMM_RANK(newComm, newRang, code)
+
+    end subroutine validateProc
+
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    subroutine set_validProcs_comm(valid, comm, rang, validProcMSH, validProcRDF, &
+                                   commMSH, commRDF, nProcsMSH, nProcsRDF, rangMSH, rangRDF)
+
+        implicit none
+
+        !INPUT
+        logical, intent(in) :: valid
+        integer, intent(in) :: comm
+        integer, intent(in) :: rang
+        !OUTPUT
+        logical, intent(out) :: validProcMSH
+        logical, intent(out) :: validProcRDF
+        integer, intent(out) :: commMSH, commRDF
+        integer, intent(out) :: nProcsMSH, nProcsRDF
+        integer, intent(out) :: rangMSH, rangRDF
+
+        !LOCAL
+        integer :: newComm, newNbProcs, newRang, code, color
+
+        validProcRDF = valid
+        validProcMSH = valid
+
+        if(validProcMSH) then
+            color = 1
+        else
+            color = 0
+        end if
+
+        call MPI_COMM_SPLIT(comm, color, rang, newComm, code)
+        call MPI_COMM_SIZE(newComm, newNbProcs, code)
+        call MPI_COMM_RANK(newComm, newRang, code)
+
+        commMSH = newComm
+        commRDF = newComm
+        nProcsMSH = newNbProcs
+        nProcsRDF = newNbProcs
+        rangMSH = newRang
+        rangRDF = newRang
+
+    end subroutine set_validProcs_comm
+
+
 
 !    !---------------------------------------------------------------------------------
 !    !---------------------------------------------------------------------------------

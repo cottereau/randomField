@@ -96,8 +96,6 @@ contains
             !LOCAL
             character(len=50) , dimension(:,:), allocatable :: dataTable;
 
-            write(*,*) "path = ", path
-
             call set_DataTable(path, dataTable)
             call read_DataTable(dataTable, "nDim", IPT%nDim_mesh)
             call read_DataTable(dataTable, "meshMod", IPT%meshMod)

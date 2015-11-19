@@ -14,6 +14,7 @@ module type_RF
         integer :: rang = -1
         integer :: nb_procs = -1
         integer :: log_ID = -1
+        logical :: validProc
 
         !GENERATION VARIABLES
             !nDim independent
@@ -58,11 +59,12 @@ module type_RF
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine init_RF(RF_a, IPT)
+        subroutine init_RF(RF_a, IPT, comm, nb_procs, rang)
 
             implicit none
             !INPUT
             type(IPT_RF), intent(in) :: IPT
+            integer, intent(in) :: comm, nb_procs, rang
             !OUTPUT
             type(RF) :: RF_a
             !LOCAL
@@ -87,9 +89,9 @@ module type_RF
             RF_a%log_ID   = IPT%log_ID
             RF_a%nDim     = IPT%nDim_gen
             RF_a%Nmc      = IPT%Nmc
-            RF_a%comm     = IPT%comm
-            RF_a%rang     = IPT%rang
-            RF_a%nb_procs = IPT%nb_procs
+            RF_a%comm     = comm
+            RF_a%rang     = rang
+            RF_a%nb_procs = nb_procs
             RF_a%Nmc      = IPT%Nmc
             RF_a%corrMod  = IPT%corrMod
             RF_a%margiFirst  = IPT%margiFirst
@@ -112,6 +114,7 @@ module type_RF
             RF_a%calculate(:) = .true.
             RF_a%init  = .true.
             RF_a%neighSeed(:,:) = -1
+            RF_a%validProc = .true.
 
         end subroutine init_RF
 

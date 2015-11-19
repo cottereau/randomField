@@ -140,6 +140,7 @@ sample_RF.o          : calls_RF.o \
 			           mesh_RF.o \
 			           randomFieldND.o \
 			           ranlib.o \
+			           type_inputRF.o \
 			           type_MESH.o \
 			           type_RF.o \
                        topography_RF.o \
@@ -173,6 +174,7 @@ mesh_RF.o            : fftw3.o \
 			           write_Log_File.o
 topography_RF.o      : fftw3.o \
                        math_RF.o \
+                       type_inputRF.o \
 			           type_MESH.o \
                        type_RF.o \
 			           write_Log_File.o			           
