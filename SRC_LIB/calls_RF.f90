@@ -165,6 +165,11 @@ contains
 
         !RDF%randField = 1.0 ! For Tests
 
+        call wLog("minval(RDF%randField,1) =")
+        call wLog(minval(RDF%randField,1))
+        call wLog("maxval(RDF%randField,1) =")
+        call wLog(maxval(RDF%randField,1))
+
         if(RDF%independent .and. RDF%nb_procs > 1) then
             call wLog("")
             call wLog("GENERATING OVERLAP")

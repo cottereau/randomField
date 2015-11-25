@@ -98,7 +98,6 @@ contains
             call write_HDF5_attributes(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
             !call finish_HDF5_file(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
         end if
-
         !!!!!!!!!!!!XMF
         !write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";
         XMFName = stringNumb_join(trim(adjustL(fileName))//"it_", indexXMF)
@@ -752,7 +751,7 @@ contains
         character(LEN=8) :: dsetname
         logical :: bool !for tests
         integer :: tmp_val
-        integer(HSIZE_T), dimension(:,:), allocatable :: localSlab
+        !integer(HSIZE_T), dimension(:,:), allocatable :: localSlab
         double precision, dimension(MSH%nDim) :: orig
         integer, dimension(MSH%nDim) :: minPos, maxPos
         double precision, dimension(:), allocatable :: randFieldLinear
@@ -798,27 +797,24 @@ contains
         call h5sclose_f(filespace, error) !CLOSE filespace
 
         if(RDF%independent) then
-            offset = MSH%origin - 1!Lines Offset to start writing
 
-            if(RDF%method == FFT) then
-                minPos = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep)
-                maxPos = find_xNStep(MSH%xMinGlob, MSH%xMaxBound , MSH%xStep)
-                countND = maxPos - minPos + 1
-                offset = minPos - 1
-                call wLog("countND")
-                call wLog(int(countND))
-                call wLog("offset")
-                call wLog(int(offset))
-                call wLog("minPos")
-                call wLog(minPos)
-                call wLog("maxPos")
-                call wLog(maxPos)
-                call wLog("dims")
-                call wLog(int(dims))
-                !dims = maxPos - minPos + 1
-                !call wLog("dims = ")
-                !call wLog(int(dims))
-            end if
+            minPos = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep) - MSH%origin + 1
+            maxPos = find_xNStep(MSH%xMinGlob, MSH%xMaxBound , MSH%xStep) - MSH%origin + 1
+            countND = maxPos - minPos + 1
+            offset = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep) - 1
+            !dims   = countND
+            call wLog("minPos")
+            call wLog(int(minPos))
+            call wLog("maxPos")
+            call wLog(int(maxPos))
+            call wLog("countND")
+            call wLog(int(countND))
+            call wLog("offset")
+            call wLog(int(offset))
+            call wLog("minPos")
+            call wLog(minPos)
+            call wLog("maxPos")
+            call wLog(maxPos)
 
             !CHOOSING SPACE IN MEMORY FOR THIS PROC
             call wLog("countND = ")
@@ -834,9 +830,9 @@ contains
             call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
 
         else
-            if(RDF%method == FFT) then
-                !CHOOSING SPACE IN MEMORY FOR THIS PROC
-                countND = RDF%kExtent
+
+                countND = MSH%xNStep
+
                 call wLog("countND = ")
                 call wLog(int(countND))
                 write(*,*) "countND = ", countND
@@ -851,82 +847,45 @@ contains
                 write(*,*) "offset = ", offset
                 call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
 
-            else
-                !CHOOSING SPACE IN MEMORY FOR THIS PROC
-                call wLog("count1D = ")
-                call wLog(int(count1D))
-                call wLog("MSH%origin = ")
-                call wLog(int(MSH%origin))
-                call h5screate_simple_f(rank1D, count1D, memspace, error)  !NEW memspace
-
-                !CHOOSING SPACE IN FILE FOR THIS PROC
-                call h5dget_space_f(dset_id, filespace, error) !GET filespace
-                ! Select hyperslab in the file.
-                allocate(localSlab(RDF%nDim, MSH%xNTotal))
-                do i = 1, MSH%nDim
-                    localSlab(i,:) = nint((RDF%xPoints(i,:)-MSH%xMinGlob(i))/MSH%xStep(i)) + 1
-                end do
-
-                !call wLog("localSlab = ")
-                !call wLog(int(localSlab))
-
-                count1D = MSH%xNTotal
-                call h5sselect_elements_f(filespace, H5S_SELECT_SET_F, RDF%nDim, count1D(1), &
-                                          localSlab, error) !SET filespace (to the portion in the list hyperslab)
-                deallocate(localSlab)
-            end if
         end if
 
         ! Create property list for collective dataset write
         call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error) !NEW plist_id (for dataset)
         call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error) !SET plist to MPI (for dataset)
 
+        if(RDF%independent) then
 
-        ! Write dataset
-        if(RDF%method == FFT) then
             allocate(randFieldLinear(product(countND)))
 
 
             if(RDF%nDim == 2) then
+                call wLog("Point in minimal position = ")
+                call wLog(RDF%xPoints_2D(:,minPos(1),minPos(2)))
+                call wLog("Point in maximal position = ")
+                call wLog(RDF%xPoints_2D(:,maxPos(1),maxPos(2)))
                 randFieldLinear = pack(RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), .true.)
+
             else if (RDF%nDim == 3) then
-                !do i = 1, countND(1)
-                !    do j = 1, countND(2)
-                !        do k = 1, countND(3)
-                !            !randFieldLinear(i
-                !        end do
-                !    end do
-                !end do
+                call wLog("Point in minimal position = ")
+                call wLog(RDF%xPoints_3D(:,minPos(1),minPos(2),minPos(3)))
+                call wLog("Point in maximal position = ")
+                call wLog(RDF%xPoints_3D(:,maxPos(1),maxPos(2),maxPos(3)))
                 randFieldLinear = pack(RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), .true.)
-                !randFieldLinear = pack(&
-                !RESHAPE( source=RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
-                !shape=[countND(3), countND(2), countND(1)], &
-                !order=(/ 3, 2,1 /) ), &
-                !.true.)
 
             end if
 
-            !    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
-            !                    RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
-            !                    dims, error, &
-            !                    file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace!
-
-            !else if (RDF%nDim == 3) then
-            !    call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
-            !                    RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
-            !                    dims, error, &
-            !                    file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write ds
-            !
-            !
-            !end if
             call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
                                 randFieldLinear, &
                                 dims, error, &
                                 file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
-            if (allocated(randFieldLinear)) deallocate(randFieldLinear)
+
         else
-            call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, RDF%randField, dims, error, &
-                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace
+
+            call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+                               RDF%randField,  &
+                               dims, error, &
+                               file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace
+
         end if
 
         ! Close dataspaces.
@@ -950,7 +909,8 @@ contains
             !write(get_fileId(),*) "'inside write HDF5' output -- HDF5Name = ", HDF5Name
         end if
 
-        if(allocated(localSlab)) deallocate(localSlab)
+        if (allocated(randFieldLinear)) deallocate(randFieldLinear)
+        !if(allocated(localSlab)) deallocate(localSlab)
 
         call wLog("------------END Writing result HDF5 file (MPI)-----------------------")
 

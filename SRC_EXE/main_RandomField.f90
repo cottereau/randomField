@@ -25,7 +25,7 @@ program main_RandomField
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeFiles = .true.
     logical :: sameFolder = .true.
-    integer :: outputStyle = 2 !1: parallel hdf5, 2: hdf5 per proc
+    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
 
 	!LOCAL VARIABLES
     logical            :: file_exist

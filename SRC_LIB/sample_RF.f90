@@ -32,7 +32,7 @@ contains
             type(IPT_RF), intent(in) :: IPT
             logical, intent(in) :: writeFiles
             logical, intent(in) :: sameFolder
-            integer, intent(in) :: outputStyle
+            integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
             !LOCAL
             type(RF)      :: RDF
             type(MESH)    :: MSH
@@ -159,12 +159,17 @@ contains
 
                         if(outputStyle==1) then
                             call wLog("   (Parallel)");
+                            call wLog("minval(RDF%randField,1) =")
+                            call wLog(minval(RDF%randField,1))
+                            call wLog("maxval(RDF%randField,1) =")
+                            call wLog(maxval(RDF%randField,1))
                             call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, "trans_", RDF%rang, single_path, &
                                                             MSH%comm, ["_All"], [0], 0, style=outputStyle)
                         else
                             call wLog("   (Per Proc)");
                             call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, "trans_", RDF%rang, single_path, &
                                                             MSH%comm, ["_All"], [RDF%rang], 0, style=outputStyle)
+
                         end if
                         t3 = MPI_Wtime();
                         call MPI_ALLREDUCE (t3, all_t3, 1, MPI_DOUBLE_PRECISION, MPI_SUM,MSH%comm,code)
