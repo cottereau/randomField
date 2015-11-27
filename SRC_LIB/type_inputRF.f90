@@ -23,6 +23,7 @@ module type_inputRF
         integer         , dimension(:,:), allocatable :: connectList
         logical :: monotype
         logical :: unv = .false.
+        character(len=1024) :: unv_path
 
         !GENERATION
         integer :: nDim_gen
@@ -60,6 +61,11 @@ contains
             IPT%log_ID = log_file_RF_ID
             IPT%rang   = rang
             IPT%init   = .true.
+            IPT%xMaxGlob   = -1.0D0
+            IPT%xMinGlob = -1.0D0
+            IPT%pointsPerCorrL   = -1.0D0
+            IPT%corrL   = -1.0D0
+            IPT%overlap = -1.0D0
 
         end subroutine init_IPT_RF
 
@@ -104,26 +110,28 @@ contains
 
             select case (IPT%meshMod)
                 case(1)
-                    !if(rang==0) write(*,*) "   Mesh automatic"
-                    !call wLog("    Mesh automatic")
+                    if(IPT%rang==0) write(*,*) "   Mesh automatic"
+                    call wLog("    Mesh automatic")
                     call read_DataTable(dataTable, "Min", IPT%xMinGlob)
                     call read_DataTable(dataTable, "Max", IPT%xMaxGlob)
                     call read_DataTable(dataTable, "pointsPerCorrL", IPT%pointsPerCorrL)
                 case(2)
-                    stop("Inside read_mesh_input UNV not updated")
-                    !if(rang==0) write(*,*) "   Mesh UNV"
-                    !IPT%unv = .true.
-                    !call wLog("    Mesh UNV")
-                    !call readUNV(unv_input, nDim, IPT%coordList, IPT%connectList, IPT%monotype, &
-                    !             IPT%rang, IPT%nb_procs, IPT%comm)
-                    !call wLog("-> defining_UNV_extremes")
-                    !call get_Global_Extremes_Mesh(IPT%coordList, IPT%xMinGlob, IPT%xMaxGlob, IPT%comm)
+                    !stop("Inside read_mesh_input UNV not updated")
+                    if(IPT%rang==0) write(*,*) "   Mesh UNV"
+                    call wLog("    Mesh UNV")
+                    call read_DataTable(dataTable, "unv_path", IPT%unv_path)
+                    call read_DataTable(dataTable, "pointsPerCorrL", IPT%pointsPerCorrL)
+                    IPT%unv = .true.
+                    call readUNV(unv_input, IPT%nDim_mesh, IPT%coordList, IPT%connectList, IPT%monotype, &
+                                 IPT%rang, IPT%nb_procs, IPT%comm)
+                    call wLog("-> defining_UNV_extremes")
+                    call get_Global_Extremes_Mesh(IPT%coordList, IPT%comm, IPT%xMinGlob, IPT%xMaxGlob)
                 case default
                     write(*,*) "meshMod not accepted: ", IPT%meshMod
                     stop(" ")
             end select
 
-            deallocate(dataTable)
+            if(allocated(dataTable)) deallocate(dataTable)
 
         end subroutine read_mesh_input
 
@@ -254,6 +262,7 @@ contains
                 write(unit,*) " pointsPerCorrL = ", IPT%pointsPerCorrL
                 write(unit,*) " unv = ", IPT%unv
                 if(IPT%unv) then
+                    write(unit,*) " unv_path = ", IPT%unv_path
                     write(unit,*) " shape(coordList) = "  , shape(IPT%coordList)
                     write(unit,*) " shape(connectList) = ", shape(IPT%connectList)
                     write(unit,*) " monotype = ", IPT%monotype
@@ -275,5 +284,52 @@ contains
             end if
 
         end subroutine show_IPT_RF
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine get_Global_Extremes_Mesh(coordList, comm, xMinGlob, xMaxGlob)
+        implicit none
+
+        !INPUT
+        double precision, dimension(:,:), intent(in) :: coordList
+        integer, intent(in) :: comm
+        !OUTPUT
+        double precision, dimension(:), intent(out) :: xMinGlob, xMaxGlob
+        !LOCAL
+        integer :: nDim
+        double precision, dimension(:), allocatable :: xMinLoc, xMaxLoc
+        integer :: code, i
+
+        !call DispCarvalhol(transpose(coordList), "transpose(coordList)")
+
+        nDim = size(coordList,1)
+        allocate(xMinLoc(nDim))
+        allocate(xMaxLoc(nDim))
+
+        xMinLoc = minval(coordList, 2)
+        xMaxLoc = maxval(coordList, 2)
+
+        call wLog("xMinLoc = ")
+        call wLog(xMinLoc)
+        call wLog("xMaxLoc = ")
+        call wLog(xMaxLoc)
+
+        do i = 1, nDim
+            call MPI_ALLREDUCE (xMinLoc(i), xMinGlob(i), 1, MPI_DOUBLE_PRECISION, MPI_MIN, comm,code)
+            call MPI_ALLREDUCE (xMaxLoc(i), xMaxGlob(i), 1, MPI_DOUBLE_PRECISION, MPI_MAX, comm,code)
+        end do
+
+        call wLog(" ")
+        call wLog("xMinGlob = ")
+        call wLog(xMinGlob)
+        call wLog("xMaxGlob = ")
+        call wLog(xMaxGlob)
+
+        if(allocated(xMinLoc)) deallocate(xMinLoc)
+        if(allocated(xMaxLoc)) deallocate(xMaxLoc)
+
+    end subroutine get_Global_Extremes_Mesh
 
 end module type_inputRF

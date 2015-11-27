@@ -115,7 +115,7 @@ contains
         call wLog(" ")
         do i = 1, RDF%nDim
             RDF%xPoints(i,:)   = RDF%xPoints(i,:)/RDF%corrL(i)
-
+            MSH%xStep(i)       = MSH%xStep(i) /RDF%corrL(i)
             MSH%xMinInt(i)     = MSH%xMinInt(i)/RDF%corrL(i)
             MSH%xMaxInt(i)     = MSH%xMaxInt(i)/RDF%corrL(i)
             MSH%xMinExt(i)     = MSH%xMinExt(i)/RDF%corrL(i)
@@ -207,7 +207,8 @@ contains
         call wLog("->Reverting Normalization")
         do i = 1, RDF%nDim
             RDF%xPoints(i,:)   = RDF%xPoints(i,:)*RDF%corrL(i)
-
+            RDF%xRange(i)      = RDF%xRange(i)*RDF%corrL(i)
+            MSH%xStep(i)       = MSH%xStep(i)*RDF%corrL(i)
             MSH%xMinInt(i)     = MSH%xMinInt(i)*RDF%corrL(i)
             MSH%xMaxInt(i)     = MSH%xMaxInt(i)*RDF%corrL(i)
             MSH%xMinExt(i)     = MSH%xMinExt(i)*RDF%corrL(i)

@@ -22,16 +22,18 @@ contains
 
         !if(rang==0) write(*,*) "creating Folder"
 
-        if(.not. folderExist (folder, path, compiler)) then
+        !if(.not. folderExist (folder, path, compiler)) then
             fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
             !write(*,*) "fullName = ", fullName
             !write(*,*) "Directory is being created: ", fullName
             if(rang==0) then
+                !write(*,*) "fullName = ", fullName
+                !call system("ls "//trim(adjustL(path)))
                 command = 'mkdir -pv '// trim(adjustL(fullName))
                 !write(*,*) "command = ", command
                 call system(command)
             end if
-        end if
+        !end if
 
         call MPI_BARRIER (comm ,code)
 

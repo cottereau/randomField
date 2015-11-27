@@ -23,8 +23,8 @@ program main_RandomField
     !INPUTS
     integer :: nDim, Nmc;
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
-    logical :: writeFiles = .true.
-    logical :: sameFolder = .true.
+    logical :: writeFiles = .false.
+    logical :: sameFolder = .false.
     integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
 
 	!LOCAL VARIABLES
@@ -122,7 +122,6 @@ program main_RandomField
 
     !Finalizing MPI
 	call end_communication()
-
         !----------------------------------------------------------------------------------------------------
         !----------------------------------------------------------------------------------------------------
         !----------------------------------------------------------------------------------------------------
@@ -181,14 +180,14 @@ program main_RandomField
             if(sameFolder) log_folder_name     = ".."
 
             !results folder creation
-            call create_folder(results_path, ".", rang, comm, compiler)
+            !call create_folder(results_path, ".", rang, comm, compiler)
 
             !results_date_time folder creation
-            call delete_folder(results_folder_name, results_path, rang, comm, compiler)
-            call create_folder(results_folder_name, results_path, rang, comm, compiler)
+            !if(sameFolder) call delete_folder(results_folder_name, results_path, rang, comm, compiler)
+            !call create_folder(results_folder_name, results_path, rang, comm, compiler)
 
             !log folder creation
-            call delete_folder(log_folder_name, results_path, rang, comm, compiler)
+            !if(sameFolder) call delete_folder(log_folder_name, results_path, rang, comm, compiler)
             call create_folder(log_folder_name, results_path, rang, comm, compiler)
 
             !create xmf and h5 folders

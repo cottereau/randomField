@@ -73,7 +73,6 @@ contains
                                          MSH%validProc, RDF%validProc, MSH%comm, RDF%comm, &
                                          MSH%nb_procs, RDF%nb_procs, MSH%rang, RDF%rang)
 
-
                 if(validProc) then
                     !call MPI_BARRIER(MSH%comm, code)
 
@@ -164,11 +163,11 @@ contains
                             call wLog("maxval(RDF%randField,1) =")
                             call wLog(maxval(RDF%randField,1))
                             call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, "trans_", RDF%rang, single_path, &
-                                                            MSH%comm, ["_All"], [0], 0, style=outputStyle)
+                                                            MSH%comm, ["_All"], [0], 0, style=outputStyle, meshMod = msh_AUTO)
                         else
                             call wLog("   (Per Proc)");
                             call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, "trans_", RDF%rang, single_path, &
-                                                            MSH%comm, ["_All"], [RDF%rang], 0, style=outputStyle)
+                                                            MSH%comm, ["_All"], [RDF%rang], 0, style=outputStyle, meshMod = msh_AUTO)
 
                         end if
                         t3 = MPI_Wtime();

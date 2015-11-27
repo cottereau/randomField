@@ -442,6 +442,14 @@ contains
             call fftw_mpi_init()
 
             xNStepGlob = find_xNStep(MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep)
+            call wLog("MSH%xMinGlob = ")
+            call wLog(MSH%xMinGlob)
+            call wLog("MSH%xMaxGlob = ")
+            call wLog(MSH%xMaxGlob)
+            call wLog("MSH%xStep = ")
+            call wLog(MSH%xStep)
+            call wLog("xNStepGlob = ")
+            call wLog(xNStepGlob)
 
             if(RDF%nDim == 2) then
                 L = xNStepGlob(1)

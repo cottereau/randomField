@@ -117,7 +117,9 @@ contains
                 !RDF%kNStep(:) = RDF%xNStep(:);
                 RDF%kDelta(:) = RDF%kDelta(:)
                 RDF%kNTotal   = product(RDF%kNStep);
-                RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
+                !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
+                RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
+
 
                 if(RDF%independent) then
                     call wLog("RDF%kNStep = ")

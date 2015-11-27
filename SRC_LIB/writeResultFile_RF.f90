@@ -18,7 +18,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine write_Mono_XMF_h5(RDF, MSH, connectList, monotype, fileName, rang, folderPath, &
-                                            communicator, labelsH5, indexesH5, indexXMF, style)
+                                            communicator, labelsH5, indexesH5, indexXMF, style, meshMod)
 
         implicit none
 
@@ -32,6 +32,7 @@ contains
         integer                           , intent(in) :: communicator, indexXMF
         character(len=*), dimension(1:)   , intent(in) :: labelsH5
         integer         , dimension(1:)   , intent(in) :: indexesH5
+        integer, intent(in) :: meshMod
         logical, intent(in) :: monotype
         integer, intent(in) :: style !1 for parallel h5 writing
                                      !2 for sequential per processor h5 writing
@@ -49,7 +50,7 @@ contains
 
         select case (style)
             case(1)
-                select case (MSH%meshMod)
+                select case (meshMod)
                     case(msh_UNV)
                         fileName2 = "samples"
                         call write_pHDF5_Unstr(double_Data=RDF%randField, &
@@ -104,7 +105,7 @@ contains
 
         select case (style)
             case(1)
-                select case (MSH%meshMod)
+                select case (meshMod)
                     case(msh_UNV)
                         call write_pHDF5_Unstr_XMF(HDF5Names, xSz, ySz, XMFName, &
                                                rang, trim(adjustL(folderPath))//"/xmf", &

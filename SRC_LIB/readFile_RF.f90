@@ -60,6 +60,7 @@ contains
         open (unit = fileID , file = path, action = 'read')
         !write(*,*) "AFTER OPEN"
         contentSize = 0
+        !wdMax       = 20 !For Tests
         allocate (contentVector(wdMax)) !Limitation about the number of words the file can have
         contentVector = "notUsed"
         do while(stat.eq.0)
@@ -68,7 +69,10 @@ contains
             read(fileID, fmt=*,IOSTAT = stat) contentVector(1:contentSize)
             rewind(fileID);
             !write(*,*) "stat", stat
+            !if(contentSize > 15) stop("ERROR READING FILE (truncated at 200 words)")
         end do
+
+        !write(*,*) "AFTER"
         contentSize = contentSize - 1
         deallocate (contentVector)
         allocate (contentVector(contentSize))
@@ -461,13 +465,13 @@ contains
         end do
 
         if(stat /= 0) then
-            write(*,*) "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
+            write(*,*) "ERROR! in -read_DataTable_IntScal- read failed (check types and Tag name)"
             write(*,*) "tagName = ", tagName
             stop
         end if
 
         if(.not.tagFounded) then
-            write(*,*) "ERROR! in -read_DataTable- TAG not founded"
+            write(*,*) "ERROR! in -read_DataTable_IntScal- TAG not founded"
             write(*,*) "tagName = ", tagName
             stop
         end if
@@ -492,20 +496,22 @@ contains
 
         do i = 1, size(dataTable,2)
             if (trim(dataTable(1,i)) == tagName) then
-                read(dataTable(2,i), fmt=*, IOSTAT = stat) dataDestination
+                !read(dataTable(2,i), fmt=*, IOSTAT = stat) dataDestination
+                dataDestination = adjustL(dataTable(2,i))
+                !write(*,*) "dataDestination = ", dataDestination
                 tagFounded = .TRUE.
                 exit
             end if
         end do
 
-        if(stat /= 0) then
-            write(*,*) "ERROR! in -read_DataTable_DbleVec- read failed (check types and Tag name)"
-            write(*,*) "tagName = ", tagName
-            stop
-        end if
+!        if(stat /= 0) then
+!            write(*,*) "ERROR! in -read_DataTable_CharScal- read failed (check types and Tag name)"
+!            write(*,*) "tagName = ", tagName
+!            stop
+!        end if
 
         if(.not.tagFounded) then
-            write(*,*) "ERROR! in -read_DataTable- TAG not founded"
+            write(*,*) "ERROR! in -read_DataTable_CharScal- TAG not founded"
             write(*,*) "tagName = ", tagName
             stop
         end if
