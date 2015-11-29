@@ -100,7 +100,7 @@ contains
             !OUTPUT
             type(IPT_RF), intent(inout)  :: IPT
             !LOCAL
-            character(len=50) , dimension(:,:), allocatable :: dataTable;
+            character(len=1024) , dimension(:,:), allocatable :: dataTable;
 
             call set_DataTable(path, dataTable)
             call read_DataTable(dataTable, "nDim", IPT%nDim_mesh)
@@ -119,10 +119,11 @@ contains
                     !stop("Inside read_mesh_input UNV not updated")
                     if(IPT%rang==0) write(*,*) "   Mesh UNV"
                     call wLog("    Mesh UNV")
+                    call wLog("        file: "//trim(IPT%unv_path))
                     call read_DataTable(dataTable, "unv_path", IPT%unv_path)
                     call read_DataTable(dataTable, "pointsPerCorrL", IPT%pointsPerCorrL)
                     IPT%unv = .true.
-                    call readUNV(unv_input, IPT%nDim_mesh, IPT%coordList, IPT%connectList, IPT%monotype, &
+                    call readUNV(IPT%unv_path, IPT%nDim_mesh, IPT%coordList, IPT%connectList, IPT%monotype, &
                                  IPT%rang, IPT%nb_procs, IPT%comm)
                     call wLog("-> defining_UNV_extremes")
                     call get_Global_Extremes_Mesh(IPT%coordList, IPT%comm, IPT%xMinGlob, IPT%xMaxGlob)
@@ -148,7 +149,7 @@ contains
             !OUTPUT
             type(IPT_RF), intent(inout)  :: IPT
             !LOCAL
-            character(len=50) , dimension(:,:), allocatable :: dataTable;
+            character(len=1024) , dimension(:,:), allocatable :: dataTable;
             integer :: independent
 
             call set_DataTable(path, dataTable)

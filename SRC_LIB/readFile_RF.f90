@@ -26,19 +26,19 @@ contains
         integer,   optional, intent(in) :: wordsMax;
         integer,   optional, intent(in) :: tagPatternMax;
         !OUTPUT
-        character(len=50), dimension(:,:), allocatable, intent(out) :: dataTable;
+        character(len=1024), dimension(:,:), allocatable, intent(out) :: dataTable;
 
         !LOCAL VARIABLES
         integer            :: fileID, contentSize, unitTags;
-        character (len=50) :: empty='';
+        character (len=1024) :: empty='';
         integer            :: i, j, stat, wdMax, conStart, commentCount,   &
             tagCount, tagTotal, blankTotal,ratioTagData,         &
             dataRow, dataColumn, dataCount,dataTotal, tagPatMax;
         logical            :: posTaken, dataPassed, labelPassed;
         character          :: comment, tagID;
-        character (len=50), dimension(40)               :: foundedTags
+        character (len=1024), dimension(40)               :: foundedTags
         integer,            dimension(:),   allocatable :: tagPattern, lastLine;
-        character (len=300), dimension(:),   allocatable :: contentVector;
+        character (len=1024), dimension(:),   allocatable :: contentVector;
 
 
         !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Treating optional arguments

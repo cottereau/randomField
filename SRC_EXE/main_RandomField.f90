@@ -23,8 +23,8 @@ program main_RandomField
     !INPUTS
     integer :: nDim, Nmc;
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
-    logical :: writeFiles = .false.
-    logical :: sameFolder = .false.
+    logical :: writeFiles = .true.
+    logical :: sameFolder = .true.
     integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
 
 	!LOCAL VARIABLES

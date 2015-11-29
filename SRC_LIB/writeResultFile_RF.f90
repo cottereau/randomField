@@ -18,7 +18,8 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine write_Mono_XMF_h5(RDF, MSH, connectList, monotype, fileName, rang, folderPath, &
-                                            communicator, labelsH5, indexesH5, indexXMF, style, meshMod)
+                                 communicator, labelsH5, indexesH5, indexXMF, style, meshMod, &
+                                 HDF5FullPath)
 
         implicit none
 
@@ -37,6 +38,9 @@ contains
         integer, intent(in) :: style !1 for parallel h5 writing
                                      !2 for sequential per processor h5 writing
                                      !3 for gathered monoprocesor h5 writing
+        !OUTPUTS
+        character(len=*), intent(out), optional :: HDF5FullPath
+
         !LOCAL
         character(len=110), dimension(3) :: HDF5Names
         integer, dimension(3) :: xSz, ySz
@@ -50,32 +54,32 @@ contains
 
         select case (style)
             case(1)
-                select case (meshMod)
-                    case(msh_UNV)
-                        fileName2 = "samples"
-                        call write_pHDF5_Unstr(double_Data=RDF%randField, &
-                                               fileName=fileName2, &
-                                               rang=rang, &
-                                               folderPath=trim(adjustL(folderPath))//"/h5", &
-                                               communicator=communicator, &
-                                               HDF5Name=HDF5Names(1), xSz=xSz(1), ySz=ySz(1), transp = .true.)
-                        HDF5Name = HDF5Names(1)
-                        fileName2 = "nodes"
-                        call write_pHDF5_Unstr(double_Data=RDF%xPoints, &
-                                               fileName=fileName2, &
-                                               rang=rang, &
-                                               folderPath=trim(adjustL(folderPath))//"/h5", &
-                                               communicator=communicator, &
-                                               HDF5Name=HDF5Names(2), xSz=xSz(2), ySz=ySz(2), transp = .false.)
-                        fileName2 = "connect"
-                        call write_pHDF5_Unstr(integer_Data=connectList-1, &
-                                               fileName=fileName2, &
-                                               rang=rang, &
-                                               folderPath=trim(adjustL(folderPath))//"/h5", &
-                                               communicator=communicator, &
-                                               HDF5Name=HDF5Names(3), xSz=xSz(3), ySz=ySz(3), transp = .false.)
-
-                    case(msh_AUTO)
+!                select case (meshMod)
+!                    case(msh_UNV)
+!                        fileName2 = "samples"
+!                        call write_pHDF5_Unstr(double_Data=RDF%randField, &
+!                                               fileName=fileName2, &
+!                                               rang=rang, &
+!                                               folderPath=trim(adjustL(folderPath))//"/h5", &
+!                                               communicator=communicator, &
+!                                               HDF5Name=HDF5Names(1), xSz=xSz(1), ySz=ySz(1), transp = .true.)
+!                        HDF5Name = HDF5Names(1)
+!                        fileName2 = "nodes"
+!                        call write_pHDF5_Unstr(double_Data=RDF%xPoints, &
+!                                               fileName=fileName2, &
+!                                               rang=rang, &
+!                                               folderPath=trim(adjustL(folderPath))//"/h5", &
+!                                               communicator=communicator, &
+!                                               HDF5Name=HDF5Names(2), xSz=xSz(2), ySz=ySz(2), transp = .false.)
+!                        fileName2 = "connect"
+!                        call write_pHDF5_Unstr(integer_Data=connectList-1, &
+!                                               fileName=fileName2, &
+!                                               rang=rang, &
+!                                               folderPath=trim(adjustL(folderPath))//"/h5", &
+!                                               communicator=communicator, &
+!                                               HDF5Name=HDF5Names(3), xSz=xSz(3), ySz=ySz(3), transp = .false.)
+!
+!                    case(msh_AUTO)
                         fileName2 = "samples"                     
                         call write_pHDF5_Str(  MSH=MSH, &
                                                RDF=RDF, &
@@ -83,13 +87,13 @@ contains
                                                rang=rang, &
                                                folderPath=trim(adjustL(folderPath))//"/h5", &
                                                communicator=communicator, &
-                                               HDF5Name=HDF5Name)
-                    case default
-                        stop("In hdf5 style 1 writing - meshMod not implemented")
-                end select
+                                               HDF5Name=HDF5Name, HDF5FullPath = HDF5FullPath)
+!                    case default
+!                        stop("In hdf5 style 1 writing - meshMod not implemented")
+!                end select
             case(2)
                 call write_HDF5_Unstr_per_proc(RDF%xPoints, RDF%randField, fileName, rang, trim(adjustL(folderPath))//"/h5", &
-                                   communicator, labelsH5, indexesH5, HDF5Name)
+                                   communicator, labelsH5, indexesH5, HDF5Name=HDF5Name, HDF5FullPath=HDF5FullPath)
             case default
                 stop("hdf5 writing style not implemented")
         end select
@@ -105,18 +109,18 @@ contains
 
         select case (style)
             case(1)
-                select case (meshMod)
-                    case(msh_UNV)
-                        call write_pHDF5_Unstr_XMF(HDF5Names, xSz, ySz, XMFName, &
-                                               rang, trim(adjustL(folderPath))//"/xmf", &
-                                               communicator, "../h5")
-                    case(msh_AUTO)
+!                select case (meshMod)
+!                    case(msh_UNV)
+!                        call write_pHDF5_Unstr_XMF(HDF5Names, xSz, ySz, XMFName, &
+!                                               rang, trim(adjustL(folderPath))//"/xmf", &
+!                                               communicator, "../h5")
+!                    case(msh_AUTO)
                         call write_pHDF5_Str_XMF(HDF5Name, MSH, fileName, &
                                                  rang, trim(adjustL(folderPath))//"/xmf", &
                                                  communicator, "../h5")
-                    case default
-                        stop("In XMF style 1 writing - meshMod not implemented")
-                end select
+!                    case default
+!                        stop("In XMF style 1 writing - meshMod not implemented")
+!                end select
 
 
             case(2)
@@ -133,8 +137,73 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    subroutine write_UNV_XMF_h5(UNV_randField, UNV_xPoints, connectList, monotype, fileName, rang, folderPath, &
+                                 communicator, labelsH5, indexesH5, indexXMF)
+
+        implicit none
+
+        !INPUTS
+        double precision, dimension (:,:) , intent(in) :: UNV_randField, UNV_xPoints
+        integer         , dimension(1:,1:), intent(in) :: connectList;
+        character(len=*)                  , intent(in) :: filename;
+        integer                           , intent(in) :: rang;
+        character(len=*)                  , intent(in) :: folderPath
+        integer                           , intent(in) :: communicator, indexXMF
+        character(len=*), dimension(1:)   , intent(in) :: labelsH5
+        integer         , dimension(1:)   , intent(in) :: indexesH5
+        logical, intent(in) :: monotype
+
+        !LOCAL
+        character(len=110), dimension(3) :: HDF5Names
+        integer, dimension(3) :: xSz, ySz
+        character(len=110) :: XMFName, HDF5Name, fileName2
+        integer :: error
+
+
+        !!!!!!!!!!!!HDF5
+        !write(get_fileId(),*) "-> Writing h5 file in", trim(adjustL(folderPath))//"/h5";
+
+        fileName2 = "samples"
+        call write_pHDF5_Unstr(double_Data=UNV_randField, &
+                               fileName=fileName2, &
+                               rang=rang, &
+                               folderPath=trim(adjustL(folderPath))//"/h5", &
+                               communicator=communicator, &
+                               HDF5Name=HDF5Names(1), xSz=xSz(1), ySz=ySz(1), transp = .true.)
+        HDF5Name = HDF5Names(1)
+        fileName2 = "nodes"
+        call write_pHDF5_Unstr(double_Data=UNV_xPoints, &
+                               fileName=fileName2, &
+                               rang=rang, &
+                               folderPath=trim(adjustL(folderPath))//"/h5", &
+                               communicator=communicator, &
+                               HDF5Name=HDF5Names(2), xSz=xSz(2), ySz=ySz(2), transp = .false.)
+        fileName2 = "connect"
+        call write_pHDF5_Unstr(integer_Data=connectList-1, &
+                               fileName=fileName2, &
+                               rang=rang, &
+                               folderPath=trim(adjustL(folderPath))//"/h5", &
+                               communicator=communicator, &
+                               HDF5Name=HDF5Names(3), xSz=xSz(3), ySz=ySz(3), transp = .false.)
+
+
+        !call MPI_BARRIER(RDF%comm, error)
+        !!!!!!!!!!!!XMF
+        !write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";
+        XMFName = stringNumb_join(trim(adjustL(fileName))//"it_", indexXMF)
+
+        call write_pHDF5_Unstr_XMF(HDF5Names, xSz, ySz, XMFName, &
+                               rang, trim(adjustL(folderPath))//"/xmf", &
+                               communicator, "../h5")
+
+    end subroutine write_UNV_XMF_h5
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     subroutine write_pHDF5_Unstr(double_Data, integer_Data, fileName, rang, folderPath, &
-                                 communicator, HDF5Name, xSz, ySz, transp)
+                                 communicator, HDF5Name, xSz, ySz, transp, HDF5FullPath)
         implicit none
 
         !INPUTS
@@ -147,7 +216,7 @@ contains
         logical                           , intent(in) :: transp
 
         !OUTPUTS
-        character(len=110) , optional  , intent(out) ::HDF5Name
+        character(len=*) , optional  , intent(out) ::HDF5Name, HDF5FullPath
         integer, intent(out) :: xSz, ySz
 
         !HDF5 VARIABLES
@@ -215,6 +284,7 @@ contains
         dsetname = trim(adjustL(fileName)) ! Dataset name
         fileHDF5Name = trim(fileName)//"-ALLproc.h5"
         fullPath     = string_join(folderPath,"/"//fileHDF5Name)
+        if(present(HDF5FullPath)) HDF5FullPath = fullPath
         !write(get_fileId(),*) "' fileHDF5Name = ", fileHDF5Name
 
         !PREPARING ENVIROMENT
@@ -404,7 +474,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine write_HDF5_Unstr_per_proc(xPoints, randField, fileName, rang, folderPath, &
-        communicator, labels, indexes, HDF5Name)
+        communicator, labels, indexes, HDF5Name, HDF5FullPath)
         implicit none
 
         !INPUTS
@@ -417,7 +487,7 @@ contains
         integer          , dimension(1:), optional  , intent(in) :: indexes
 
         !OUTPUTS
-        character(len=110) , optional  , intent(out) ::HDF5Name
+        character(len=110) , optional  , intent(out) ::HDF5Name, HDF5FullPath
 
         !HDF5 VARIABLES
         character(len=110)             :: fileHDF5Name, fullPath !File name
@@ -478,6 +548,7 @@ contains
 
         fileHDF5Name = string_join(fileHDF5Name,".h5")
         fullPath     = string_join(folderPath,"/"//fileHDF5Name)
+        if(present(HDF5FullPath)) HDF5FullPath = fullPath
 
         !write(*,*) "'inside write HDF5' -- fileHDF5Name = ", fileHDF5Name
 
@@ -707,7 +778,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine write_pHDF5_Str(MSH, RDF, fileName, rang, folderPath, &
-                                 communicator, HDF5Name)
+                                 communicator, HDF5Name, HDF5FullPath)
         implicit none
 
         !INPUTS
@@ -719,7 +790,7 @@ contains
         integer                           , intent(in) :: communicator
 
         !OUTPUTS
-        character(len=110) , optional  , intent(out) ::HDF5Name
+        character(len=110) , optional  , intent(out) ::HDF5Name, HDF5FullPath
 
         !HDF5 VARIABLES
         character(len=110)             :: fileHDF5Name, fullPath !File name
@@ -769,6 +840,7 @@ contains
         dsetname = trim(adjustL(fileName)) ! Dataset name
         fileHDF5Name = trim(fileName)//"-ALLprocStruct.h5"
         fullPath     = string_join(folderPath,"/"//fileHDF5Name)
+        if(present(HDF5FullPath)) HDF5FullPath = fullPath
         call wLog("' fileHDF5Name = ")
         call wLog(fileHDF5Name)
 
@@ -1005,9 +1077,9 @@ contains
             fileXMFName = string_join(fileName,".xmf")
             fullPathXMF = string_join(folderPath, "/"//fileXMFName)
             HDF5path = string_join(HDF5relativePath, "/")
-            !write(get_fileId(),*) "fileXMFName = ", fileXMFName
-            !write(get_fileId(),*) "fullPathXMF = ", fullPathXMF
-            !write(get_fileId(),*) "HDF5path    = ", HDF5path
+            !write(*,*) "fileXMFName = ", fileXMFName
+            !write(*,*) "fullPathXMF = ", fullPathXMF
+            !write(*,*) "HDF5path    = ", HDF5path
 
             total_xNStep = nint((MSH%xMaxGlob - MSH%xMinGlob)/MSH%xStep) + 1
 
@@ -1077,8 +1149,8 @@ contains
             write(*,*) "nDim = ", nDim
             write(*,*) "The file won't be created"
         end if
-
-        !write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
+!
+!        !write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
 
     end subroutine write_pHDF5_Str_XMF
 

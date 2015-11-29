@@ -36,10 +36,10 @@ program main_Stat
         write(*,*) "  -----------------------------------------------"
         write(*,*) " "
     end if
-    call read_RF_h5_File_Attributes()
-    call set_Local_Range()
-    call set_Sk_Dir()
-    call read_RF_h5_File_Table()
+    !call read_RF_h5_File_Attributes()
+    !call set_Local_Range()
+    !call set_Sk_Dir()
+    !call read_RF_h5_File_Table()
     !call calculate_average_and_stdVar_MPI(STA)
     !call rebuild_Sk(STA)
     !call show_STAT(STA, "HEY STAT", 6)
@@ -200,7 +200,8 @@ program main_Stat
             integer :: hdferr
             integer(HID_T) :: file_id, attr_id, space_id, dset_id, mem_id
             !integer(HSIZE_T), dimension(STA%nDim) :: dims, maxdims
-            integer(HSIZE_T), dimension(STA%nDim) :: locDims, offset, locShape
+            integer(HSIZE_T), dimension(STA%nDim) :: offset, locDims
+            integer(HSIZE_T), dimension(2) :: locShape
             integer(HSIZE_T), dimension(2) :: zero2D
             !double precision, dimension(:,:), allocatable :: locRF
 
