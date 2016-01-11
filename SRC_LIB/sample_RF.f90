@@ -48,6 +48,7 @@ contains
             logical :: validProc
             integer :: newComm, newNbProcs, newRang
             character(len=100) :: BBoxFileName = "trans_", BBoxPath
+            integer(kind=8) :: xNTotal
 
             call wLog("-> validateProc")
             call validateProc(validProc, IPT, newComm, newNbProcs, newRang)
@@ -129,6 +130,9 @@ contains
                     call wLog(shape(RDF%randField))
                     call wLog("     Calculating sample")
                     call create_RF_Unstruct_Init (RDF, MSH)
+                    call wLog("     Normalizing sample")
+                    xNTotal = product(nint((MSH%xMaxGlob-MSH%xMinGlob)/MSH%xStep) +1)
+                    call normalize_randField(RDF, xNTotal, RDF%randField)
 
                     !i = size(RDF%xPoints,2)
                     !if(i>50) i = 50
@@ -187,13 +191,15 @@ contains
                 end if
             end if
 
+            call MPI_BARRIER(IPT%comm, code) !Waiting for the generation to finish
+
             if(IPT%unv .and. writeFiles .and. outputStyle == 1) then
-                if(RDF%rang == 0) write(*,*) "-> Writing 'UNV' XMF and hdf5 files for"
-                if(RDF%rang == 0) write(*,*) IPT%unv_path
+                if(IPT%rang == 0) write(*,*) "-> Writing 'UNV' XMF and hdf5 files for"
+                if(IPT%rang == 0) write(*,*) IPT%unv_path
                 allocate(UNV_randField(size(IPT%coordList,2),1))
                 if(RDF%rang == 0) write(*,*) "  Source:"
                 if(RDF%rang == 0) write(*,*) BBoxPath
-                call interpolateToUNV(BBoxPath, IPT%coordList, UNV_randField)
+                call interpolateToUNV(BBoxPath, IPT%coordList, UNV_randField, IPT%rang)
                 call write_UNV_XMF_h5(UNV_randField, IPT%coordList, IPT%connectList, IPT%monotype, &
                                       "UNV_", RDF%rang, single_path, &
                                       MSH%comm, ["_All_UNV"], [RDF%rang], 0)
@@ -209,12 +215,13 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine interpolateToUNV(BBoxFileName, coordList, UNV_randField)
+        subroutine interpolateToUNV(BBoxFileName, coordList, UNV_randField, rang)
             implicit none
 
             !INPUT
             character(len=*), intent(in)      :: BBoxFileName
             double precision, dimension(:,:), intent(in) :: coordList
+            integer, intent(in) :: rang
             !OUTPUT
             double precision, dimension(:,:), intent(out) :: UNV_randField
             !LOCAL
@@ -273,8 +280,15 @@ contains
 
             minPos = floor((xMin_Loc_UNV-xMinGlob)/xStep) + 1
             maxPos = ceiling((xMax_Loc_UNV-xMinGlob)/xStep) + 1
+            where(minPos < 1) minPos = 1
+            where(maxPos > xNStep) maxPos = xNStep
+
             extent = maxPos - minPos + 1
 
+            call wLog("xMin_Loc_UNV")
+            call wLog(xMin_Loc_UNV)
+            call wLog("xMax_Loc_UNV")
+            call wLog(xMax_Loc_UNV)
             call wLog("minPos BB")
             call wLog(minPos)
             call wLog("maxPos BB")
@@ -294,9 +308,12 @@ contains
             offset = minPos-1
             locShape = shape(BB_randField)
             zero2D = 0
-            write(*,*) " locShape = ", locShape
-            write(*,*) " offset   = ", offset
-            write(*,*) " locDims  = ", locDims
+            call wLog(" locShape = ")
+            call wLog(int(locShape))
+            call wLog(" offset   = ")
+            call wLog(int(offset))
+            call wLog(" locDims  = ")
+            call wLog(int(locDims))
             !For hyperslab lecture
 
             !IN
@@ -343,7 +360,7 @@ contains
                 !MAPPING COORD In BB
                 coordPos = ((coordList(:,i)-xMinGlob)/xStep) + 1.0D0
                 coordPosInt = floor(coordPos)
-                where(coordPosInt == xNStep) coordPosInt = coordPosInt - 1 !Dealing with points on the positive border
+                where(coordPosInt == maxPos) coordPosInt = coordPosInt - 1 !Dealing with points on the positive border
                 if(any(coordPosInt<0)) stop("coordPosInt smaller than 1")
 
                 !Applying Values
@@ -354,6 +371,35 @@ contains
                     !weight      = 1.0D0 - sqrt(sum(distance**2))/sqrt(dble(nDim))
 
                     !write(*,*) "weight = ", weight
+
+                    if(any(coordPosInt(:)+neighCoord(:,j) > maxPos)) then
+                        call wLog("Error in rang ")
+                        call wLog(rang)
+                        call wLog("   coordPos = ")
+                        call wLog(coordPos)
+                        call wLog("          j = ")
+                        call wLog(j)
+                        call wLog("coordPosInt(:)+neighCoord(:,j) = ")
+                        call wLog(coordPosInt(:)+neighCoord(:,j))
+                        call wLog("maxPos = ")
+                        call wLog(maxPos)
+                        !stop(" ERROR! UNV TRIED POSITION OUT OF RANGE")
+
+                    end if
+
+                    if(any(coordPosInt(:)+neighCoord(:,j) < minPos)) then
+                        call wLog("Error in rang ")
+                        call wLog(rang)
+                        call wLog("   coordPos = ")
+                        call wLog(coordPos)
+                        call wLog("          j = ")
+                        call wLog(j)
+                        call wLog("coordPosInt(:)+neighCoord(:,j) = ")
+                        call wLog(coordPosInt(:)+neighCoord(:,j))
+                        call wLog("minPos = ")
+                        call wLog(minPos)
+                        !stop(" ERROR! UNV TRIED POSITION OUT OF RANGE")
+                    end if
 
                     if(nDim == 2) then
                         UNV_randField(i,1) = UNV_randField(i,1) +                  &

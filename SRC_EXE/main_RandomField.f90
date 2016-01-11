@@ -87,13 +87,13 @@ program main_RandomField
     call wLog("    Reading Mesh Input")
     path = mesh_input
     path = adjustL(path)
-    call wLog("        file: "//trim(path))
+    !call wLog("        file: "//trim(path))
     call read_mesh_input(path, IPT)
     !Reading Generation Input---------------------------------------
     call wLog("    Reading Generation Input")
     path = gen_input
     path = adjustL(path)
-    call wLog("        file: "//trim(path))
+    !call wLog("        file: "//trim(path))
     call read_generation_input(path, IPT)
     !Validating Inputs----------------------------------------------
     call wLog("    Validating Inputs")
@@ -101,6 +101,7 @@ program main_RandomField
 #ifdef MAKELOG
     call show_IPT_RF(IPT, forLog_in=.true.)
 #endif
+    if(rang == 0) call show_IPT_RF(IPT)
     !Initial allocation---------------------------------------------
     call allocate_init()
 

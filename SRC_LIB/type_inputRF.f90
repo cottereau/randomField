@@ -103,6 +103,9 @@ contains
             character(len=1024) , dimension(:,:), allocatable :: dataTable;
 
             call set_DataTable(path, dataTable)
+
+            call wLog("    set_DataTable")
+
             call read_DataTable(dataTable, "nDim", IPT%nDim_mesh)
             call read_DataTable(dataTable, "meshMod", IPT%meshMod)
 
@@ -119,18 +122,30 @@ contains
                     !stop("Inside read_mesh_input UNV not updated")
                     if(IPT%rang==0) write(*,*) "   Mesh UNV"
                     call wLog("    Mesh UNV")
-                    call wLog("        file: "//trim(IPT%unv_path))
+                    call wLog("        file: ")
+                    !call wLog(trim(IPT%unv_path))
                     call read_DataTable(dataTable, "unv_path", IPT%unv_path)
                     call read_DataTable(dataTable, "pointsPerCorrL", IPT%pointsPerCorrL)
                     IPT%unv = .true.
                     call readUNV(IPT%unv_path, IPT%nDim_mesh, IPT%coordList, IPT%connectList, IPT%monotype, &
                                  IPT%rang, IPT%nb_procs, IPT%comm)
+                    !call readUNV_many([IPT%unv_path, IPT%unv_path], IPT%nDim_mesh, IPT%coordList, &
+                    !                  IPT%connectList, IPT%monotype, &
+                    !                  IPT%rang, IPT%nb_procs, IPT%comm)
                     call wLog("-> defining_UNV_extremes")
+                    if(IPT%rang==0) write(*,*) "-> defining_UNV_extremes"
                     call get_Global_Extremes_Mesh(IPT%coordList, IPT%comm, IPT%xMinGlob, IPT%xMaxGlob)
+                    if(IPT%rang==0) write(*,*) " IPT%xMinGlob = ", IPT%xMinGlob
+                    if(IPT%rang==0) write(*,*) " IPT%xMaxGlob = ", IPT%xMaxGlob
+!                    call DispCarvalhol(transpose(IPT%connectList), "transpose(IPT%connectList)", &
+!                                       nColumns=8, unit_in=IPT%log_ID)
+!                    call DispCarvalhol(transpose(IPT%coordList), "transpose(IPT%coordList)", &
+!                                       unit_in=IPT%log_ID)
                 case default
                     write(*,*) "meshMod not accepted: ", IPT%meshMod
                     stop(" ")
             end select
+
 
             if(allocated(dataTable)) deallocate(dataTable)
 

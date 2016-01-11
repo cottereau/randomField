@@ -68,7 +68,7 @@ contains
         character(len=*), intent(in) :: string
         !write(*,*) "log_file_RF_ID inside STRING = ", log_file_RF_ID
 #ifdef MAKELOG
-        write(log_file_RF_ID,*) string
+        write(log_file_RF_ID, *) string
 #endif
     end subroutine wLogString
 
@@ -167,7 +167,7 @@ contains
     subroutine wLogString_Arr(string)
         character(len=*), dimension(:,:), intent(in) :: string
 #ifdef MAKELOG
-        write(log_file_RF_ID,*) string
+        write(log_file_RF_ID, *) string
 #endif
     end subroutine wLogString_Arr
 

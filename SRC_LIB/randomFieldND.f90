@@ -548,7 +548,7 @@ contains
                 call random_number(trashNumber)
             end do
             call random_number(phiK(:))
-!
+
             call wLog("shape(gammaK)")
             call wLog(shape(gammaK))
             call wLog("shape(phiK)")
@@ -614,6 +614,7 @@ contains
     !---------------------------------------------------------------------------------
     !---------------------------------------------------------------------------------
     subroutine allocate_randField(RDF, xNstep, randField)
+        implicit none
         !INPUT AND OUTPUT
         type(RF)   :: RDF
         double precision, dimension(:,:), allocatable, target :: randField
@@ -642,6 +643,81 @@ contains
         end if
 
     end subroutine allocate_randField
+
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    !---------------------------------------------------------------------------------
+    subroutine normalize_randField(RDF, xNTotal, randField)
+        implicit none
+        !INPUT OUTPUT
+        double precision, dimension(:,:), intent(inout) :: randField
+        !INPUT
+        integer(kind=8), intent(in) :: xNTotal
+        type(RF), intent(in) :: RDF
+        !LOCAL
+        double precision, dimension(RDF%Nmc) :: sumRF, sumRFsquare
+        double precision, dimension(RDF%Nmc) :: totalSumRF, totalSumRFsquare;
+        double precision, dimension(RDF%Nmc) :: evntAvg, evntStdDev;
+        !integer, dimension(:), allocatable :: xNTotal_Vec, deplacement
+        integer :: code
+        integer :: i
+
+
+        call wLog("Calculating Average and stdVar")
+
+        !Calculating
+        call wLog("sumRF(1) = ")
+        call wLog(sumRF(1))
+        call wLog("sumRFsquare(1) = ")
+        call wLog(sumRFsquare(1))
+
+        !Total Number of Points
+        call wLog("xNTotal = ")
+        call wLog(xNTotal)
+
+        !Average Correction
+        sumRF(:)       = sum( RDF%randField    , dim = 1)
+        call MPI_ALLREDUCE (sumRF,totalSumRF,RDF%Nmc,MPI_DOUBLE_PRECISION, &
+                            MPI_SUM,RDF%comm,code)
+        evntAvg      = totalSumRF/xNTotal;
+        call wLog("Initial Average = ")
+        call wLog(evntAvg)
+
+        do i = 1, RDF%Nmc
+            randField(:,i) = randField(:,i) - evntAvg(i)
+        end do
+
+        !Verifying Average
+        sumRF(:)       = sum( RDF%randField    , dim = 1)
+        call MPI_ALLREDUCE (sumRF,totalSumRF,RDF%Nmc,MPI_DOUBLE_PRECISION, &
+                            MPI_SUM,RDF%comm,code)
+        evntAvg      = totalSumRF/xNTotal;
+        call wLog("Final Average = ")
+        call wLog(evntAvg)
+
+
+        !Standard Deviation Correction
+        sumRFsquare(:) = sum((RDF%randField)**2, dim = 1)
+        call MPI_ALLREDUCE (sumRFsquare,totalSumRFsquare,RDF%Nmc,MPI_DOUBLE_PRECISION, &
+                            MPI_SUM,RDF%comm,code)
+        evntStdDev   = sqrt(totalSumRFsquare/dble(xNTotal)) !Mean of random field is supposed to be 0
+        call wLog("Initial StdDev = ")
+        call wLog(evntStdDev)
+        do i = 1, RDF%Nmc
+            randField(:,i) = randField(:,i)/evntStdDev(i)
+        end do
+
+        !Verifying Standard Deviation
+        sumRFsquare(:) = sum((RDF%randField)**2, dim = 1)
+        call MPI_ALLREDUCE (sumRFsquare,totalSumRFsquare,RDF%Nmc,MPI_DOUBLE_PRECISION, &
+                            MPI_SUM,RDF%comm,code)
+        evntStdDev   = sqrt(totalSumRFsquare/dble(xNTotal)) !Mean of random field is supposed to be 0
+        call wLog("Final StdDev = ")
+        call wLog(evntStdDev)
+
+    end subroutine normalize_randField
+
 
 end module randomFieldND
 !! Local Variables:
