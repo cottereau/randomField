@@ -192,8 +192,6 @@ contains
         call h5aclose_f(attr_id, hdferr)
         call h5sclose_f(space_id, hdferr)
 
-        write(*,*) "YEAHHHH"
-
     end subroutine read_h5attr_int
 
     !-----------------------------------------------------------------------------------------------

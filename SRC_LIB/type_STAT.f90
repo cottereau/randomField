@@ -21,7 +21,7 @@ module type_STAT
         logical :: init = .false.
         logical :: independent
             !nDim dependent
-        double precision, dimension(:)   , allocatable :: corrL
+        double precision, dimension(:)   , allocatable :: corrL, corrL_out
         double precision, dimension(:, :), allocatable :: randField
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob, xStep;
         double precision, dimension(:), allocatable :: overlap;
@@ -69,6 +69,7 @@ module type_STAT
             allocate(STAT_a%localRange(nDim,2))
             allocate(STAT_a%Sk_Ind(nDim,2))
             allocate(STAT_a%SkTot_Ind(nDim,2))
+            allocate(STAT_a%corrL_out(nDim))
             STAT_a%corrL  = -1
             STAT_a%xMinGlob = -1
             STAT_a%xMaxGlob = -1
@@ -80,6 +81,7 @@ module type_STAT
             STAT_a%procPerDim = -1
             STAT_a%localRange = -1
             STAT_a%coords = -1
+            STAT_a%corrL_out = -1
             STAT_a%init  = .true.
 
         end subroutine init_STAT
@@ -107,7 +109,7 @@ module type_STAT
             write(unit,*) "  corrMod        = ", STAT_a%corrMod
             write(unit,*) "  margiFirst     = ", STAT_a%margiFirst
             write(unit,*) "  independent    = ", STAT_a%independent
-            write(unit,*) "  corrL          = ", STAT_a%corrL
+            write(unit,*) "  corrL (IN)     = ", STAT_a%corrL
             write(unit,*) "  xMinGlob       = ", STAT_a%xMinGlob
             write(unit,*) "  xMaxGlob       = ", STAT_a%xMaxGlob
             write(unit,*) "  xStep          = ", STAT_a%xStep
@@ -125,6 +127,7 @@ module type_STAT
             write(unit,*) "  Sk_Ind INF     = ", STAT_a%Sk_Ind(:,1)
             write(unit,*) "  Sk_Ind SUP     = ", STAT_a%Sk_Ind(:,2)
             write(unit,*) "  coords         = ", STAT_a%coords
+            write(unit,*) "  STATISTICS----------------- "
             if(allocated(STAT_a%evntAvg)) then
                 write(unit,*) "  evntAvg      = ", STAT_a%evntAvg
                 write(unit,*) "  evntStdDev   = ", STAT_a%evntStdDev
@@ -135,6 +138,7 @@ module type_STAT
             end if
             write(unit,*) "  globalAvg    = ", STAT_a%globalAvg
             write(unit,*) "  globalStdDev = ", STAT_a%globalStdDev
+            write(unit,*) "  corrL (OUT)  = ", STAT_a%corrL_out
             write(unit,*) "  "
 
         end subroutine show_STAT
@@ -170,6 +174,7 @@ module type_STAT
             if(allocated(STAT_a%xNStep_Loc))  deallocate(STAT_a%xNStep_Loc)
             if(allocated(STAT_a%SkTot_Dir))   deallocate(STAT_a%SkTot_Dir)
             if(allocated(STAT_a%SkTot_Ind))   deallocate(STAT_a%SkTot_Ind)
+            if(allocated(STAT_a%corrL_out))   deallocate(STAT_a%corrL_out)
 
             STAT_a%init = .false.
 

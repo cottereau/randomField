@@ -178,14 +178,15 @@ contains
         write(*,*) "rebuild_Sk"
         do i = 1, STA%nDim
             call rebuild_Sk_FFT(STA%randField(:,1), STA%xNStep_Loc, i, STA%nDim, &
-                STA%Sk_Dir(STA%Sk_Ind(i,1):STA%Sk_Ind(i,2)), STA%globalAvg)
+                                STA%Sk_Dir(STA%Sk_Ind(i,1):STA%Sk_Ind(i,2)),     &
+                                STA%globalAvg)
         end do
 
         write(*,*) "Reducing Sk to one proc"
         write(*,*) "STA%xNStep_Loc = ", STA%xNStep_Loc
         do i = 1, STA%nDim
             call MPI_ALLREDUCE (STA%xNStep_Loc(i), nPointsMin(i), 1, MPI_INTEGER, &
-                MPI_MIN, STA%comm, code)
+                                MPI_MIN, STA%comm, code)
         end do
 
         write(*,*) "nPointsMin BEFORE = ", nPointsMin
@@ -210,20 +211,33 @@ contains
             !call dispCarvalhol(STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2)), "STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2))")
         end do
 
-        write(*,*) "shape(STA%SkTot_Dir) = ", shape(STA%SkTot_Dir)
-        if(STA%rang == 0) allocate(Temp_SkTot_Dir(size(STA%SkTot_Dir)))
+        !write(*,*) "shape(STA%SkTot_Dir) = ", shape(STA%SkTot_Dir)
+        !if(STA%rang == 0) allocate(Temp_SkTot_Dir(size(STA%SkTot_Dir)))
 
-        call MPI_REDUCE (STA%SkTot_Dir, Temp_SkTot_Dir, size(STA%SkTot_Dir), &
-                         MPI_DOUBLE_PRECISION, MPI_SUM, 0, STA%comm, code)
+        allocate(Temp_SkTot_Dir(size(STA%SkTot_Dir)))
+        call MPI_ALLREDUCE (STA%SkTot_Dir, Temp_SkTot_Dir, size(STA%SkTot_Dir), &
+                            MPI_DOUBLE_PRECISION, MPI_SUM, STA%comm, code)
+        STA%SkTot_Dir = Temp_SkTot_Dir/dble(STA%nb_procs)
 
-        if(STA%rang == 0) then
-            STA%SkTot_Dir = Temp_SkTot_Dir/dble(STA%nb_procs)
-            write(*,*) "STA%SkTot_Dir = ", STA%SkTot_Dir
-        end if
+        !call MPI_REDUCE (STA%SkTot_Dir, Temp_SkTot_Dir, size(STA%SkTot_Dir), &
+        !                 MPI_DOUBLE_PRECISION, MPI_SUM, 0, STA%comm, code)
+        !if(STA%rang == 0) then
+        !    STA%SkTot_Dir = Temp_SkTot_Dir/dble(STA%nb_procs)
+        !    write(*,*) "STA%SkTot_Dir = ", STA%SkTot_Dir
+        !end if
 
         if(allocated(Temp_SkTot_Dir)) deallocate(Temp_SkTot_Dir)
 
+!        !Printing
+!        if(STA%rang == 0) then
+!            do i = 1, STA%nDim
+!                call dispCarvalhol(STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2)), &
+!                                   "STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2))", unit_in=6)
+!            end do
+!        end if
+
     end subroutine rebuild_Sk
+
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -247,7 +261,7 @@ contains
         integer :: howMany, sizeDir, i, j, k
         !integer, dimension(4,6,8) :: testeMat
 
-        write(*,*) "Calculating Sk"
+        !write(*,*) "Calculating Sk"
 
         SkVec = randFieldVec - avg;
 
@@ -262,9 +276,10 @@ contains
         !Making FFT
 
         howMany = product(xNStep)/xNStep(dir)
-        sizeDir = size(Sk_2D,dir)
+        !sizeDir = size(Sk_2D,dir)
+        sizeDir = xNStep(dir)
 
-        write(*,*) "Making FFT"
+        !write(*,*) "Making FFT"
         if(nDim == 1) then
             call dfftw_plan_dft_1d(plan, sizeDir, SkVec(:), SkVec(:), &
                 FFTW_FORWARD, FFTW_ESTIMATE)
@@ -324,7 +339,7 @@ contains
 
         end if
 
-        write(*,*) "Multiplying by the conjugate"
+        !write(*,*) "Multiplying by the conjugate"
         if(nDim == 1) then
             SkVec = SkVec * conjg(SkVec)
         else if (nDim == 2) then
@@ -335,7 +350,7 @@ contains
             stop("ERROR!!! Inside rebuild_Sk_FFT nDim not accepted")
         end if
 
-        write(*,*) "Making Average"
+        !write(*,*) "Making Average"
         !OBS: Redefinition of SkVec for simplicity
 
         if(nDim == 1) then
@@ -359,7 +374,7 @@ contains
         end if
 
         !Reverting FFT
-        write(*,*) "Reverting FFT"
+        !write(*,*) "Reverting FFT"
 
         call dfftw_plan_dft_1d(plan, size(SkVec(1:xNStep(dir))), SkVec(1:xNStep(dir)), SkVec(1:xNStep(dir)), &
             FFTW_BACKWARD, FFTW_ESTIMATE)
@@ -376,6 +391,27 @@ contains
         if(associated(Sk_3D)) nullify(Sk_3D)
 
     end subroutine rebuild_Sk_FFT
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine rebuild_corrL(STA, corrL_out)
+        implicit none
+        !INPUT
+        type(STAT) :: STA
+        !OUTPUT
+        double precision, dimension(:), intent(out) :: corrL_out
+        !LOCAL
+        integer :: i
+
+        do i = 1, STA%nDim
+            corrL_out(i) = 2.0D0 * &
+                           sum(STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2))) * &
+                           STA%xStep(i)
+        end do
+
+    end subroutine rebuild_corrL
 
 end module statistics_RF
 !! Local Variables:

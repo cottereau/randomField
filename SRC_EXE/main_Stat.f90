@@ -22,31 +22,53 @@ program main_Stat
     integer :: nDim, Nmc, method, corrMod, margiFirst
     type(STAT) :: STA
     character(len=70) :: testeChar, testInt
-    character(len=200), parameter :: resPath = "./results/res/h5/samples-ALLprocStruct.h5"
+    character(len=200) :: resPath ! = "./results/res/h5/samples-ALLprocStruct.h5"
     character(len=200), parameter :: meshPath = "./mesh_input"
     character(len=200), parameter :: genPath = "./gen_input"
+    character(len=200), parameter :: statPath = "./stat_input"
     character(len=200), parameter :: outPath = "./results/res/singleGen"
+    integer :: nFiles
+
+    !LOCAL
+    integer :: i
 
     comm = MPI_COMM_WORLD
 
+    write(*,*) "How many files? "
+    read(*,*) nFiles
+    write(*,*) "nFiles = ", nFiles
+
     call init(comm)
+
     if(STA%rang == 0) then
         write(*,*) "  -----------------------------------------------"
         write(*,*) "  -------------CALCULATING STATISTICS------------"
         write(*,*) "  -----------------------------------------------"
         write(*,*) " "
     end if
-    !call read_RF_h5_File_Attributes()
-    !call set_Local_Range()
-    !call set_Sk_Dir()
-    !call read_RF_h5_File_Table()
-    !call calculate_average_and_stdVar_MPI(STA)
-    !call rebuild_Sk(STA)
-    !call show_STAT(STA, "HEY STAT", 6)
+    do i = 1, nFiles
+        write(*,*) "File ", i
+        read(*,*) resPath
+        write(*,*) "path = ", resPath
+
+        STA%comm     = comm
+        STA%rang     = rang
+        STA%nb_procs = nb_procs
+
+        call read_RF_h5_File_Attributes()
+        call set_Local_Range()
+        call set_Sk_Dir()
+        call read_RF_h5_File_Table()
+        call calculate_average_and_stdVar_MPI(STA)
+        call rebuild_Sk(STA)
+        call rebuild_corrL(STA, STA%corrL_out)
+        call show_STAT(STA, "HEY STAT", 6)
+        if(STA%rang == 0) call write_StatisticsOnH5(STA)
+        call finalize_STAT(STA)
+
+    end do
 
     call finalize()
-
-
 
     contains
 
@@ -62,10 +84,6 @@ program main_Stat
             call MPI_INIT(code)
             call MPI_COMM_RANK(comm_local, rang, code)
             call MPI_COMM_SIZE(comm_local, nb_procs, code)
-
-            STA%comm     = comm
-            STA%rang     = rang
-            STA%nb_procs = nb_procs
 
         end subroutine init
 
@@ -107,8 +125,6 @@ program main_Stat
             attr_name = "margiFirst"
             call read_h5attr_int(file_id, trim(adjustL(attr_name)), margiFirst)
 
-
-
             !Allocating Vectors
             call init_STAT(STA, nDim, Nmc, method, corrMod, margiFirst, independent)
 
@@ -135,6 +151,87 @@ program main_Stat
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
+        subroutine write_StatisticsOnH5(STA)
+            implicit none
+            !INPUT
+            type(STAT) :: STA
+            !LOCAL
+            character(len=50) :: attr_name
+            integer(HID_T)  :: file_id       !File identifier
+            integer :: error, code
+            integer :: i
+            logical :: attr_exists
+
+            call h5open_f(error) ! Initialize FORTRAN interface.
+            call h5fopen_f(trim(resPath), H5F_ACC_RDWR_F, file_id, error) !Open File
+
+            !DOUBLE
+            attr_name = "globalAvg"
+            call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
+            write(*,*) "attr_exists = ", attr_exists
+            if(attr_exists) then
+                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
+            else
+                call write_h5attr_real(file_id, trim(adjustL(attr_name)), STA%globalAvg)
+            end if
+
+            attr_name = "globalStdDev"
+            call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
+            write(*,*) "attr_exists = ", attr_exists
+            if(attr_exists) then
+                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
+            else
+                call write_h5attr_real(file_id, trim(adjustL(attr_name)), STA%globalStdDev)
+            end if
+
+            !DOUBLE VEC
+            attr_name = "evntAvg"
+            call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
+            write(*,*) "attr_exists = ", attr_exists
+            if(attr_exists) then
+                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
+            else
+                call write_h5attr_real_vec(file_id, attr_name, STA%evntAvg)
+            end if
+
+            attr_name = "evntStdDev"
+            call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
+            write(*,*) "attr_exists = ", attr_exists
+            if(attr_exists) then
+                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
+            else
+                call write_h5attr_real_vec(file_id, attr_name, STA%evntStdDev)
+            end if
+
+            do i = 1, STA%nDim
+                attr_name = stringNumb_join("Sk_",i)
+                call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
+                write(*,*) "attr_exists = ", attr_exists
+                if(attr_exists) then
+                    write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
+                else
+                    call write_h5attr_real_vec(file_id, attr_name, STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2)))
+                end if
+            end do
+
+            attr_name = "corrL_out"
+            call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
+            write(*,*) "attr_exists = ", attr_exists
+            if(attr_exists) then
+                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
+            else
+                call write_h5attr_real_vec(file_id, attr_name, STA%corrL_out)
+            end if
+
+            call h5fclose_f(file_id, error)! Close the file.
+            call h5close_f(error) ! Close FORTRAN interface
+
+        end subroutine write_StatisticsOnH5
+
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
         subroutine set_Local_Range()
             implicit none
 
@@ -146,7 +243,7 @@ program main_Stat
             periods(:) = .false.
 
             write(*,*) "-> Setting Local Range"
-            call set_procPerDim (STA%nb_procs, STA%nDim, STA%procPerDim)
+            call set_procPerDim_2 (STA, STA%procPerDim)
             call MPI_CART_CREATE (STA%comm, STA%nDim, STA%procPerDim, periods, .false., topComm, code)
             call MPI_CART_COORDS (topComm, STA%rang, STA%nDim, STA%coords, code)
 
@@ -162,6 +259,58 @@ program main_Stat
             STA%xNStep_Loc = STA%localRange(:,2) - STA%localRange(:,1) + 1
 
         end subroutine set_Local_Range
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine set_procPerDim_2 (STA, procPerDim)
+        implicit none
+
+        !INPUT
+        type(STAT), intent(in) :: STA
+
+        !OUTPUT
+        integer, dimension(:) :: procPerDim
+
+        !LOCAL VARIABLES
+        integer :: i, j;
+        double  precision :: procRootDim, logProc2;
+
+        if(size(procPerDim)/=STA%nDim) then
+            write(*,*) "Error inside 'set_procPerDim_2', dimensions are not compatible"
+            write(*,*) "size(procPerDim) = ", size(procPerDim)
+            write(*,*) "MSH%nDim         = ", STA%nDim
+            stop(" ")
+        end if
+
+
+        procRootDim = dble(STA%nb_procs)**(1/dble(STA%nDim))
+        logProc2   = log(dble(STA%nb_procs))/log(2.0D0)
+
+        if (areEqual(procRootDim, dble(nint(procRootDim)))) then
+            call wLog("    Exact Division")
+            procPerDim(:) = nint(dble(STA%nb_procs)**(1.0d0/STA%nDim))
+
+        else if(areEqual(logProc2, dble(nint(logProc2)))) then
+            call wLog("    Power of two")
+
+            procPerDim(:) = 1
+            if(STA%nb_procs /= 1) then
+                do j = 1, nint(logProc2)
+                    i = cyclicMod(j, STA%nDim)
+                    procPerDim(i) = procPerDim(i)*2
+                end do
+            end if
+
+        else
+            stop ("ERROR, inside 'set_procPerDim_2', no mesh division algorithm for this number of procs")
+        end if
+
+        call wLog("    procPerDim = ")
+        call wLog(procPerDim)
+
+    end subroutine set_procPerDim_2
 
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
