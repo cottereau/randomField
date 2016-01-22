@@ -68,21 +68,6 @@ contains
         call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
         RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xRange))
 
-        !write(get_fileId(),*) " RDF%kMax1 = ", RDF%kMax
-
-!        if(RDF%independent) then
-!            xRange = RDF%xMaxExt - RDF%xMinExt !Delta max in between two wave numbers to avoid periodicity
-!        else
-!            xRange = RDF%xMaxGlob - RDF%xMinGlob !Delta max in between two wave numbers to avoid periodicity
-!        end if
-
-
-        !if(RDF%independent) then
-        !    RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxExt - RDF%xMinExt)) !Delta max in between two wave numbers to avoid periodicity
-        !else
-        !    RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xMaxGlob - RDF%xMinGlob)) !Delta max in between two wave numbers to avoid periodicity
-        !end if
-
         select case (RDF%method)
             case(ISOTROPIC)
                 !!write(get_fileId(),*) "RDF%kDelta = ", RDF%kDelta
@@ -118,7 +103,7 @@ contains
                 RDF%kDelta(:) = RDF%kDelta(:)
                 RDF%kNTotal   = product(RDF%kNStep);
                 !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
-                RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
+                RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(1.0D0)) * RDF%kDelta(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
 
 
                 if(RDF%independent) then
@@ -126,12 +111,12 @@ contains
                     call wLog(RDF%kNStep)
                     call wLog("RDF%kMax = ")
                     call wLog(RDF%kMax)
+                    call wLog("RDF%kNTotal = ")
+                    allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
                     call wLog("shape(RDF%kPoints) = ")
                     call wLog(shape(RDF%kPoints))
-                    call wLog("RDF%kNTotal = ")
                     call wLog(RDF%kNTotal)
                     !call wLog("RDF%kPoints = ")
-                    allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
                     do i = 1, RDF%kNTotal
                         call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
                         !call wLog(RDF%kPoints(:, i))
@@ -142,9 +127,9 @@ contains
                     call wLog("RDF%kNEnd = ")
                     call wLog(RDF%kNEnd)
                     kNLocal = RDF%kNEnd - RDF%kNInit + 1
-                    allocate(RDF%kPoints(RDF%nDim, kNLocal))
                     call wLog("kNLocal = ")
                     call wLog(kNLocal)
+                    allocate(RDF%kPoints(RDF%nDim, kNLocal))
                     call wLog("shape(RDF%kPoints) = ")
                     call wLog(shape(RDF%kPoints))
                     do i = RDF%kNInit, RDF%kNEnd
@@ -173,17 +158,30 @@ contains
         !INPUT OUTPUT
         type(RF) :: RDF
         !LOCAL
-        integer :: i
+        integer :: i, freqK = 6
 
         if(allocated(RDF%SkVec)) deallocate(RDF%SkVec)
         allocate(RDF%SkVec(size(RDF%kPoints,2)))
 
+        call wLog("RDF%corrMod")
+        call wLog(RDF%corrMod)
+
         select case(RDF%corrMod)
 
             case(cm_GAUSSIAN)
+                call wLog("cm_GAUSSIAN")
                 RDF%SkVec = exp(-sum(RDF%kPoints**(2.0D0), 1)/(4.0d0*pi))
-                !RDF%SkVec = [(i, i=1, RDF%kNTotal)] !For Tests
-
+            case(cm_COS)
+                call wLog("cm_COS")
+                RDF%SkVec = 0
+                if(size(RDF%SkVec)>freqK) then
+                    RDF%SkVec(freqK) = 1
+                    call wLog("kPoint used in cosinus CM: ")
+                    call wLog(RDF%kPoints(:,freqK))
+                    if(RDF%rang == 0) write(*,*) "kPoint used in cosinus CM: ", RDF%kPoints(:,freqK)
+                else
+                    stop("When using the cosinus correlation Model you should have more than 'freqK' kPoints")
+                end if
         end select
 
     end subroutine set_SkVec

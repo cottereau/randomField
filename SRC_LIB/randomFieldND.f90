@@ -356,9 +356,11 @@ contains
         integer :: i, j, k, ind
         double precision :: trashNumber
         integer, dimension(RDF%nDim) :: xNStepGlob
+        double precision :: ampMult
 
         call wLog("gen_Std_Gauss_FFT_init")
         call wLog(" ")
+
 
         L = MSH%xNStep(1)
         if(RDF%nDim >= 2) M = MSH%xNStep(2)
@@ -382,8 +384,9 @@ contains
 
             end if
 
-            call wLog("Defining kPoints and SkVec")
+            call wLog("Defining kPoints")
             call set_kPoints(RDF, MSH%xStep)
+            call wLog("Defining SkVec")
             call set_SkVec(RDF)
 
             !call wLog("SkVec")
@@ -407,11 +410,13 @@ contains
             call random_number(phiK(:))
 
             gammaK       = gammaK -0.5
-            RDF%SkVec(:) = gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+            !RDF%SkVec(:) = gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
             !RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
 
             if(allocated(gammaK)) deallocate(gammaK)
             if(allocated(phik))   deallocate(phik)
+
+            RDF%randField(:,1) = RDF%SkVec
 
             if(RDF%nDim == 2) then
                 plan = fftw_plan_r2r(RDF%nDim, [int(M), int(L)], data_real_2D, data_real_2D, &
@@ -424,7 +429,7 @@ contains
             else if(RDF%nDim == 3) then
                 plan = fftw_plan_r2r(RDF%nDim, [int(N), int(M), int(L)], data_real_3D, data_real_3D, &
                                         [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
-                data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M,N])
+                data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M, N])
                 call fftw_execute_r2r(plan, data_real_3D, data_real_3D)
                 RDF%randField(:,1) = pack(data_real_3D(1:MSH%xNStep(1), 1:MSH%xNStep(2), 1:MSH%xNStep(3)), .true.)
                 call fftw_destroy_plan(plan)
@@ -566,11 +571,14 @@ contains
             !cdata = fftw_alloc_real(alloc_local)
             !call c_f_pointer(cdata, data_real_2D, [L,local_M])
 
+            ampMult = 2.0d0*sqrt(product(MSH%xStep)/((2.0d0)**(dble(RDF%nDim))))
+
             if(RDF%nDim == 2) then
                 plan = fftw_mpi_plan_r2r(RDF%nDim, [M, L], data_real_2D, data_real_2D, &
                                          RDF%comm, [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
                 data_real_2D(:,:) = reshape(RDF%SkVec, [L, local_LastDim])
                 call fftw_mpi_execute_r2r(plan, data_real_2D, data_real_2D)
+                data_real_2D = data_real_2D*sqrt(product(MSH%xStep))
                 RDF%randField(:,1) = pack(data_real_2D(1:L,1:local_LastDim), .true.)
 
             else if(RDF%nDim == 3) then
@@ -578,6 +586,8 @@ contains
                                          RDF%comm, [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
                 data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M, local_LastDim])
                 call fftw_mpi_execute_r2r(plan, data_real_3D, data_real_3D)
+                !data_real_3D = data_real_3D*(2.0D0**((RDF%nDim-1))/2.0D0))*sqrt(product(MSH%xStep))
+                data_real_3D = data_real_3D*(2.0D0)*sqrt(product(MSH%xStep))
                 RDF%randField(:,1) = pack(data_real_3D(1:L, 1:M, 1:local_LastDim), .true.)
             end if
 

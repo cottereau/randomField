@@ -1307,6 +1307,8 @@ contains
         !INTEGER VEC
         attr_name = "seed"
         call write_h5attr_int_vec(file_id, trim(adjustL(attr_name)), RDF%seed)
+        attr_name = "kNStep"
+        call write_h5attr_int_vec(file_id, attr_name, RDF%kNStep)
         !attr_name = "sum_xNStep"
         !call write_h5attr_int(file_id, trim(adjustL(attr_name)), sum_xNStep)
         !attr_name = "sum_kNStep"
@@ -1319,6 +1321,8 @@ contains
         call write_h5attr_real_vec(file_id, attr_name, MSH%xMaxGlob)
         attr_name = "xStep"
         call write_h5attr_real_vec(file_id, attr_name, MSH%xStep)
+        attr_name = "kMax"
+        call write_h5attr_real_vec(file_id, attr_name, RDF%kMax)
         attr_name = "corrL"
         call write_h5attr_real_vec(file_id, attr_name, RDF%corrL)
         attr_name = "overlap"
@@ -1328,5 +1332,27 @@ contains
         call h5close_f(error) ! Close FORTRAN interface
 
     end subroutine write_HDF5_attributes
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine write_stat_input(filePath, h5_path)
+        implicit none
+        !INPUT
+        character(len=*) :: filePath, h5_path
+        !LOCAL
+        integer :: fileId
+
+        fileID = 18
+
+        open (unit = fileId , file = filePath, action = 'write')
+
+        write(fileId,"(A)") '1'
+        write(fileId,"(A)") '"', h5_path, '"'
+
+        close(fileId)
+
+    end subroutine write_stat_input
 
 end module writeResultFile_RF

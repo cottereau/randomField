@@ -176,10 +176,13 @@ contains
         double precision, dimension(:), allocatable :: Temp_SkTot_Dir
 
         write(*,*) "rebuild_Sk"
+
         do i = 1, STA%nDim
             call rebuild_Sk_FFT(STA%randField(:,1), STA%xNStep_Loc, i, STA%nDim, &
                                 STA%Sk_Dir(STA%Sk_Ind(i,1):STA%Sk_Ind(i,2)),     &
-                                STA%globalAvg)
+                                STA%corrL_out(i),&
+                                STA%globalAvg, STA%globalStdDev, &
+                                STA%xStep(i))
         end do
 
         write(*,*) "Reducing Sk to one proc"
@@ -242,41 +245,35 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine rebuild_Sk_FFT(randFieldVec, xNStep, dir, nDim, Sk_part, avg)
+    subroutine rebuild_Sk_FFT(randFieldVec, xNStep, dir, nDim, Sk_part, corrL_out, avg, stdDev, xStep)
         implicit none
         !INPUT
         double precision, dimension(:), intent(in), target :: randFieldVec
         integer(kind=8), dimension(:), intent(in) :: xNStep
         integer, intent(in) :: dir, nDim
-        double precision, intent(in) :: avg
+        double precision, intent(in) :: avg, stdDev, xStep
         !OUTPUT
         double precision, dimension(:), intent(out) :: Sk_part
+        double precision,               intent(out) :: corrL_out
         !LOCAL
         double complex  , dimension(size(randFieldVec)), target :: SkVec
-        !double precision, dimension(:,:)  , pointer :: RF_2D
-        !double precision, dimension(:,:,:), pointer :: RF_3D
         double complex  , dimension(:,:)  , pointer :: Sk_2D
         double complex  , dimension(:,:,:), pointer :: Sk_3D
         integer*8 plan
         integer :: howMany, sizeDir, i, j, k
-        !integer, dimension(4,6,8) :: testeMat
 
-        !write(*,*) "Calculating Sk"
+        SkVec = (randFieldVec - avg)/stdDev; !Field normalization
 
-        SkVec = randFieldVec - avg;
+        !write(*,*) "Centered RF = ", real(SkVec(1:10))
 
         if(nDim == 2) then
-            !RF_2D(1:xNStep(1),1:xNStep(2)) => randFieldVec
             Sk_2D(1:xNStep(1),1:xNStep(2)) => SkVec
         else if(nDim == 3) then
-            !RF_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => randFieldVec
             Sk_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => SkVec
         end if
-        !
-        !Making FFT
 
+        !Making FFT
         howMany = product(xNStep)/xNStep(dir)
-        !sizeDir = size(Sk_2D,dir)
         sizeDir = xNStep(dir)
 
         !write(*,*) "Making FFT"
@@ -302,6 +299,7 @@ contains
                     call dfftw_execute_dft(plan, Sk_2D(i,:), Sk_2D(i,:))
                     call dfftw_destroy_plan(plan)
                 end do
+
             end if
 
 
@@ -339,6 +337,11 @@ contains
 
         end if
 
+        !FFT Normalization
+        SkVec = SkVec/xNStep(dir) !Need to be before the conjugate multiplication
+
+        !write(*,*) "After FFT = ", real(SkVec(1:10))
+
         !write(*,*) "Multiplying by the conjugate"
         if(nDim == 1) then
             SkVec = SkVec * conjg(SkVec)
@@ -349,6 +352,8 @@ contains
         else
             stop("ERROR!!! Inside rebuild_Sk_FFT nDim not accepted")
         end if
+
+        !write(*,*) "After conj multiplication = ", real(SkVec(1:10))
 
         !write(*,*) "Making Average"
         !OBS: Redefinition of SkVec for simplicity
@@ -373,19 +378,31 @@ contains
             stop("ERROR!!! Inside rebuild_Sk_FFT nDim not accepted")
         end if
 
+        !write(*,*) "After average = ", real(SkVec(1:10))
+
         !Reverting FFT
         !write(*,*) "Reverting FFT"
-
         call dfftw_plan_dft_1d(plan, size(SkVec(1:xNStep(dir))), SkVec(1:xNStep(dir)), SkVec(1:xNStep(dir)), &
             FFTW_BACKWARD, FFTW_ESTIMATE)
         call dfftw_execute_dft(plan, SkVec(1:xNStep(dir)), SkVec(1:xNStep(dir)))
         call dfftw_destroy_plan(plan)
 
+        !iFFT Normalization
+        !SkVec = SkVec*xNStep(dir) !I don't know why but this normalization should not be applied (on a similar Matlab code you should normalize)
+
+        !write(*,*) "After iFFT = ", real(SkVec(1:10))
+
         !Taking real part
         Sk_part = SkVec(1:xNStep(dir))
-        Sk_part = Sk_part/Sk_part(1)
+        !Sk_part = Sk_part/Sk_part(1)
 
         !write(*,*) "Sk_part = ", Sk_part
+
+        corrL_out = (       &
+                     sum(Sk_part) &
+                     -(Sk_part(1) + Sk_part(size(Sk_part)))/2.0D0 &
+                     +(Sk_part(1) + Sk_part(2))/2.0D0 &
+                     )*xStep
 
         if(associated(Sk_2D)) nullify(Sk_2D)
         if(associated(Sk_3D)) nullify(Sk_3D)
@@ -407,8 +424,11 @@ contains
 
         do i = 1, STA%nDim
             corrL_out(i) = 2.0D0 * &
-                           sum(STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2))) * &
-                           STA%xStep(i)
+                           (       &
+                           sum(STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2))) &
+                           -((STA%SkTot_Dir(STA%SkTot_Ind(i,1)) &
+                           + STA%SkTot_Dir(STA%SkTot_Ind(i,2)))/2.0D0) &
+                           )*STA%xStep(i)
         end do
 
     end subroutine rebuild_corrL

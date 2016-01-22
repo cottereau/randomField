@@ -130,9 +130,9 @@ contains
                     call wLog(shape(RDF%randField))
                     call wLog("     Calculating sample")
                     call create_RF_Unstruct_Init (RDF, MSH)
-                    call wLog("     Normalizing sample")
-                    xNTotal = product(nint((MSH%xMaxGlob-MSH%xMinGlob)/MSH%xStep) +1)
-                    call normalize_randField(RDF, xNTotal, RDF%randField)
+                    !call wLog("     Normalizing sample")
+                    !xNTotal = product(nint((MSH%xMaxGlob-MSH%xMinGlob)/MSH%xStep) +1)
+                    !call normalize_randField(RDF, xNTotal, RDF%randField)
 
                     !i = size(RDF%xPoints,2)
                     !if(i>50) i = 50
@@ -204,6 +204,8 @@ contains
                                       "UNV_", RDF%rang, single_path, &
                                       MSH%comm, ["_All_UNV"], [RDF%rang], 0)
             end if
+
+            if(IPT%rang == 0) call write_stat_input("./stat_input", BBoxPath)
 
             call finalize_MESH(MSH)
             call finalize_RF(RDF)

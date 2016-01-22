@@ -61,7 +61,7 @@ program main_Stat
         call read_RF_h5_File_Table()
         call calculate_average_and_stdVar_MPI(STA)
         call rebuild_Sk(STA)
-        call rebuild_corrL(STA, STA%corrL_out)
+        !call rebuild_corrL(STA, STA%corrL_out)
         call show_STAT(STA, "HEY STAT", 6)
         if(STA%rang == 0) call write_StatisticsOnH5(STA)
         call finalize_STAT(STA)
@@ -168,60 +168,59 @@ program main_Stat
             !DOUBLE
             attr_name = "globalAvg"
             call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            write(*,*) "attr_exists = ", attr_exists
+            !write(*,*) "attr_exists = ", attr_exists
             if(attr_exists) then
-                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
-            else
-                call write_h5attr_real(file_id, trim(adjustL(attr_name)), STA%globalAvg)
+                call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
             end if
+            call write_h5attr_real(file_id, trim(adjustL(attr_name)), STA%globalAvg)
 
             attr_name = "globalStdDev"
             call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            write(*,*) "attr_exists = ", attr_exists
+            !write(*,*) "attr_exists = ", attr_exists
             if(attr_exists) then
-                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
-            else
-                call write_h5attr_real(file_id, trim(adjustL(attr_name)), STA%globalStdDev)
+                call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
             end if
+            call write_h5attr_real(file_id, trim(adjustL(attr_name)), STA%globalStdDev)
+
 
             !DOUBLE VEC
             attr_name = "evntAvg"
             call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            write(*,*) "attr_exists = ", attr_exists
+            !write(*,*) "attr_exists = ", attr_exists
             if(attr_exists) then
-                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
-            else
-                call write_h5attr_real_vec(file_id, attr_name, STA%evntAvg)
+                call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
             end if
+            call write_h5attr_real_vec(file_id, attr_name, STA%evntAvg)
+
 
             attr_name = "evntStdDev"
             call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            write(*,*) "attr_exists = ", attr_exists
+            !write(*,*) "attr_exists = ", attr_exists
             if(attr_exists) then
-                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
-            else
-                call write_h5attr_real_vec(file_id, attr_name, STA%evntStdDev)
+                call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
             end if
+            call write_h5attr_real_vec(file_id, attr_name, STA%evntStdDev)
+
+
+            attr_name = "corrL_out"
+            call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
+            !write(*,*) "attr_exists = ", attr_exists
+            if(attr_exists) then
+                call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
+            end if
+            call write_h5attr_real_vec(file_id, attr_name, STA%corrL_out)
+
 
             do i = 1, STA%nDim
                 attr_name = stringNumb_join("Sk_",i)
                 call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-                write(*,*) "attr_exists = ", attr_exists
+                !write(*,*) "attr_exists = ", attr_exists
                 if(attr_exists) then
-                    write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
-                else
-                    call write_h5attr_real_vec(file_id, attr_name, STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2)))
+                    call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
                 end if
-            end do
+                call write_h5attr_real_vec(file_id, attr_name, STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2)))
 
-            attr_name = "corrL_out"
-            call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            write(*,*) "attr_exists = ", attr_exists
-            if(attr_exists) then
-                write(*,*) trim(adjustL(attr_name)), " already exists and will not be rewriten"
-            else
-                call write_h5attr_real_vec(file_id, attr_name, STA%corrL_out)
-            end if
+            end do
 
             call h5fclose_f(file_id, error)! Close the file.
             call h5close_f(error) ! Close FORTRAN interface

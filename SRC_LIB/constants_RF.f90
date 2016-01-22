@@ -14,7 +14,8 @@ module constants_RF
 	                      RANDOMIZATION = 3, &
 	                      FFT = 4
     !Correlation Model
-    integer, parameter :: cm_GAUSSIAN = 1
+    integer, parameter :: cm_GAUSSIAN = 1, &
+                          cm_COS = 2
     !First-order Marginal Density
     integer, parameter :: fom_GAUSSIAN = 1, &
                           fom_LOGNORMAL = 2
