@@ -946,7 +946,7 @@ contains
                 call wLog("Point in maximal position = ")
                 call wLog(RDF%xPoints_3D(:,maxPos(1),maxPos(2),maxPos(3)))
                 !randFieldLinear = pack(RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), .true.)
-                randFieldLinear = reshape(RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)),
+                randFieldLinear = reshape(RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
                                   [product(maxPos-minPos+1)])
 
             end if
