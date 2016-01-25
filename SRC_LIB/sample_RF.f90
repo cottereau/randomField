@@ -170,12 +170,12 @@ contains
                             call wLog(maxval(RDF%randField,1))
                             call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, BBoxFileName, RDF%rang, single_path, &
                                                             MSH%comm, ["_All"], [0], 0, style=outputStyle, meshMod = msh_AUTO, &
-                                                            HDF5FullPath = BBoxPath)
+                                                            HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
                         else
                             call wLog("   (Per Proc)");
                             call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, BBoxFileName, RDF%rang, single_path, &
                                                             MSH%comm, ["_All"], [RDF%rang], 0, style=outputStyle, meshMod = msh_AUTO, &
-                                                            HDF5FullPath = BBoxPath)
+                                                            HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
 
                         end if
 

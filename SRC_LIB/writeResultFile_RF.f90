@@ -19,7 +19,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     subroutine write_Mono_XMF_h5(RDF, MSH, connectList, monotype, fileName, rang, folderPath, &
                                  communicator, labelsH5, indexesH5, indexXMF, style, meshMod, &
-                                 HDF5FullPath)
+                                 HDF5FullPath, writeDataSet)
 
         implicit none
 
@@ -34,7 +34,7 @@ contains
         character(len=*), dimension(1:)   , intent(in) :: labelsH5
         integer         , dimension(1:)   , intent(in) :: indexesH5
         integer, intent(in) :: meshMod
-        logical, intent(in) :: monotype
+        logical, intent(in) :: monotype, writeDataSet
         integer, intent(in) :: style !1 for parallel h5 writing
                                      !2 for sequential per processor h5 writing
                                      !3 for gathered monoprocesor h5 writing
@@ -54,43 +54,14 @@ contains
 
         select case (style)
             case(1)
-!                select case (meshMod)
-!                    case(msh_UNV)
-!                        fileName2 = "samples"
-!                        call write_pHDF5_Unstr(double_Data=RDF%randField, &
-!                                               fileName=fileName2, &
-!                                               rang=rang, &
-!                                               folderPath=trim(adjustL(folderPath))//"/h5", &
-!                                               communicator=communicator, &
-!                                               HDF5Name=HDF5Names(1), xSz=xSz(1), ySz=ySz(1), transp = .true.)
-!                        HDF5Name = HDF5Names(1)
-!                        fileName2 = "nodes"
-!                        call write_pHDF5_Unstr(double_Data=RDF%xPoints, &
-!                                               fileName=fileName2, &
-!                                               rang=rang, &
-!                                               folderPath=trim(adjustL(folderPath))//"/h5", &
-!                                               communicator=communicator, &
-!                                               HDF5Name=HDF5Names(2), xSz=xSz(2), ySz=ySz(2), transp = .false.)
-!                        fileName2 = "connect"
-!                        call write_pHDF5_Unstr(integer_Data=connectList-1, &
-!                                               fileName=fileName2, &
-!                                               rang=rang, &
-!                                               folderPath=trim(adjustL(folderPath))//"/h5", &
-!                                               communicator=communicator, &
-!                                               HDF5Name=HDF5Names(3), xSz=xSz(3), ySz=ySz(3), transp = .false.)
-!
-!                    case(msh_AUTO)
-                        fileName2 = "samples"                     
-                        call write_pHDF5_Str(  MSH=MSH, &
-                                               RDF=RDF, &
-                                               fileName=fileName2, &
-                                               rang=rang, &
-                                               folderPath=trim(adjustL(folderPath))//"/h5", &
-                                               communicator=communicator, &
-                                               HDF5Name=HDF5Name, HDF5FullPath = HDF5FullPath)
-!                    case default
-!                        stop("In hdf5 style 1 writing - meshMod not implemented")
-!                end select
+                fileName2 = "samples"
+                call write_pHDF5_Str(  MSH=MSH, &
+                                       RDF=RDF, &
+                                       fileName=fileName2, &
+                                       rang=rang, &
+                                       folderPath=trim(adjustL(folderPath))//"/h5", &
+                                       communicator=communicator, &
+                                       HDF5Name=HDF5Name, HDF5FullPath = HDF5FullPath, writeDataSet = writeDataSet)
             case(2)
                 call write_HDF5_Unstr_per_proc(RDF%xPoints, RDF%randField, fileName, rang, trim(adjustL(folderPath))//"/h5", &
                                    communicator, labelsH5, indexesH5, HDF5Name=HDF5Name, HDF5FullPath=HDF5FullPath)
@@ -98,38 +69,30 @@ contains
                 stop("hdf5 writing style not implemented")
         end select
 
-        !call MPI_BARRIER(RDF%comm, error)
         if(RDF%rang == 0) then
             call write_HDF5_attributes(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
             !call finish_HDF5_file(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
         end if
-        !!!!!!!!!!!!XMF
-        !write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";
-        XMFName = stringNumb_join(trim(adjustL(fileName))//"it_", indexXMF)
 
-        select case (style)
-            case(1)
-!                select case (meshMod)
-!                    case(msh_UNV)
-!                        call write_pHDF5_Unstr_XMF(HDF5Names, xSz, ySz, XMFName, &
-!                                               rang, trim(adjustL(folderPath))//"/xmf", &
-!                                               communicator, "../h5")
-!                    case(msh_AUTO)
-                        call write_pHDF5_Str_XMF(HDF5Name, MSH, fileName, &
-                                                 rang, trim(adjustL(folderPath))//"/xmf", &
-                                                 communicator, "../h5")
-!                    case default
-!                        stop("In XMF style 1 writing - meshMod not implemented")
-!                end select
+        if(writeDataSet) then
+            !!!!!!!!!!!!XMF
+            !write(get_fileId(),*) "-> Writing XMF file in", trim(adjustL(folderPath))//"/xmf";
+            XMFName = stringNumb_join(trim(adjustL(fileName))//"it_", indexXMF)
 
+            select case (style)
+                case(1)
+                    call write_pHDF5_Str_XMF(HDF5Name, MSH, fileName, &
+                                             rang, trim(adjustL(folderPath))//"/xmf", &
+                                             communicator, "../h5")
 
-            case(2)
-                call write_HDF5_Unstr_per_proc_XMF(1, [HDF5name], [size(RDF%xPoints,2)], [.true.], size(RDF%xPoints,1), XMFName, &
-                                    rang, trim(adjustL(folderPath))//"/xmf", &
-                                    communicator, "../h5")
-            case default
-                stop("hdf5/XMF writing style not implemented")
-        end select
+                case(2)
+                    call write_HDF5_Unstr_per_proc_XMF(1, [HDF5name], [size(RDF%xPoints,2)], [.true.], size(RDF%xPoints,1), XMFName, &
+                                        rang, trim(adjustL(folderPath))//"/xmf", &
+                                        communicator, "../h5")
+                case default
+                    stop("hdf5/XMF writing style not implemented")
+            end select
+        end if
 
     end subroutine write_Mono_XMF_h5
 
@@ -778,7 +741,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine write_pHDF5_Str(MSH, RDF, fileName, rang, folderPath, &
-                                 communicator, HDF5Name, HDF5FullPath)
+                                 communicator, HDF5Name, HDF5FullPath, writeDataSet)
         implicit none
 
         !INPUTS
@@ -788,6 +751,7 @@ contains
         integer                           , intent(in) :: rang;
         character(len=*)                  , intent(in) :: folderPath
         integer                           , intent(in) :: communicator
+        logical                           , intent(in) :: writeDataSet
 
         !OUTPUTS
         character(len=110) , optional  , intent(out) ::HDF5Name, HDF5FullPath
@@ -858,6 +822,17 @@ contains
         call wLog(int(dims))
 
 
+!        call wLog(" -> h5 creation")
+!        call h5open_f(error) ! Initialize FORTRAN interface.
+!        call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error) !NEW plist_id (for file)
+!        !call h5pset_deflate_f(plist_id, 5, error) !Activates Compression  TO DO
+!        call h5pset_fapl_mpio_f(plist_id, communicator, info, error) !SET plist to MPI (for file)
+!        call h5fcreate_f(fullPath, H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id) !NEW file_id
+!        call h5pclose_f(plist_id, error) !CLOSE plist_id
+!        call h5screate_simple_f(rank, dims, filespace, error) !NEW filespace (the size of the whole table)
+!        call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, dset_id, error) !NEW dset_id
+!        call h5sclose_f(filespace, error) !CLOSE filespace
+
         call wLog(" -> h5 creation")
         call h5open_f(error) ! Initialize FORTRAN interface.
         call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error) !NEW plist_id (for file)
@@ -865,113 +840,118 @@ contains
         call h5pset_fapl_mpio_f(plist_id, communicator, info, error) !SET plist to MPI (for file)
         call h5fcreate_f(fullPath, H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id) !NEW file_id
         call h5pclose_f(plist_id, error) !CLOSE plist_id
-        call h5screate_simple_f(rank, dims, filespace, error) !NEW filespace (the size of the whole table)
-        call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, dset_id, error) !NEW dset_id
-        call h5sclose_f(filespace, error) !CLOSE filespace
 
-        if(RDF%independent) then
+        if(writeDataSet)then
+            call h5screate_simple_f(rank, dims, filespace, error) !NEW filespace (the size of the whole table)
+            call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, dset_id, error) !NEW dset_id
+            call h5sclose_f(filespace, error) !CLOSE filespace
 
-            minPos = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep) - MSH%origin + 1
-            maxPos = find_xNStep(MSH%xMinGlob, MSH%xMaxBound , MSH%xStep) - MSH%origin + 1
-            countND = maxPos - minPos + 1
-            offset = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep) - 1
-            !dims   = countND
-            call wLog("minPos")
-            call wLog(int(minPos))
-            call wLog("maxPos")
-            call wLog(int(maxPos))
-            call wLog("countND")
-            call wLog(int(countND))
-            call wLog("offset")
-            call wLog(int(offset))
-            call wLog("minPos")
-            call wLog(minPos)
-            call wLog("maxPos")
-            call wLog(maxPos)
+            if(RDF%independent) then
 
-            !CHOOSING SPACE IN MEMORY FOR THIS PROC
-            call wLog("countND = ")
-            call wLog(int(countND))
-            call wLog("offset = ")
-            call wLog(int(offset))
-            call h5screate_simple_f(rank, countND, memspace, error)  !NEW memspace
+                minPos = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep) - MSH%origin + 1
+                maxPos = find_xNStep(MSH%xMinGlob, MSH%xMaxBound , MSH%xStep) - MSH%origin + 1
+                countND = maxPos - minPos + 1
+                offset = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep) - 1
+                !dims   = countND
+                call wLog("minPos")
+                call wLog(int(minPos))
+                call wLog("maxPos")
+                call wLog(int(maxPos))
+                call wLog("countND")
+                call wLog(int(countND))
+                call wLog("offset")
+                call wLog(int(offset))
+                call wLog("minPos")
+                call wLog(minPos)
+                call wLog("maxPos")
+                call wLog(maxPos)
 
-            !CHOOSING SPACE IN FILE FOR THIS PROC
-            call h5dget_space_f(dset_id, filespace, error) !GET filespace
-            ! Select hyperslab in the file.
-
-            call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
-
-        else
-
-                countND = MSH%xNStep
-
+                !CHOOSING SPACE IN MEMORY FOR THIS PROC
                 call wLog("countND = ")
                 call wLog(int(countND))
-                write(*,*) "countND = ", countND
+                call wLog("offset = ")
+                call wLog(int(offset))
                 call h5screate_simple_f(rank, countND, memspace, error)  !NEW memspace
 
                 !CHOOSING SPACE IN FILE FOR THIS PROC
                 call h5dget_space_f(dset_id, filespace, error) !GET filespace
                 ! Select hyperslab in the file.
-                offset = MSH%origin - 1!Lines Offset to start writing
-                call wLog("offset = ")
-                call wLog(int(offset))
-                write(*,*) "offset = ", offset
+
                 call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
 
-        end if
+            else
 
-        ! Create property list for collective dataset write
-        call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error) !NEW plist_id (for dataset)
-        call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error) !SET plist to MPI (for dataset)
+                    countND = MSH%xNStep
 
-        if(RDF%independent) then
+                    call wLog("countND = ")
+                    call wLog(int(countND))
+                    write(*,*) "countND = ", countND
+                    call h5screate_simple_f(rank, countND, memspace, error)  !NEW memspace
 
-            allocate(randFieldLinear(product(countND)))
-
-
-            if(RDF%nDim == 2) then
-                call wLog("Point in minimal position = ")
-                call wLog(RDF%xPoints_2D(:,minPos(1),minPos(2)))
-                call wLog("Point in maximal position = ")
-                call wLog(RDF%xPoints_2D(:,maxPos(1),maxPos(2)))
-                !randFieldLinear = pack(RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), .true.)
-                randFieldLinear = reshape(RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
-                                  [product(maxPos-minPos+1)])
-
-            else if (RDF%nDim == 3) then
-                call wLog("Point in minimal position = ")
-                call wLog(RDF%xPoints_3D(:,minPos(1),minPos(2),minPos(3)))
-                call wLog("Point in maximal position = ")
-                call wLog(RDF%xPoints_3D(:,maxPos(1),maxPos(2),maxPos(3)))
-                !randFieldLinear = pack(RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), .true.)
-                randFieldLinear = reshape(RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
-                                  [product(maxPos-minPos+1)])
+                    !CHOOSING SPACE IN FILE FOR THIS PROC
+                    call h5dget_space_f(dset_id, filespace, error) !GET filespace
+                    ! Select hyperslab in the file.
+                    offset = MSH%origin - 1!Lines Offset to start writing
+                    call wLog("offset = ")
+                    call wLog(int(offset))
+                    write(*,*) "offset = ", offset
+                    call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
 
             end if
 
-            call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
-                                randFieldLinear, &
-                                dims, error, &
-                                file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+            ! Create property list for collective dataset write
+            call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error) !NEW plist_id (for dataset)
+            call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error) !SET plist to MPI (for dataset)
 
-        else
+            if(RDF%independent) then
 
-            call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
-                               RDF%randField,  &
-                               dims, error, &
-                               file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace
+                allocate(randFieldLinear(product(countND)))
 
+
+                if(RDF%nDim == 2) then
+                    call wLog("Point in minimal position = ")
+                    call wLog(RDF%xPoints_2D(:,minPos(1),minPos(2)))
+                    call wLog("Point in maximal position = ")
+                    call wLog(RDF%xPoints_2D(:,maxPos(1),maxPos(2)))
+                    !randFieldLinear = pack(RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), .true.)
+                    randFieldLinear = reshape(RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+                                      [product(maxPos-minPos+1)])
+
+                else if (RDF%nDim == 3) then
+                    call wLog("Point in minimal position = ")
+                    call wLog(RDF%xPoints_3D(:,minPos(1),minPos(2),minPos(3)))
+                    call wLog("Point in maximal position = ")
+                    call wLog(RDF%xPoints_3D(:,maxPos(1),maxPos(2),maxPos(3)))
+                    !randFieldLinear = pack(RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), .true.)
+                    randFieldLinear = reshape(RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                                      [product(maxPos-minPos+1)])
+
+                end if
+
+                call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+                                    randFieldLinear, &
+                                    dims, error, &
+                                    file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+
+            else
+
+                call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+                                   RDF%randField,  &
+                                   dims, error, &
+                                   file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id) !Write dset, INPUT form = memspace, OUTPUT form = filespace
+
+            end if
+
+            ! Close dataspaces.
+            call h5sclose_f(filespace, error) !CLOSE filespace
+            call h5sclose_f(memspace, error) !CLOSE memspace
+
+            ! Close the property list
+            call h5pclose_f(plist_id, error) !CLOSE plist_id
+            ! Close the dataset.
+            call h5dclose_f(dset_id, error) !CLOSE dset_id
         end if
 
-        ! Close dataspaces.
-        call h5sclose_f(filespace, error) !CLOSE filespace
-        call h5sclose_f(memspace, error) !CLOSE memspace
-
-        ! Close the dataset and property list.
-        call h5dclose_f(dset_id, error) !CLOSE dset_id
-        call h5pclose_f(plist_id, error) !CLOSE plist_id
 
         ! Close the file.
         call h5fclose_f(file_id, error) !CLOSE file_id

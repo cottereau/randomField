@@ -462,8 +462,10 @@ contains
                                                  unityPartition, minPos, maxPos)
 
         end do !Direction
-
-        RDF%randField(:,1) = RDF%randField(:,1) * sqrt(unityPartition(:))
+        do i = 1, size(RDF%randField(:,1),1)
+            RDF%randField(i,1) = RDF%randField(i,1) * sqrt(unityPartition(i))
+        end do
+        !RDF%randField(:,1) = RDF%randField(:,1) * sqrt(unityPartition(:)) !This syntax demands too much memory for Occygen
 
         !RDF%randField(:,1) = unityPartition(:) !TEST
 

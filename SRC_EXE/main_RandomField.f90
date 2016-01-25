@@ -24,6 +24,7 @@ program main_RandomField
     integer :: nDim, Nmc;
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeFiles = .true.
+    logical :: writeDataSet = .false.
     logical :: sameFolder = .true.
     integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
 
@@ -41,6 +42,9 @@ program main_RandomField
     !Initializing MPI
     call init_communication(MPI_COMM_WORLD, IPT%comm, IPT%rang, IPT%nb_procs)
     rang = IPT%rang
+    IPT%writeDataSet = writeDataSet
+
+    !
 
     if(IPT%rang == 0)then
         write(*,*)

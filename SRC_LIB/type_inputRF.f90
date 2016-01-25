@@ -13,6 +13,7 @@ module type_inputRF
         integer :: rang = -1
         integer :: nb_procs = -1
         logical :: init=.false.
+        logical :: writeDataSet=.true.
         !MESH
         integer :: nDim_mesh
         integer :: meshMod
