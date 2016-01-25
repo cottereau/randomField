@@ -423,7 +423,8 @@ contains
                                         [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
                 data_real_2D(:,:) = reshape(RDF%SkVec, [L, M])
                 call fftw_execute_r2r(plan, data_real_2D, data_real_2D)
-                RDF%randField(:,1) = pack(data_real_2D(1:MSH%xNStep(1), 1:MSH%xNStep(2)), .true.)
+                !RDF%randField(:,1) = pack(data_real_2D(1:MSH%xNStep(1), 1:MSH%xNStep(2)), .true.)
+                RDF%randField(:,1) = reshape(data_real_2D, [L, M])
                 call fftw_destroy_plan(plan)
 
             else if(RDF%nDim == 3) then
@@ -431,7 +432,8 @@ contains
                                         [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
                 data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M, N])
                 call fftw_execute_r2r(plan, data_real_3D, data_real_3D)
-                RDF%randField(:,1) = pack(data_real_3D(1:MSH%xNStep(1), 1:MSH%xNStep(2), 1:MSH%xNStep(3)), .true.)
+                !RDF%randField(:,1) = pack(data_real_3D(1:MSH%xNStep(1), 1:MSH%xNStep(2), 1:MSH%xNStep(3)), .true.)
+                RDF%randField(:,1) = reshape(data_real_3D, [L, M, N])
                 call fftw_destroy_plan(plan)
 
             else
@@ -579,7 +581,8 @@ contains
                 data_real_2D(:,:) = reshape(RDF%SkVec, [L, local_LastDim])
                 call fftw_mpi_execute_r2r(plan, data_real_2D, data_real_2D)
                 data_real_2D = data_real_2D*sqrt(product(MSH%xStep))
-                RDF%randField(:,1) = pack(data_real_2D(1:L,1:local_LastDim), .true.)
+                !RDF%randField(:,1) = pack(data_real_2D(1:L,1:local_LastDim), .true.)
+                RDF%randField(:,1) = reshape(data_real_2D, [L*local_LastDim])
 
             else if(RDF%nDim == 3) then
                 plan = fftw_mpi_plan_r2r(RDF%nDim, [N, M, L], data_real_3D, data_real_3D, &
@@ -588,7 +591,8 @@ contains
                 call fftw_mpi_execute_r2r(plan, data_real_3D, data_real_3D)
                 !data_real_3D = data_real_3D*(2.0D0**((RDF%nDim-1))/2.0D0))*sqrt(product(MSH%xStep))
                 data_real_3D = data_real_3D*(2.0D0)*sqrt(product(MSH%xStep))
-                RDF%randField(:,1) = pack(data_real_3D(1:L, 1:M, 1:local_LastDim), .true.)
+                !RDF%randField(:,1) = pack(data_real_3D(1:L, 1:M, 1:local_LastDim), .true.)
+                RDF%randField(:,1) = reshape(data_real_3D, L*M*local_LastDim)
             end if
 
             call wLog("shape(RDF%SkVec)")

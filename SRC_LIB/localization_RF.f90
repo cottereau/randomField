@@ -72,6 +72,7 @@ contains
         type(MESH), intent(in) :: MSH
         !OUTPUT
         integer, intent(out) :: minIndexNeigh, maxIndexNeigh
+        integer :: i
         !logical, dimension(:), intent(out) :: considerNeighbour
 
         !considerNeighbour = .true.
@@ -79,8 +80,21 @@ contains
         !where(minval(MSH%neighShift,1) < 0) considerNeighbour = .false.
 
         !Global Min and Max positions
-        minIndexNeigh = minval(pack(MSH%indexNeigh(1,:), MSH%considerNeighbour))
-        maxIndexNeigh = maxval(pack(MSH%indexNeigh(2,:), MSH%considerNeighbour))
+        !minIndexNeigh = minval(pack(MSH%indexNeigh(1,:), MSH%considerNeighbour))
+        !maxIndexNeigh = maxval(pack(MSH%indexNeigh(2,:), MSH%considerNeighbour))
+
+        minIndexNeigh = -1
+        maxIndexNeigh = -1
+        do i = 1, size(MSH%indexNeigh,2)
+            if(MSH%considerNeighbour(i)) then
+                if(minIndexNeigh == -1) then
+                    minIndexNeigh = MSH%indexNeigh(1,i)
+                    maxIndexNeigh = MSH%indexNeigh(2,i)
+                end if
+                if(minIndexNeigh > MSH%indexNeigh(1,i)) minIndexNeigh = MSH%indexNeigh(1,i)
+                if(maxIndexNeigh < MSH%indexNeigh(2,i)) maxIndexNeigh = MSH%indexNeigh(2,i)
+            end if
+        end do
 
     end subroutine getNeighIndexRange
 
