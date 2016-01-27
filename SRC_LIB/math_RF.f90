@@ -475,7 +475,7 @@ contains
             call system_clock(COUNT=clock)
         end do
 
-        if(present(seedStart)) then
+        if(present(seedStart) .and. seedStart>=0) then
             seed = 72 + seedStart*18 + 37*(/ (i - 1, i = 1, n) /)
         else
             seed = clock + 37*(/ (i - 1, i = 1, n) /)

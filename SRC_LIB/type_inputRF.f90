@@ -296,6 +296,7 @@ contains
                 write(unit,*) " method = ", IPT%method
                 write(unit,*) " Nmc = ", IPT%Nmc
                 write(unit,*) " independent = ", IPT%independent
+                write(unit,*) " seedStart = ", IPT%seedStart
                 write(unit,*) " "
 
             end if
