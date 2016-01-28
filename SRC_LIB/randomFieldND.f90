@@ -207,21 +207,25 @@ contains
 
         !LOCAL
         double precision, dimension(:)  , allocatable :: gammaN, phiN, thetaN, psiN;
-        double precision, dimension(:)  , allocatable :: rVec;
+        double precision, dimension(RDF%nDim) :: rVec;
         logical         , dimension(:)  , allocatable :: effectCalc;
         double precision :: rMax, Sk
         double precision, dimension(1) :: rMaxVec
         integer          :: i, j, k, m;
         integer          :: rNTotal;
         double precision :: step, rDelta;
-        double precision, dimension(:), allocatable :: dgemm_mult;
+        double precision, dimension(MSH%xNTotal) :: dgemm_mult;
 
-!        !Allocating
-!        allocate(rVec (RDF%nDim));
-!        allocate(dgemm_mult(RDF%xNTotal))
-!
-!        !write(get_fileId(),*) "-----Inside Isotropic-----"
-!
+        call wLog("-----Inside Isotropic-----")
+
+        call set_kPoints(RDF, MSH%xStep)
+        call set_SkVec(RDF)
+
+        call wLog("RDF%kPoints------------")
+        call wLog(RDF%kPoints)
+        call wLog("RDF%SkVec--------------")
+        call wLog(RDF%SkVec)
+
 !        !r Definition
 !        call set_kMaxND(RDF%corrMod, rMaxVec)
 !        call set_kPoints(RDF)
@@ -233,9 +237,9 @@ contains
 !        step      = rMax/dble(rNTotal)
 !        RDF%randField(:,:) = 0.0D0;
 !
-!        call init_random_seed(RDF%seed)
-!
-!        if (RDF%nDim == 2) then
+        call init_random_seed(RDF%seed)
+
+        if (RDF%nDim == 2) then
 !            allocate(psiN   (rNTotal));
 !            allocate(thetaN (rNTotal));
 !            allocate(gammaN (rNTotal));
@@ -267,7 +271,7 @@ contains
 !                end if
 !            end do
 !
-!        else if (RDF%nDim == 3) then
+        else if (RDF%nDim == 3) then
 !            !write(*,*) "nDim = 3 !!!"
 !            !write(*,*) "k = ",k;
 !            allocate(psiN   (rNTotal));
@@ -308,26 +312,24 @@ contains
 !                end if
 !            end do
 !
-!        else
+        else
 !            write(*,*) "ERROR The number of dimensions is not accepted in this method (Isotropic)";
 !            write(*,*) "RDF%nDim = ", RDF%nDim;
 !            stop
-!        end if
+        end if
 !
 !        !if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
 !
 !        RDF%randField(:,:) = sqrt((1.0d0)/((2.0d0*pi)**(RDF%nDim)))&
 !                             * RDF%randField(:,:)
 !
-!        !RDF%randField = 1.0 ! For Tests
-!        !RDF%randField = RDF%rang ! For Tests
+        RDF%randField = 1.0 ! For Tests
+        !RDF%randField = RDF%rang ! For Tests
 
-        if(allocated(dgemm_mult))   deallocate(dgemm_mult)
         if(allocated(phiN))         deallocate(phiN);
         if(allocated(psiN))         deallocate(psiN);
         if(allocated(thetaN))       deallocate(thetaN);
         if(allocated(gammaN))       deallocate(gammaN);
-        if(allocated(rVec))         deallocate(rVec);
 
     end subroutine gen_Std_Gauss_Isotropic
 
@@ -411,12 +413,12 @@ contains
 
             gammaK       = gammaK -0.5
             !RDF%SkVec(:) = gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
-            !RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+            RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+            !RDF%randField(:,1) = RDF%SkVec
 
             if(allocated(gammaK)) deallocate(gammaK)
             if(allocated(phik))   deallocate(phik)
 
-            RDF%randField(:,1) = RDF%SkVec
 
             if(RDF%nDim == 2) then
                 plan = fftw_plan_r2r(RDF%nDim, [int(M), int(L)], data_real_2D, data_real_2D, &

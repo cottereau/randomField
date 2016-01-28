@@ -66,11 +66,19 @@ contains
         if(allocated(RDF%kPoints)) deallocate(RDF%kPoints)
 
         call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
-        RDF%kDelta(:) = 2.0D0*PI/(periodMult*(RDF%xRange))
 
         select case (RDF%method)
             case(ISOTROPIC)
-                !!write(get_fileId(),*) "RDF%kDelta = ", RDF%kDelta
+                RDF%kDelta(1) = 2.0D0*PI/(periodMult*sqrt(sum(RDF%xRange**2))) !Diagonal
+                RDF%kNStep(1) = 1 + kAdjust*(ceiling(maxval(RDF%kMax)/RDF%kDelta(1))); !Number of points in k
+                RDF%kDelta(1) = maxval(RDF%kMax)/(RDF%kNStep(1)-1); !Redefining kDelta after ceiling and adjust
+                RDF%kNTotal   = product(RDF%kNStep);
+
+                allocate(RDF%kPoints(1, RDF%kNTotal))
+
+                do i = 1, RDF%kNTotal
+                    call get_Permutation(i, [RDF%kMax(1)], [RDF%kNStep(1)], RDF%kPoints(:, i), snapExtremes = .true.);
+                end do
 
             case(SHINOZUKA)
                 RDF%kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:))); !Number of points in k
