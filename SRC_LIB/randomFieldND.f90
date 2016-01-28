@@ -209,16 +209,18 @@ contains
         double precision, dimension(:)  , allocatable :: gammaN, phiN, thetaN, psiN;
         double precision, dimension(RDF%nDim) :: rVec;
         logical         , dimension(:)  , allocatable :: effectCalc;
-        double precision :: rMax, Sk
-        double precision, dimension(1) :: rMaxVec
+        !double precision :: rMax, Sk
+        !double precision, dimension(1) :: rMaxVec
         integer          :: i, j, k, m;
-        integer          :: rNTotal;
-        double precision :: step, rDelta;
+        !integer          :: rNTotal;
+        double precision :: step;
         double precision, dimension(MSH%xNTotal) :: dgemm_mult;
 
         call wLog("-----Inside Isotropic-----")
 
+        write(*,*) "Setting kPoints"
         call set_kPoints(RDF, MSH%xStep)
+        write(*,*) "Setting SkVec"
         call set_SkVec(RDF)
 
         call wLog("RDF%kPoints------------")
@@ -234,84 +236,89 @@ contains
 !        rNTotal = ceiling(rMax/rDelta) + 1;
 !
 !        !Generating random field samples
-!        step      = rMax/dble(rNTotal)
+        step = RDF%kPoints(1,2)-RDF%kPoints(1,1)
+        call wLog("step = ")
+        call wLog(step)
 !        RDF%randField(:,:) = 0.0D0;
 !
         call init_random_seed(RDF%seed)
 
         if (RDF%nDim == 2) then
-!            allocate(psiN   (rNTotal));
-!            allocate(thetaN (rNTotal));
-!            allocate(gammaN (rNTotal));
-!            do k = 1, RDF%Nmc
-!                if(RDF%calculate(k)) then
-!                    call random_number(psiN(:))
-!                    call random_number(thetaN(:))
-!                    call random_number(gammaN(:))
-!                    psiN   = 2d0*pi*psiN
-!                    thetaN = 2d0*pi*psiN
-!                    gammaN = 2d0*pi*gammaN
-!
-!                    do j = 1, rNTotal
-!                        rVec           = [cos(thetaN(j)) * (j-1)*step, &
-!                                          sin(thetaN(j)) * (j-1)*step]
-!                        Sk             = get_SpectrumND([(j-1)*step], RDF%corrMod); !Obs, here Sk is a scalar
-!                        call DGEMM ( "T", "N", RDF%xNTotal, 1, RDF%nDim, &
-!                            1.0d0, RDF%xPoints, RDF%nDim, rVec, RDF%nDim, 0.0d0, dgemm_mult, RDF%xNTotal)
-!
-!                        RDF%randField(:,k) = sqrt(Sk*(j-1)*(dble(step**2))) * gammaN(j) &
-!                                            * cos(                           &
-!                                            dgemm_mult                &
-!                                            + psiN(j)                 &
-!                                            )                          &
-!                                            + RDF%randField(:,k)
-!                    end do
-!                else
-!                    RDF%randField(:,k) = 0.0
-!                end if
-!            end do
-!
+            allocate(psiN   (RDF%kNTotal));
+            allocate(thetaN (RDF%kNTotal));
+            allocate(gammaN (RDF%kNTotal));
+            do k = 1, RDF%Nmc
+                if(RDF%calculate(k)) then
+                    write(*,*) "k = ",k;
+                    !write(*,*) "dgemm_mult"
+                    call random_number(psiN(:))
+                    call random_number(thetaN(:))
+                    call random_number(gammaN(:))
+                    psiN   = 2d0*pi*psiN
+                    thetaN = 2d0*pi*psiN
+                    gammaN = 2d0*pi*gammaN
+
+                    do j = 1, RDF%kNTotal
+                        rVec           = [cos(thetaN(j)) * RDF%kPoints(1,j), &
+                                          sin(thetaN(j)) * RDF%kPoints(1,j)]
+                        call DGEMM ( "T", "N", size(RDF%randField,1), 1, RDF%nDim, &
+                            1.0d0, RDF%xPoints, RDF%nDim, rVec, RDF%nDim, 0.0d0, dgemm_mult, size(RDF%randField,1))
+                        call wLog(dgemm_mult)
+                        RDF%randField(:,k) = sqrt(RDF%SkVec(j)*RDF%kPoints(1,j)) * gammaN(j) &
+                                            * cos(                           &
+                                            dgemm_mult                &
+                                            + psiN(j)                 &
+                                            )                          &
+                                            + RDF%randField(:,k)
+                    end do
+                else
+                    RDF%randField(:,k) = 0.0
+                end if
+            end do
+
         else if (RDF%nDim == 3) then
-!            !write(*,*) "nDim = 3 !!!"
-!            !write(*,*) "k = ",k;
-!            allocate(psiN   (rNTotal));
-!            allocate(thetaN (rNTotal));
-!            allocate(phiN   (rNTotal));
-!            allocate(gammaN (rNTotal));
-!            do k = 1, RDF%Nmc
-!                if(RDF%calculate(k)) then
-!                    !write(*,*) "k = ",k;
-!                    !write(*,*) "rNTotal = ",rNTotal;
-!                    call random_number(phiN(:))
-!                    call random_number(thetaN(:))
-!                    call random_number(gammaN(:))
-!                    call random_number(psiN(:))
-!
-!                    psiN   = 2*pi*psiN
-!                    thetaN = 2*pi*psiN
-!                    phiN   = pi*phiN
-!                    gammaN = sqrt(12.0)*(gammaN -0.5d0)
-!
-!                    do j = 1, rNTotal
-!                        !write(*,*) "j = ", j
-!                        rVec           = [cos(thetaN(j))*sin(phiN(j)) * (j-1)*step, &
-!                                          sin(thetaN(j))*sin(phiN(j)) * (j-1)*step, &
-!                                          cos(phiN(j))                * (j-1)*step]
-!                        Sk             = get_SpectrumND([(j-1)*step], RDF%corrMod);
-!                        call DGEMM ( "T", "N", RDF%xNTotal, 1, RDF%nDim, &
-!                                    1.0d0, RDF%xPoints, RDF%nDim, rVec, RDF%nDim, 0.0d0, dgemm_mult, RDF%xNTotal)
-!                        RDF%randField(:,k) = sqrt(Sk*sin(phiN(j))*step*((j-1)*step)**2) * gammaN(j) &
-!                                              * cos(                                             &
-!                                              dgemm_mult                                   &
-!                                              + psiN(j)                                    &
-!                                              )                                            &
-!                                              + RDF%randField(:,k)
-!                    end do
-!                else
-!                    RDF%randField(:,k) = 0.0
-!                end if
-!            end do
-!
+            !write(*,*) "nDim = 3 !!!"
+            !write(*,*) "k = ",k;
+            allocate(psiN   (RDF%kNTotal));
+            allocate(thetaN (RDF%kNTotal));
+            allocate(phiN   (RDF%kNTotal));
+            allocate(gammaN (RDF%kNTotal));
+            do k = 1, RDF%Nmc
+                if(RDF%calculate(k)) then
+                    !write(*,*) "k = ",k, "-------------------------";
+                    !write(*,*) "rNTotal = ",rNTotal;
+                    call random_number(phiN(:))
+                    call random_number(thetaN(:))
+                    call random_number(gammaN(:))
+                    call random_number(psiN(:))
+
+                    psiN   = 2*pi*psiN
+                    thetaN = 2*pi*psiN
+                    phiN   = pi*phiN
+                    gammaN = sqrt(12.0)*(gammaN -0.5d0)
+
+
+
+                    do j = 1, RDF%kNTotal
+                        !write(*,*) "j = ", j
+                        rVec           = [cos(thetaN(j))*sin(phiN(j)) * RDF%kPoints(1,j), &
+                                          sin(thetaN(j))*sin(phiN(j)) * RDF%kPoints(1,j), &
+                                          cos(phiN(j))                * RDF%kPoints(1,j)]
+                        !call wLog(rVec)
+                        call DGEMM ( "T", "N", size(RDF%randField,1), 1, RDF%nDim, &
+                                    1.0d0, RDF%xPoints, RDF%nDim, rVec, RDF%nDim, 0.0d0, dgemm_mult, size(RDF%randField,1))
+                        RDF%randField(:,k) = sqrt(RDF%SkVec(j)*sin(phiN(j))*(RDF%kPoints(1,j))**2) * gammaN(j) &
+                                              * cos(                                             &
+                                              dgemm_mult                                   &
+                                              + psiN(j)                                    &
+                                              )                                            &
+                                              + RDF%randField(:,k)
+                    end do
+                else
+                    RDF%randField(:,k) = 0.0
+                end if
+            end do
+
         else
 !            write(*,*) "ERROR The number of dimensions is not accepted in this method (Isotropic)";
 !            write(*,*) "RDF%nDim = ", RDF%nDim;
@@ -320,10 +327,13 @@ contains
 !
 !        !if(rang == 0) write(*,*) "Spectra (Sk) cut in: ", Sk
 !
-!        RDF%randField(:,:) = sqrt((1.0d0)/((2.0d0*pi)**(RDF%nDim)))&
-!                             * RDF%randField(:,:)
+        RDF%randField(:,:) = sqrt((step)/((2.0d0*pi)**(RDF%nDim)))&
+                             * RDF%randField(:,:)
+
+        call wLog("RDF%randField--------------")
+        call wLog(RDF%randField)
 !
-        RDF%randField = 1.0 ! For Tests
+!        RDF%randField = 1.0 ! For Tests
         !RDF%randField = RDF%rang ! For Tests
 
         if(allocated(phiN))         deallocate(phiN);

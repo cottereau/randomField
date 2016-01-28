@@ -70,9 +70,9 @@ contains
         select case (RDF%method)
             case(ISOTROPIC)
                 RDF%kDelta(1) = 2.0D0*PI/(periodMult*sqrt(sum(RDF%xRange**2))) !Diagonal
-                RDF%kNStep(1) = 1 + kAdjust*(ceiling(maxval(RDF%kMax)/RDF%kDelta(1))); !Number of points in k
+                RDF%kNStep(1) = 1 + 5.0D0*kAdjust*(ceiling(maxval(RDF%kMax)/RDF%kDelta(1))); !Number of points in k
                 RDF%kDelta(1) = maxval(RDF%kMax)/(RDF%kNStep(1)-1); !Redefining kDelta after ceiling and adjust
-                RDF%kNTotal   = product(RDF%kNStep);
+                RDF%kNTotal   = RDF%kNStep(1);
 
                 allocate(RDF%kPoints(1, RDF%kNTotal))
 
