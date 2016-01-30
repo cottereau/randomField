@@ -33,12 +33,14 @@ program main_Stat
     integer :: i
 
     comm = MPI_COMM_WORLD
-
-    write(*,*) "How many files? "
-    read(*,*) nFiles
-    write(*,*) "nFiles = ", nFiles
-
     call init(comm)
+
+    if(STA%rang == 0) then
+        write(*,*) "How many files? "
+        read(*,*) nFiles
+        write(*,*) "nFiles = ", nFiles
+    end if
+
 
     if(STA%rang == 0) then
         write(*,*) "  -----------------------------------------------"
@@ -47,24 +49,26 @@ program main_Stat
         write(*,*) " "
     end if
     do i = 1, nFiles
-        write(*,*) "File ", i
-        read(*,*) resPath
-        write(*,*) "path = ", resPath
+        if(STA%rang == 0) then
+            write(*,*) "File ", i
+            read(*,*) resPath
+            write(*,*) "path = ", resPath
+        end if
 
-        STA%comm     = comm
-        STA%rang     = rang
-        STA%nb_procs = nb_procs
-
-        call read_RF_h5_File_Attributes()
-        call set_Local_Range()
-        call set_Sk_Dir()
-        call read_RF_h5_File_Table()
-        call calculate_average_and_stdVar_MPI(STA)
-        call rebuild_Sk(STA)
-        !call rebuild_corrL(STA, STA%corrL_out)
-        call show_STAT(STA, "HEY STAT", 6)
-        if(STA%rang == 0) call write_StatisticsOnH5(STA)
-        call finalize_STAT(STA)
+!        STA%comm     = comm
+!        STA%rang     = rang
+!        STA%nb_procs = nb_procs
+!
+!        call read_RF_h5_File_Attributes()
+!        call set_Local_Range()
+!        call set_Sk_Dir()
+!        call read_RF_h5_File_Table()
+!        call calculate_average_and_stdVar_MPI(STA)
+!        call rebuild_Sk(STA)
+!        !call rebuild_corrL(STA, STA%corrL_out)
+!        call show_STAT(STA, "HEY STAT", 6)
+!        if(STA%rang == 0) call write_StatisticsOnH5(STA)
+!        call finalize_STAT(STA)
 
     end do
 
