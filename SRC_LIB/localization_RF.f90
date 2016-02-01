@@ -163,7 +163,7 @@ contains
         integer :: i, direction, neighPos
         integer :: code
         integer, dimension(RDF%nDim) :: minPos, maxPos
-        integer :: totalSize, double_size, overHead, overEst
+        integer :: totalSize, double_size, overHead, overEst, bufferSize
         double precision, dimension(:), allocatable :: buffer
         integer :: testrank = 0, testrank2 = 4
         double precision, dimension(1:MSH%xNTotal), target :: tempRandField
@@ -197,13 +197,16 @@ contains
         tag = 0
 
         !Buffer allocation
+        call wLog ("Allocating buffer")
         !overEst = MSH%nDim + 1
-        overEst = 10
+        overEst = 1
         call MPI_TYPE_SIZE(MPI_DOUBLE_PRECISION,double_size,code)
         overHead = int(1+(MPI_BSEND_OVERHEAD*1.)/double_size)
-        !allocate(buffer(overEst*(MSH%xNTotal+overHead)))
-        allocate(buffer(overEst*(MSH%nOvlpPoints+overHead)))
-        call MPI_BUFFER_ATTACH(buffer, overEst*double_size*(MSH%xNTotal+overHead),code)
+        bufferSize = overEst*(MSH%nOvlpPoints+overHead)
+        call wLog ("bufferSize = ")
+        call wLog (bufferSize)
+        allocate(buffer(bufferSize))
+        call MPI_BUFFER_ATTACH(buffer, double_size*bufferSize,code)
 
         !Allocation
         allocate(request(requestSize))
@@ -220,7 +223,6 @@ contains
 
         call wLog(" RANG = ")
         call wLog(MSH%rang)
-
 
 
         do stage = 1, 2 !Sending and then receiving
@@ -392,7 +394,7 @@ contains
         !call MPI_WAITALL (countReq, request(1:countReq), status(:,1:countReq), code)
         !if(MSH%rang == testrank) write(*,*) "RDF%randField(:,1) = ", RDF%randField(:,1)
 
-        call MPI_BUFFER_DETACH (buffer,overEst*double_size*(MSH%xNTotal+overHead),code)
+        call MPI_BUFFER_DETACH (buffer,double_size*bufferSize,code)
         if(allocated(buffer)) deallocate(buffer)
 
         if(allocated(request)) deallocate(request)

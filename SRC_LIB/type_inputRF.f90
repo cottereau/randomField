@@ -19,7 +19,7 @@ module type_inputRF
         integer :: meshMod
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         integer         , dimension(:), allocatable :: pointsPerCorrL;
-        integer         , dimension(:), allocatable :: procPerDim;
+        integer         , dimension(:), allocatable :: procPerDim
         !UNV
         double precision, dimension(:,:), allocatable :: coordList
         integer         , dimension(:,:), allocatable :: connectList
@@ -36,6 +36,8 @@ module type_inputRF
         integer :: method = -1 !1 for Isotropic, 2 for Shinozuka, 3 for Randomization, 4 for FFT
         integer :: Nmc = -1, seedStart
         logical :: independent
+        integer :: nProcPerField
+        integer, dimension(:), allocatable :: nFields
 
     end type IPT_RF
 
@@ -60,6 +62,7 @@ contains
             if(.not. allocated(IPT%corrL)) allocate(IPT%corrL(nDim))
             if(.not. allocated(IPT%overlap)) allocate(IPT%overlap(nDim))
             if(.not. allocated(IPT%procPerDim)) allocate(IPT%procPerDim(nDim))
+            if(.not. allocated(IPT%nFields)) allocate(IPT%nFields(nDim))
 
             IPT%log_ID = log_file_RF_ID
             IPT%rang   = rang
@@ -89,6 +92,7 @@ contains
             if(allocated(IPT%corrL)) deallocate(IPT%corrL)
             if(allocated(IPT%overlap)) deallocate(IPT%overlap)
             if(allocated(IPT%procPerDim)) deallocate(IPT%procPerDim)
+            if(allocated(IPT%nFields)) deallocate(IPT%nFields)
 
         end subroutine finalize_IPT_RF
 
@@ -123,7 +127,7 @@ contains
                     call read_DataTable(dataTable, "Max", IPT%xMaxGlob)
                     call read_DataTable(dataTable, "pointsPerCorrL", IPT%pointsPerCorrL)
                 case(2)
-                    !stop("Inside read_mesh_input UNV not updated")
+                    stop("Inside read_mesh_input UNV not updated")
                     if(IPT%rang==0) write(*,*) "   Mesh UNV"
                     call wLog("    Mesh UNV")
                     call wLog("        file: ")
@@ -185,6 +189,8 @@ contains
             call read_DataTable(dataTable, "seedStart"  , IPT%seedStart)
             call read_DataTable(dataTable, "corrL"      , IPT%corrL)
             call read_DataTable(dataTable, "independent", independent)
+            call read_DataTable(dataTable, "nFields"    , IPT%nFields)
+            call read_DataTable(dataTable, "nProcPerField", IPT%nProcPerField)
 
             if(independent == 1) then
                 IPT%independent = .true.
@@ -300,7 +306,10 @@ contains
                 write(unit,*) " Nmc = ", IPT%Nmc
                 write(unit,*) " independent = ", IPT%independent
                 write(unit,*) " seedStart = ", IPT%seedStart
+                write(unit,*) " nProcPerField = ", IPT%nProcPerField
+                write(unit,*) " nFields = ", IPT%nFields
                 write(unit,*) " "
+
 
             end if
 
