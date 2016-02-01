@@ -64,12 +64,13 @@ contains
     !---------------------------------------------------------------------------------
     !---------------------------------------------------------------------------------
     !---------------------------------------------------------------------------------
-    subroutine set_global_extremes(MSH,xMaxGlob, xMinGlob, procExtent, procStart)
+    subroutine set_global_extremes(MSH,xMaxGlob, xMinGlob, procExtent, procStart, stepProc_out)
         !INPUT
         type(MESH), intent(in) :: MSH
         !OUTPUT
         double precision, dimension(:), intent(inout) :: xMinGlob, xMaxGlob
         double precision, dimension(:), intent(out) :: procExtent, procStart
+        double precision, dimension(:), intent(out), optional :: stepProc_out
         !LOCAL
         double precision, dimension(MSH%nDim) :: delta, half, minVol
         double precision, dimension(MSH%nDim) :: ovlp_Tot, Novlp_Tot, ovlp, Novlp
@@ -149,6 +150,7 @@ contains
 
         procExtent = delta_Proc
         procStart  = stepProc*dble(MSH%coords)
+        if(present(stepProc_out)) stepProc_out = stepProc
 
     end subroutine set_global_extremes
 
