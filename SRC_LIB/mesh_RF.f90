@@ -38,13 +38,6 @@ contains
 
         call setGrid(xPoints, MSH%xMinBound, MSH%xStep, MSH%xNStep)
 
-!        xPoints = dble(meshGridInt(MSH%xNStep,0))
-
-!
-!        do d = 1, MSH%nDim
-!            xPoints(d,:) = MSH%xMinBound(d) + MSH%xStep(d)*xPoints(d,:)
-!        end do
-
         RDF%xPoints => xPoints
 
         if(RDF%nDim == 2) then

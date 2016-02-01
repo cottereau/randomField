@@ -105,75 +105,50 @@ contains
         call wLog("        IN  MSH%procPerDim = ")
         call wLog(MSH%procPerDim)
 
-        !GLOBAL CASE (Not INDEPENDENT)
-        if(.not. MSH%independent) then
 
-            !Global extremes
-            half  = (MSH%xMaxGlob + MSH%xMinGlob)/2.0D0
-            delta = MSH%xMaxGlob - MSH%xMinGlob
-            call roundToMultiple(delta, MSH%xStep*dble(MSH%procPerDim), up=.true.)
-            xMaxGlob = MSH%xMinGlob + delta
+        !Size of the non-overlapping areas
+        ovlp      = MSH%overlap*MSH%corrL
+        ovlp_Tot  = ovlp*dble(MSH%procPerDim-1) +2.0D0*(ovlp-MSH%xStep) !We consider an overlap -1 in each extreme
+        where(MSH%procPerDim == 1) ovlp = 0.0D0
+        where(MSH%procPerDim == 1) ovlp_Tot = 0.0D0
+        where(ovlp_Tot <= 0.0D0) ovlp_Tot = 0.0D0
+        call wLog("        OVERLAP = ")
+        call wLog(ovlp)
+        call wLog("        OVERLAP TOTAL = ")
+        call wLog(ovlp_Tot)
+        Novlp_Tot = (MSH%xMaxGlob - MSH%xMinGlob) - ovlp_Tot
+        call wLog("        NON-OVERLAP TOTAL (rest) = ")
+        call wLog(Novlp_Tot)
+        where(Novlp_Tot < 0.0D0)
+            Novlp_Tot = 0.0D0
+        end where
+        call roundToMultiple(Novlp_Tot, MSH%xStep*dble(MSH%procPerDim), up=.true.)
+        call wLog("        NON-OVERLAP TOTAL (Round) = ")
+        call wLog(Novlp_Tot)
+        Novlp = Novlp_Tot/dble(MSH%procPerDim)
 
-            procExtent = delta/dble(MSH%procPerDim)
-            procStart  = procExtent*MSH%coords + MSH%xMinGlob
+        call wLog("        NON-OVERLAP TOTAL = ")
+        call wLog(Novlp_Tot)
 
-            call wLog("        OUT MSH%xMinGlob (Round 2) = ")
-            call wLog(MSH%xMinGlob)
-            call wLog("        OUT MSH%xMaxGlob (Round 2) = ")
-            call wLog(MSH%xMaxGlob)
-            call wLog("            delta        (Round 2) = ")
-            call wLog(MSH%xMaxGlob - MSH%xMinGlob)
-            call wLog(" ")
+        !Redefining Global Extremes
+        delta = ovlp_Tot + Novlp_Tot
+        xMaxGlob = MSH%xMinGlob + delta
+        call wLog("        OUT MSH%xMinGlob (Round 2) = ")
+        call wLog(MSH%xMinGlob)
+        call wLog("        OUT MSH%xMaxGlob (Round 2) = ")
+        call wLog(MSH%xMaxGlob)
 
-        !INDEPENDENT CASE (For Localization)
-        else if(MSH%independent) then
+        !Extent of a proc
+        delta_Proc = (Novlp_Tot)/dble(MSH%procPerDim) + 2.0D0*ovlp - 2*MSH%xStep
+        where(MSH%procPerDim == 1)  delta_Proc = (Novlp_Tot)/dble(MSH%procPerDim)
+        stepProc   =  Novlp + ovlp
+        call wLog("        delta_Proc = ")
+        call wLog(delta_Proc)
+        call wLog("        stepProc = ")
+        call wLog(stepProc)
 
-
-            !Size of the non-overlapping areas
-            ovlp      = MSH%overlap*MSH%corrL
-            ovlp_Tot  = ovlp*dble(MSH%procPerDim-1) +2.0D0*(ovlp-MSH%xStep) !We consider an overlap -1 in each extreme
-            where(MSH%procPerDim == 1) ovlp = 0.0D0
-            where(MSH%procPerDim == 1) ovlp_Tot = 0.0D0
-            where(ovlp_Tot <= 0.0D0) ovlp_Tot = 0.0D0
-            call wLog("        OVERLAP = ")
-            call wLog(ovlp)
-            call wLog("        OVERLAP TOTAL = ")
-            call wLog(ovlp_Tot)
-            Novlp_Tot = (MSH%xMaxGlob - MSH%xMinGlob) - ovlp_Tot
-            call wLog("        NON-OVERLAP TOTAL (rest) = ")
-            call wLog(Novlp_Tot)
-            where(Novlp_Tot < 0.0D0)
-                Novlp_Tot = 0.0D0
-            end where
-            call roundToMultiple(Novlp_Tot, MSH%xStep*dble(MSH%procPerDim), up=.true.)
-            call wLog("        NON-OVERLAP TOTAL (Round) = ")
-            call wLog(Novlp_Tot)
-            Novlp = Novlp_Tot/dble(MSH%procPerDim)
-
-            call wLog("        NON-OVERLAP TOTAL = ")
-            call wLog(Novlp_Tot)
-
-            !Redefining Global Extremes
-            delta = ovlp_Tot + Novlp_Tot
-            xMaxGlob = MSH%xMinGlob + delta
-            call wLog("        OUT MSH%xMinGlob (Round 2) = ")
-            call wLog(MSH%xMinGlob)
-            call wLog("        OUT MSH%xMaxGlob (Round 2) = ")
-            call wLog(MSH%xMaxGlob)
-
-            !Extent of a proc
-            delta_Proc = (Novlp_Tot)/dble(MSH%procPerDim) + 2.0D0*ovlp - 2*MSH%xStep
-            where(MSH%procPerDim == 1)  delta_Proc = (Novlp_Tot)/dble(MSH%procPerDim)
-            stepProc   =  Novlp + ovlp
-            call wLog("        delta_Proc = ")
-            call wLog(delta_Proc)
-            call wLog("        stepProc = ")
-            call wLog(stepProc)
-
-            procExtent = delta_Proc
-            procStart  = stepProc*MSH%coords
-
-        end if
+        procExtent = delta_Proc
+        procStart  = stepProc*dble(MSH%coords)
 
     end subroutine set_global_extremes
 
@@ -181,18 +156,19 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_local_bounding_box (MSH, procStart, procExtent, xMinBound, xMaxBound, &
+    subroutine set_local_bounding_box (MSH, xMinBound, xMaxBound, &
                                        xNStep, xNTotal, origin, validProc)
 
         implicit none
 
         type(MESH), intent(in) :: MSH
-        double precision, dimension(:), intent(in) :: procStart, procExtent
         !INPUT AND OUTPUT
         double precision, dimension(:), intent(out) :: xMinBound, xMaxBound
         integer         , dimension(:), intent(out) :: xNStep, origin
         integer(kind=8) , intent(out) :: xNTotal
         logical, intent(inout) :: validProc
+        double precision :: deltaLD
+        integer :: LD
 
         !FFTW
         integer(C_INTPTR_T) :: L, M, N
@@ -201,14 +177,22 @@ contains
         integer(C_INTPTR_T) :: alloc_local
         integer, dimension(MSH%nDim) :: xNStepGlob
 
-        xMinBound = procStart
-        xMaxBound = procStart + procExtent
-
+        xMinBound = MSH%procStart
+        xMaxBound = MSH%procStart + MSH%procExtent
         validProc = .true.
 
-        !GLOBAL FFT
         if(.not. MSH%independent) then
+            xMinBound = 0.0
+            xMaxBound = MSH%procExtent
+            !Slicing Last Dimension (LD)
+            LD      = MSH%nDim
+            deltaLD = MSH%procExtent(LD)/dble(MSH%nb_procs)
+            xMinBound(LD) = MSH%rang*deltaLD
+            xMaxBound(LD) = xMinBound(3) + deltaLD
 
+            validProc = .true.
+
+            !GLOBAL FFT
             if(MSH%method == FFT) then
 
                 xNStepGlob = find_xNStep(xMaxExt=(MSH%xMaxGlob - MSH%xMinGlob), xStep=MSH%xStep)
@@ -252,6 +236,7 @@ contains
             else
                 !Taking out the repeated point on the positive extreme
                 where(MSH%coords /= (MSH%procPerDim - 1)) xMaxBound = xMaxBound - MSH%xStep
+
             end if
         end if
 

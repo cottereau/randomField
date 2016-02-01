@@ -128,21 +128,47 @@ contains
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    function numb2String(number) result(stringTot)
+    function numb2String(number, nCharacters) result(stringTot)
 
         implicit none
 
         !INPUT
         integer, intent(in) :: number
+        integer, intent(in), optional :: nCharacters
 
         !OUTPUT
         character (len=30) :: stringTot;
 
         !LOCAL
         character (len=30)  :: nmbString
+        integer :: n, i
 
-        write(nmbString, fmt='(I8)') number
-        stringTot = adjustL(nmbString)
+        write(nmbString, fmt='(I30)') number
+        nmbString = adjustL(nmbString)
+
+        if(present(nCharacters)) then
+            !write(*,*) "nmbString = ", nmbString
+            n = len(trim(nmbString))
+            if(n > nCharacters) stop("Inside numb2String the number of characters is to little to represent tis number")
+
+            do i = 1, len(stringTot)
+                if(i<=nCharacters) then
+                    stringTot(i:i) = "0"
+                else
+                    stringTot(i:i) = " "
+                end if
+
+                !write(*,*) "stringTot = ", stringTot
+            end do
+
+            stringTot(nCharacters-n+1:nCharacters) = trim(nmbString)
+            stringTot = adjustL(stringTot)
+
+            !write(*,*) "nmbString = ", nmbString
+            !write(*,*) "stringTot = ", stringTot
+        else
+            stringTot = nmbString
+        end if
 
     end function
 

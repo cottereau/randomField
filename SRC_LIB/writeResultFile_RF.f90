@@ -46,18 +46,19 @@ contains
         integer, dimension(3) :: xSz, ySz
         integer, dimension(MSH%nDim) :: sizeSamples
         character(len=110) :: XMFName, HDF5Name, fileName2
-        integer :: error
+        integer :: error, i
 
 
         !!!!!!!!!!!!HDF5
-        !write(get_fileId(),*) "-> Writing h5 file in", trim(adjustL(folderPath))//"/h5";
+        call wLog("-> Writing h5 file in"//trim(adjustL(folderPath))//"/h5");
+        call wLog("         fileName: "//trim(adjustL(fileName)));
 
         select case (style)
             case(1)
-                fileName2 = "samples"
+                !fileName2 = "samples"
                 call write_pHDF5_Str(  MSH=MSH, &
                                        RDF=RDF, &
-                                       fileName=fileName2, &
+                                       fileName=fileName, &
                                        rang=rang, &
                                        folderPath=trim(adjustL(folderPath))//"/h5", &
                                        communicator=communicator, &
@@ -784,7 +785,7 @@ contains
         integer :: nb_procs
         character (len=12) :: numberStr, rangStr;
         integer(kind=8), dimension(MSH%nDim) :: total_xNStep
-        character(LEN=8) :: dsetname
+        character(LEN=8) :: dsetname = "samples"
         logical :: bool !for tests
         integer :: tmp_val
         !integer(HSIZE_T), dimension(:,:), allocatable :: localSlab
@@ -801,8 +802,8 @@ contains
         call wLog("folderPath       = ")
         call wLog(folderPath)
         !Creating file name
-        dsetname = trim(adjustL(fileName)) ! Dataset name
-        fileHDF5Name = trim(fileName)//"-ALLprocStruct.h5"
+        !dsetname = "samples" ! Dataset name
+        fileHDF5Name = trim(fileName)//".h5"
         fullPath     = string_join(folderPath,"/"//fileHDF5Name)
         if(present(HDF5FullPath)) HDF5FullPath = fullPath
         call wLog("' fileHDF5Name = ")
@@ -848,6 +849,7 @@ contains
 
             if(RDF%independent) then
 
+                call wLog("INDEPENDENT")
                 minPos = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep) - MSH%origin + 1
                 maxPos = find_xNStep(MSH%xMinGlob, MSH%xMaxBound , MSH%xStep) - MSH%origin + 1
                 countND = maxPos - minPos + 1
@@ -880,7 +882,7 @@ contains
                 call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
 
             else
-
+                    call wLog("GLOBAL")
                     countND = MSH%xNStep
 
                     call wLog("countND = ")

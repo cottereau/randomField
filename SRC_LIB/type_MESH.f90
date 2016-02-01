@@ -27,7 +27,8 @@ module type_MESH
         integer         , dimension(:), allocatable :: xNStep, procPerDim;
         integer         , dimension(:), allocatable :: neigh, coords;
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
-        double precision, dimension(:), allocatable :: xStep, corrL;
+        double precision, dimension(:), allocatable :: xStep, corrL
+        double precision, dimension(:), allocatable :: procStart, procExtent
         integer         , dimension(:), allocatable :: pointsPerCorrL;
         double precision, dimension(:), allocatable :: xMaxInt, xMinInt; !Non-overlapping area
         double precision, dimension(:), allocatable :: xMaxExt, xMinExt; !Interface with neighbours proc
@@ -83,6 +84,8 @@ module type_MESH
             allocate(MESH_a%pointsPerCorrL(nDim))
             allocate(MESH_a%corrL(nDim))
             allocate(MESH_a%origin(nDim))
+            allocate(MESH_a%procExtent(nDim))
+            allocate(MESH_a%procStart(nDim))
 
             MESH_a%log_ID   = IPT%log_ID
             MESH_a%nDim     = IPT%nDim_mesh
@@ -313,6 +316,8 @@ module type_MESH
             if (allocated(MESH_a%considerNeighbour)) deallocate(MESH_a%considerNeighbour)
             if (allocated(MESH_a%corrL))  deallocate(MESH_a%corrL)
             if (allocated(MESH_a%origin)) deallocate(MESH_a%origin)
+            if (allocated(MESH_a%procExtent)) deallocate(MESH_a%procExtent)
+            if (allocated(MESH_a%procStart)) deallocate(MESH_a%procStart)
 
 
             MESH_a%init = .false.

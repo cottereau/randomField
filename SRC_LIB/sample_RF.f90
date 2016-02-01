@@ -25,14 +25,18 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
 
-        subroutine single_realization(IPT, writeFiles, outputStyle, sameFolder)
+        subroutine single_realization(IPT, globMSH, writeFiles, outputStyle, sameFolder, nProcPerField, fieldComm, fieldNumber, h5fullPath)
 
             implicit none
             !INPUT
             type(IPT_RF), intent(in) :: IPT
+            type(MESH)  , intent(in) :: globMSH
             logical, intent(in) :: writeFiles
             logical, intent(in) :: sameFolder
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
+            integer              , intent(in) :: nProcPerField
+            integer, intent(in) :: fieldComm, fieldNumber
+
             !LOCAL
             type(RF)      :: RDF
             type(MESH)    :: MSH
@@ -47,53 +51,78 @@ contains
             integer :: i
             logical :: validProc
             integer :: newComm, newNbProcs, newRang
-            character(len=100) :: BBoxFileName = "trans_", BBoxPath
+            character(len=100) :: BBoxPartFileName, BBoxPath
+            character(len=*)   :: h5fullPath
             integer(kind=8) :: xNTotal
 
-            call wLog("-> validateProc")
-            call validateProc(validProc, IPT, newComm, newNbProcs, newRang)
 
-            if(validProc) then
+            validProc = .true.
+            call MPI_COMM_RANK(fieldComm, newRang, code)
+            call MPI_COMM_SIZE(fieldComm, newNbProcs, code)
 
-                call init_MESH(MSH, IPT, newComm, newNbProcs, newRang)
-                call init_RF(RDF, IPT, newComm, newNbProcs, newRang)
+            !call wLog("-> validateProc")
+            !call validateProc(validProc, IPT, newComm, newNbProcs, newRang)
 
-                call wLog("-> set_communications_topology")
-                call set_communications_topology(MSH)
-                call wLog("-> round_basic_inputs")
-                call round_basic_inputs(MSH, MSH%xStep, MSH%overlap)
-                call wLog("-> set_global_extremes")
-                call set_global_extremes(MSH, MSH%xMaxGlob, MSH%xMinGlob, procExtent, procStart)
-                call wLog("     procStart = ")
-                call wLog(procStart)
-                call wLog("     procExtent = ")
-                call wLog(procExtent)
-                call wLog("-> set_local_bounding_box")
-                call set_local_bounding_box(MSH, procStart, procExtent,&
+            !if(validProc) then
+
+                call init_MESH(MSH, IPT, fieldComm, newNbProcs, newRang)
+                call init_RF(RDF, IPT, fieldComm, newNbProcs, newRang)
+
+                !Copy from globMSH
+                MSH%xStep   = globMSH%xStep
+                MSH%overlap = globMSH%overlap
+                MSH%xMinGlob = 0.0D0
+                MSH%xMaxGlob = globMSH%procExtent
+                MSH%procExtent = globMSH%procExtent
+                MSH%independent = .false.
+                RDF%independent = .false.
+                MSH%procPerDim = 1
+                MSH%procPerDim(MSH%nDim) = newNbProcs
+                MSH%coords = 0
+                MSH%coords(MSH%nDim) = newRang
+
+                !call wLog("-> set_communications_topology")
+                !call set_communications_topology(MSH)
+                !call wLog("-> round_basic_inputs")
+                !call round_basic_inputs(MSH, MSH%xStep, MSH%overlap)
+                !call wLog("-> set_global_extremes")
+                !call set_global_extremes(MSH, MSH%xMaxGlob, MSH%xMinGlob, procExtent, procStart)
+                !call wLog("     procStart = ")
+                !call wLog(procStart)
+                !call wLog("     procExtent = ")
+                !call wLog(procExtent)
+                !call wLog("-> set_local_bounding_box")
+
+                call set_local_bounding_box(MSH,&
                                             MSH%xMinBound, MSH%xMaxBound, &
                                             MSH%xNStep, MSH%xNTotal, MSH%origin, validProc)
-                call set_validProcs_comm(validProc, newComm, MSH%rang, &
+
+                call set_validProcs_comm(validProc, fieldComm, MSH%rang, &
                                          MSH%validProc, RDF%validProc, MSH%comm, RDF%comm, &
                                          MSH%nb_procs, RDF%nb_procs, MSH%rang, RDF%rang)
 
                 if(validProc) then
                     !call MPI_BARRIER(MSH%comm, code)
 
-                    call wLog("-> set_overlap_geometry")
-                    call set_overlap_geometry (MSH, MSH%xMinInt, MSH%xMaxInt, MSH%xMinExt, MSH%xMaxExt, &
-                                               MSH%xMaxNeigh, MSH%xMinNeigh, MSH%xOrNeigh, MSH%nOvlpPoints)
+    !                    call wLog("-> set_overlap_geometry")
+    !                    call set_overlap_geometry (MSH, MSH%xMinInt, MSH%xMaxInt, MSH%xMinExt, MSH%xMaxExt, &
+    !                                               MSH%xMaxNeigh, MSH%xMinNeigh, MSH%xOrNeigh, MSH%nOvlpPoints)
 
 
                     call wLog("-> Initializing Random Seed")
 
-                    if(MSH%independent) then
-                        !Define independent seed in each proc
-                        call calculate_random_seed(RDF%seed, RDF%seedStart+RDF%rang)
-                        call init_random_seed(RDF%seed)
-                    else
+                    if(RDF%seedStart >= 0) then
+                        !Deterministic Seed
+                        RDF%seedStart = RDF%seedStart + fieldNumber
                         call calculate_random_seed(RDF%seed, RDF%seedStart)
-                        call init_random_seed(RDF%seed)
+                    else
+                        !Stochastic Seed
+                        if(RDF%rang == 0) call calculate_random_seed(RDF%seed, RDF%seedStart)
+                        call MPI_BCAST (RDF%seed, size(RDF%seed), MPI_INTEGER, 0, RDF%comm, code)
+                        RDF%seed = RDF%seed + fieldNumber
                     end if
+
+                    call init_random_seed(RDF%seed)
 
                     call wLog("      RDF%seed = ")
                     call wLog(RDF%seed)
@@ -110,9 +139,8 @@ contains
                     !if(i>50) i = 50
                     !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
 
-
                     call wLog("-> Setting folder path")
-                    single_path = string_vec_join([results_path,"/",results_folder_name])
+                    single_path = string_join_many(results_path,"/",results_folder_name)
                     call wLog("     single_path = "//trim(single_path))
 
                     !Discovering the total number of points in all procs
@@ -130,6 +158,12 @@ contains
                     call wLog(shape(RDF%randField))
                     call wLog("     Calculating sample")
                     call create_RF_Unstruct_Init (RDF, MSH)
+
+                    call wLog("      maxval(RDF%randField,1) = ")
+                    call wLog(maxval(RDF%randField,1))
+                    call wLog( "      minval(RDF%randField,1) = ")
+                    call wLog(minval(RDF%randField,1))
+
                     !call wLog("     Normalizing sample")
                     !xNTotal = product(nint((MSH%xMaxGlob-MSH%xMinGlob)/MSH%xStep) +1)
                     !call normalize_randField(RDF, xNTotal, RDF%randField)
@@ -161,6 +195,7 @@ contains
                         call wLog("outputStyle");
                         call wLog(outputStyle);
                         if(RDF%rang == 0) write(*,*) "-> Writing 'Bounding Box' XMF and hdf5 files"
+                        BBoxPartFileName = string_join_many(BBoxFileName,"_part",numb2String(fieldNumber,5))
 
                         if(outputStyle==1) then
                             call wLog("   (Parallel)");
@@ -168,14 +203,14 @@ contains
                             call wLog(minval(RDF%randField,1))
                             call wLog("maxval(RDF%randField,1) =")
                             call wLog(maxval(RDF%randField,1))
-                            call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, BBoxFileName, RDF%rang, single_path, &
-                                                            MSH%comm, ["_All"], [0], 0, style=outputStyle, meshMod = msh_AUTO, &
-                                                            HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
+                            call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, BBoxPartFileName, RDF%rang, single_path, &
+                                                   MSH%comm, ["_Part"], [fieldNumber], fieldNumber, style=outputStyle, meshMod = msh_AUTO, &
+                                                   HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
                         else
                             call wLog("   (Per Proc)");
-                            call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, BBoxFileName, RDF%rang, single_path, &
-                                                            MSH%comm, ["_All"], [RDF%rang], 0, style=outputStyle, meshMod = msh_AUTO, &
-                                                            HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
+                            call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, BBoxPartFileName, RDF%rang, single_path, &
+                                                   MSH%comm, ["_Part"], [RDF%rang], 0, style=outputStyle, meshMod = msh_AUTO, &
+                                                   HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
 
                         end if
 
@@ -184,28 +219,32 @@ contains
                         if(RDF%rang == 0) write(*,*) "Writing Files Time = ", all_t3 - all_t2
                         call wLog ("    Writing Files CPU Time (s)")
                         call wLog (all_t3 - all_t2)
+
+                        h5fullPath = BBoxPath
                     end if
-
-                    call write_generation_spec(MSH, RDF, single_path, "singleGen", &
-                                               [all_t1,all_t2,all_t3])
+!
+!                    call write_generation_spec(MSH, RDF, single_path, "singleGen", &
+!                                               [all_t1,all_t2,all_t3])
                 end if
-            end if
-
-            call MPI_BARRIER(IPT%comm, code) !Waiting for the generation to finish
-
-            if(IPT%unv .and. writeFiles .and. outputStyle == 1) then
-                if(IPT%rang == 0) write(*,*) "-> Writing 'UNV' XMF and hdf5 files for"
-                if(IPT%rang == 0) write(*,*) IPT%unv_path
-                allocate(UNV_randField(size(IPT%coordList,2),1))
-                if(RDF%rang == 0) write(*,*) "  Source:"
-                if(RDF%rang == 0) write(*,*) BBoxPath
-                call interpolateToUNV(BBoxPath, IPT%coordList, UNV_randField, IPT%rang)
-                call write_UNV_XMF_h5(UNV_randField, IPT%coordList, IPT%connectList, IPT%monotype, &
-                                      "UNV_", RDF%rang, single_path, &
-                                      MSH%comm, ["_All_UNV"], [RDF%rang], 0)
-            end if
-
-            if(IPT%rang == 0) call write_stat_input("./stat_input", BBoxPath)
+!            !end if
+!
+!            call MPI_BARRIER(IPT%comm, code) !Waiting for the generation to finish
+!
+!
+!
+!            if(IPT%unv .and. writeFiles .and. outputStyle == 1) then
+!                if(IPT%rang == 0) write(*,*) "-> Writing 'UNV' XMF and hdf5 files for"
+!                if(IPT%rang == 0) write(*,*) IPT%unv_path
+!                allocate(UNV_randField(size(IPT%coordList,2),1))
+!                if(RDF%rang == 0) write(*,*) "  Source:"
+!                if(RDF%rang == 0) write(*,*) BBoxPath
+!                call interpolateToUNV(BBoxPath, IPT%coordList, UNV_randField, IPT%rang)
+!                call write_UNV_XMF_h5(UNV_randField, IPT%coordList, IPT%connectList, IPT%monotype, &
+!                                      "UNV_", RDF%rang, single_path, &
+!                                      MSH%comm, ["_All_UNV"], [RDF%rang], 0)
+!            end if
+!
+!            if(IPT%rang == 0) call write_stat_input("./stat_input", BBoxPath)
 
             call finalize_MESH(MSH)
             call finalize_RF(RDF)

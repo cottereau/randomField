@@ -24,8 +24,8 @@ program main_RandomField
     integer :: nDim, Nmc;
     integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeFiles = .true.
-    logical :: writeDataSet = .false.
-    logical :: sameFolder = .false.
+    logical :: writeDataSet = .true.
+    logical :: sameFolder = .true.
     integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
 
 	!LOCAL VARIABLES
@@ -33,9 +33,28 @@ program main_RandomField
     integer            :: i, baseStep, nIter
     integer            :: rang
     character(len=30)  :: rangChar;
-    character(len=200) :: path, logFilePath
+    character(len=200) :: path, logFilePath, randFieldFilePath
     character(len=110), dimension(:)  , allocatable :: HDF5Name
+    character(len=100) :: BBoxPartFileName
     integer, dimension(:), allocatable :: seed
+
+    !DEVEL
+    integer, dimension(2) :: nFields = [2,1] !Number of independent fields in each dimension
+    integer               :: nProcPerField = 3, fieldNumber
+    logical, dimension(2) :: periods
+    integer(HSIZE_T), dimension(2) :: offset, locDims
+    double precision, dimension(2) :: procStart
+    type(MESH)            :: globMSH
+    type(RF)              :: globRDF
+    integer               :: group, groupComm, groupNbProcs, groupRang, groupMax
+    integer               :: code, nTotalProcs
+    logical               :: validProc
+
+    character(len=50) :: attr_Name, dset="samples"
+    integer :: hdferr
+    integer(HID_T) :: file_id, attr_id, space_id, dset_id, mem_id
+    integer(HSIZE_T), dimension(2) :: locShape
+    integer(HSIZE_T), dimension(2) :: zero2D
 
     type(IPT_RF)  :: IPT
 
@@ -109,10 +128,171 @@ program main_RandomField
     !Initial allocation---------------------------------------------
     call allocate_init()
 
-    !SINGLE REALIZATION
-    if(rang == 0) write(*,*)  "-> Single realization"
-    call wLog("-> Single realization")
-    call single_realization(IPT, writeFiles, outputStyle, sameFolder)
+    !DIVISING FIELD
+    periods(:) = .false.
+    globMSH%nDim = 2;
+    fieldNumber = 1;
+
+    call init_MESH(globMSH, IPT, IPT%comm, product(nFields), IPT%rang)
+
+    call wLog("-> set_procPerDim")
+    !call set_procPerDim (globMSH, globMSH%procPerDim)
+    globMSH%procPerDim  = nFields
+    globMSH%independent = .true.
+    call wLog("     globMSH%procPerDim")
+    call wLog(globMSH%procPerDim)
+    call wLog("-> round_basic_inputs")
+    call round_basic_inputs(globMSH, globMSH%xStep, globMSH%overlap)
+    call wLog("-> set_global_extremes")
+    call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, procStart)
+    call wLog("     globMSH%procExtent = ")
+    call wLog(globMSH%procExtent)
+
+    !DEFINING GROUPS AND COMMUNICATORS
+    group    = IPT%rang/nProcPerField
+    groupMax = IPT%nb_procs/nProcPerField
+
+    call MPI_COMM_SPLIT(IPT%comm, group, IPT%rang, groupComm, code)
+    call MPI_COMM_SIZE(groupComm, groupNbProcs, code)
+    call MPI_COMM_RANK(groupComm, groupRang, code)
+
+    call wLog("     groupMax = ")
+    call wLog(groupMax)
+    call wLog("     group = ")
+    call wLog(group)
+    call wLog("     groupComm = ")
+    call wLog(groupComm)
+    call wLog("     groupNbProcs = ")
+    call wLog(groupNbProcs)
+    call wLog("     groupRang = ")
+    call wLog(groupRang)
+
+    !Making all realizations
+    IPT%nb_procs = groupNbProcs
+    allocate(HDF5Name(product(nFields)))
+    do i = 1, product(nFields)
+        if(rang == 0) write(*,*)  "-> Single realization"
+        call wLog("-> Single realization")
+        fieldNumber = i;
+        if(mod(i, groupMax) == group) then
+            call wLog("Proc")
+            call wLog(rang)
+            call wLog("dealing with field")
+            call wLog(fieldNumber)
+            call wLog("     Trying communication")
+            call MPI_BARRIER(groupComm, code)
+            call single_realization(IPT, globMSH, writeFiles, outputStyle, sameFolder, &
+                                    nProcPerField, groupComm, fieldNumber, HDF5Name(i))
+
+        end if
+    end do
+
+    call finalize_MESH(globMSH)
+    call wLog("     Waiting for the other procs")
+    call MPI_BARRIER(groupComm, code)
+
+    !Gluing fields together
+    call wLog("     PUTTING FIELDS TOGETHER")
+    call MPI_COMM_SIZE(IPT%comm, IPT%nb_procs, code)
+    call MPI_COMM_RANK(IPT%comm, IPT%rang, code)
+
+    if(product(nFields) > IPT%nb_procs) stop("Too little processors for this number of fields")
+
+    group = 0
+    if(IPT%rang < product(nFields)) then
+        group = 1
+    end if
+    call wLog("     group =")
+    call wLog(group)
+
+    call MPI_COMM_SPLIT(IPT%comm, group, IPT%rang, groupComm, code)
+
+    IPT%comm       = groupComm
+    IPT%nb_procs   = product(nFields)
+    IPT%procPerDim = nFields
+
+    if(group == 1) then
+
+        call init_MESH(globMSH, IPT, IPT%comm, IPT%nb_procs, IPT%rang)
+        call init_RF(globRDF, IPT, IPT%comm, IPT%nb_procs, IPT%rang)
+        globMSH%procPerDim  = nFields
+        globMSH%independent = .true.
+        call wLog("     globMSH%procPerDim")
+        call wLog(globMSH%procPerDim)
+        call wLog("-> round_basic_inputs")
+        call round_basic_inputs(globMSH, globMSH%xStep, globMSH%overlap)
+        call wLog("-> set_global_extremes")
+        call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, procStart)
+        call wLog("     globMSH%procExtent = ")
+        call wLog(globMSH%procExtent)
+
+        call wLog("-> set_communications_topology")
+        call set_communications_topology(globMSH)
+        call wLog("-> round_basic_inputs")
+        call round_basic_inputs(globMSH, globMSH%xStep, globMSH%overlap)
+        call wLog("-> set_global_extremes")
+        call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, globMSH%procStart)
+        call wLog("     globMSH%procStart = ")
+        call wLog(globMSH%procStart)
+        call wLog("     globMSH%procExtent = ")
+        call wLog(globMSH%procExtent)
+        call wLog("-> set_local_bounding_box")
+        call set_local_bounding_box(globMSH,&
+                                    globMSH%xMinBound, globMSH%xMaxBound, &
+                                    globMSH%xNStep, globMSH%xNTotal, globMSH%origin, validProc)
+
+        !call set_validProcs_comm(validProc, groupComm, globMSH%rang, &
+        !                         globMSH%validProc, globRDF%validProc, globMSH%comm, globRDF%comm, &
+        !                         globMSH%nb_procs, globRDF%nb_procs, globMSH%rang, globRDF%rang)
+
+        call wLog("-> Setting xPoints")
+        call set_xPoints(globMSH, globRDF, globRDF%xPoints_Local)
+        call wLog("      maxval(RDF%xPoints,2) = ")
+        call wLog(maxval(globRDF%xPoints,2))
+        call wLog( "      minval(RDF%xPoints,2) = ")
+        call wLog(minval(globRDF%xPoints,2))
+
+        call wLog("-> Reading Random Field")
+        BBoxPartFileName = string_join_many(BBoxFileName,"_part",numb2String(IPT%rang+1,5))
+        randFieldFilePath = string_join_many(single_path,"/h5/",BBoxPartFileName,".h5")
+        call wLog("     Reading on:")
+        call wLog(randFieldFilePath)
+        call wLog("     Allocating random field")
+        call allocate_randField(globRDF, globMSH%xNStep, globRDF%randField_Local)
+        call wLog("     shape(globRDF%randField_Local)")
+        call wLog(shape(globRDF%randField_Local))
+        call wLog("     Read dataset")
+        !MATRIX
+        call h5open_f(hdferr) ! Initialize FORTRAN interface.
+        call h5fopen_f(trim(randFieldFilePath), H5F_ACC_RDONLY_F, file_id, hdferr) !Open File
+        if(hdferr /= 0) stop("ERROR OPENING FILE inside read_RF_h5_File_Table")
+        call h5dopen_f(file_id, trim(dset), dset_id, hdferr)! Open Dataset
+        locShape = shape(globRDF%randField_Local)
+        call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, globRDF%randField_Local, locShape,  hdferr)
+        call h5dclose_f(dset_id, hdferr) !Close Dataset
+        call h5fclose_f(file_id, hdferr) ! Close the file.
+        call h5close_f(hdferr) ! Close FORTRAN interface.
+!
+!        if(RDF%nb_procs > 1) then
+!            call wLog("")
+!            call wLog("GENERATING OVERLAP")
+!            call wLog("-------------------------------")
+!            if(RDF%rang == 0) write(*,*)"GENERATING OVERLAP"
+!            if(RDF%rang == 0) write(*,*) "-------------------------------"
+!            call wLog("")
+!
+!            !RDF%randField = 1.0 ! For Tests
+!            if(RDF%rang == 0) write(*,*) "    ->Applying Weighting Functions"
+!            call wLog("    ->Applying Weighting Functions on Field")
+!            call applyWeightingFunctions_OnMatrix(globRDF, globMSH, partitionType)
+!            if(RDF%rang == 0) write(*,*) "    ->addNeighboursFields"
+!            call wLog("    ->addNeighboursFields")
+!            call addNeighboursFields(globRDF, globMSH)
+!        end if
+
+
+    end if
+
 
 	!Deallocating
 	call deallocate_all()
@@ -176,7 +356,7 @@ program main_RandomField
             call date_and_time(strings(1), strings(2), strings(3), date_time)
             results_folder_name = strings(1)(3:8)//"_"//strings(2)(1:6)//"_res"
 
-            if(sameFolder) results_folder_name = "res" !ONLY FOR TESTS
+            if(sameFolder) results_folder_name = "res"
 
             call MPI_BARRIER (comm ,code) !Necessary because each proc can have a different time
             call MPI_BCAST (results_folder_name, 100, MPI_CHARACTER, 0, comm, code)
@@ -184,15 +364,6 @@ program main_RandomField
             log_folder_name     = trim(adjustL(results_folder_name))//"/log"
             if(sameFolder) log_folder_name     = ".."
 
-            !results folder creation
-            !call create_folder(results_path, ".", rang, comm, compiler)
-
-            !results_date_time folder creation
-            !if(sameFolder) call delete_folder(results_folder_name, results_path, rang, comm, compiler)
-            !call create_folder(results_folder_name, results_path, rang, comm, compiler)
-
-            !log folder creation
-            !if(sameFolder) call delete_folder(log_folder_name, results_path, rang, comm, compiler)
             call create_folder(log_folder_name, results_path, rang, comm, compiler)
 
             !create xmf and h5 folders
@@ -232,6 +403,8 @@ program main_RandomField
         subroutine deallocate_all()
 
             call finalize_IPT_RF(IPT)
+            call finalize_MESH(globMSH)
+            call finalize_RF(globRDF)
 
         end subroutine deallocate_all
 

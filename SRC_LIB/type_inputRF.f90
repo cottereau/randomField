@@ -19,6 +19,7 @@ module type_inputRF
         integer :: meshMod
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         integer         , dimension(:), allocatable :: pointsPerCorrL;
+        integer         , dimension(:), allocatable :: procPerDim;
         !UNV
         double precision, dimension(:,:), allocatable :: coordList
         integer         , dimension(:,:), allocatable :: connectList
@@ -58,6 +59,7 @@ contains
             if(.not. allocated(IPT%pointsPerCorrL)) allocate(IPT%pointsPerCorrL(nDim))
             if(.not. allocated(IPT%corrL)) allocate(IPT%corrL(nDim))
             if(.not. allocated(IPT%overlap)) allocate(IPT%overlap(nDim))
+            if(.not. allocated(IPT%procPerDim)) allocate(IPT%procPerDim(nDim))
 
             IPT%log_ID = log_file_RF_ID
             IPT%rang   = rang
@@ -86,6 +88,7 @@ contains
             if(allocated(IPT%pointsPerCorrL)) deallocate(IPT%pointsPerCorrL)
             if(allocated(IPT%corrL)) deallocate(IPT%corrL)
             if(allocated(IPT%overlap)) deallocate(IPT%overlap)
+            if(allocated(IPT%procPerDim)) deallocate(IPT%procPerDim)
 
         end subroutine finalize_IPT_RF
 

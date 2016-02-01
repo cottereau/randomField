@@ -9,6 +9,7 @@ module common_variables_RF
 	character(len=20) , parameter :: Nmc_folder_name = "Nmc"
 	character(len=20) , parameter :: corrL_folder_name = "corrL"
 	character(len=200) :: single_path
+	character(len=200) :: BBoxFileName = "BBox"
 
 
 end module common_variables_RF
