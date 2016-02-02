@@ -887,7 +887,7 @@ contains
 
                     call wLog("countND = ")
                     call wLog(int(countND))
-                    write(*,*) "countND = ", countND
+                    !write(*,*) "countND = ", countND
                     call h5screate_simple_f(rank, countND, memspace, error)  !NEW memspace
 
                     !CHOOSING SPACE IN FILE FOR THIS PROC
@@ -896,7 +896,7 @@ contains
                     offset = MSH%origin - 1!Lines Offset to start writing
                     call wLog("offset = ")
                     call wLog(int(offset))
-                    write(*,*) "offset = ", offset
+                    !write(*,*) "offset = ", offset
                     call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
 
             end if

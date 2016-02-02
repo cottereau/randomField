@@ -38,6 +38,7 @@ module type_inputRF
         logical :: independent
         integer :: nProcPerField
         integer, dimension(:), allocatable :: nFields
+        integer :: localizationLevel
 
     end type IPT_RF
 
@@ -188,16 +189,20 @@ contains
             call read_DataTable(dataTable, "method"     , IPT%method)
             call read_DataTable(dataTable, "seedStart"  , IPT%seedStart)
             call read_DataTable(dataTable, "corrL"      , IPT%corrL)
-            call read_DataTable(dataTable, "independent", independent)
+            !call read_DataTable(dataTable, "independent", independent)
             call read_DataTable(dataTable, "nFields"    , IPT%nFields)
             call read_DataTable(dataTable, "nProcPerField", IPT%nProcPerField)
+            call read_DataTable(dataTable, "localizationLevel", IPT%localizationLevel)
+            call read_DataTable(dataTable, "overlap", IPT%overlap)
 
-            if(independent == 1) then
-                IPT%independent = .true.
-                call read_DataTable(dataTable, "overlap", IPT%overlap)
-            else
-                IPT%independent = .false.
-            end if
+            IPT%independent = .true.
+
+!            if(independent == 1) then
+!                IPT%independent = .true.
+!                call read_DataTable(dataTable, "overlap", IPT%overlap)
+!            else
+!                IPT%independent = .false.
+!            end if
 
             deallocate(dataTable)
 
