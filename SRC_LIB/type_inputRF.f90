@@ -101,6 +101,72 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
+        subroutine copy_IPT_RF(IPT, IPT_orig)
+
+            implicit none
+
+            !INPUT
+            type(IPT_RF), intent(in)  :: IPT_orig
+            !OUTPUT
+            type(IPT_RF), intent(inout)  :: IPT
+
+            IPT%xMaxGlob = IPT_orig%xMaxGlob
+            IPT%xMinGlob = IPT_orig%xMinGlob
+            IPT%pointsPerCorrL = IPT_orig%pointsPerCorrL
+            IPT%corrL   = IPT_orig%corrL
+            IPT%overlap = IPT_orig%overlap
+            IPT%procPerDim = IPT_orig%procPerDim
+            IPT%nFields = IPT_orig%nFields
+            IPT%log_ID = IPT_orig%log_ID
+            IPT%rang   = IPT_orig%rang
+            IPT%init   = IPT_orig%init
+            IPT%overlap = IPT_orig%overlap
+            IPT%comm = IPT_orig%comm
+            IPT%nb_procs = IPT_orig%nb_procs
+            IPT%writeDataSet = IPT_orig%writeDataSet
+
+            IPT%nDim_mesh = IPT_orig%nDim_mesh
+            IPT%meshMod = IPT_orig%meshMod
+
+            !UNV
+            if(allocated(IPT_orig%coordList)) then
+                if(.not. allocated(IPT%coordList)) then
+                    allocate(IPT%coordList(size(IPT_orig%connectList,1), size(IPT_orig%connectList,2)))
+                end if
+                IPT%coordList = IPT_orig%coordList
+            end if
+            if(allocated(IPT_orig%connectList)) then
+                if(.not. allocated(IPT%connectList)) then
+                    allocate(IPT%connectList(size(IPT_orig%connectList,1), size(IPT_orig%connectList,2)))
+                end if
+                IPT%connectList = IPT_orig%connectList
+            end if
+
+            IPT%monotype = IPT_orig%monotype
+            IPT%unv = IPT_orig%unv
+            IPT%unv_path = IPT_orig%unv_path
+
+            !GENERATION
+            IPT%nDim_gen = IPT_orig%nDim_gen
+            IPT%fieldAvg = IPT_orig%fieldAvg
+            IPT%fieldVar = IPT_orig%fieldVar
+            IPT%corrL = IPT_orig%corrL
+            IPT%overlap = IPT_orig%overlap
+            IPT%corrMod = IPT_orig%corrMod
+            IPT%method = IPT_orig%method
+            IPT%Nmc = IPT_orig%Nmc
+            IPT%seedStart = IPT_orig%seedStart
+            IPT%independent = IPT_orig%independent
+            IPT%nProcPerField = IPT_orig%nProcPerField
+            IPT%nFields = IPT_orig%nFields
+            IPT%localizationLevel = IPT_orig%localizationLevel
+
+        end subroutine copy_IPT_RF
+
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
         subroutine read_mesh_input(path, IPT)
 
             implicit none

@@ -100,8 +100,7 @@ module type_MESH
             MESH_a%pointsPerCorrL = IPT%pointsPerCorrL
             MESH_a%overlap(:)     = IPT%overlap
             MESH_a%independent    = IPT%independent
-
-
+            MESH_a%procPerDim = IPT%nFields
 
             MESH_a%xMaxBound     = -1
             MESH_a%xMinBound     = -1

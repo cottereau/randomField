@@ -45,7 +45,7 @@ program main_RandomField
     integer               :: group, groupComm, groupMax
     integer               :: code, nTotalProcs
     logical               :: validProc
-    double precision, dimension(:), allocatable :: stepProc
+    double precision, dimension(:), allocatable :: stepProc, procExtent, overlap, meshStep
     double precision, dimension(:,:), allocatable :: subdivisionCoords
     type(IPT_RF)  :: IPT
 
@@ -129,42 +129,45 @@ program main_RandomField
     if(rang == 0) write(*,*) "-> DIVIDING----------------------------------------"
     call wLog("-> DIVIDING----------------------------------------")
     allocate(stepProc(IPT%nDim_mesh))
-    allocate(subdivisionCoords(IPT%nDim_mesh, product(IPT%nFields)))
-    call build_subdivisions(IPT, globMSH, groupMax, group, groupComm, stepProc)
-    call setGrid(subdivisionCoords, globMSH%xMinGlob, stepProc, IPT%nFields, inverse=.true.)
-    if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
+    allocate(procExtent(IPT%nDim_mesh))
+    allocate(overlap(IPT%nDim_mesh))
+    allocate(subdivisionCoords(IPT%nDim_mesh, product(IPT%localizationLevel*IPT%nFields)))
+    call build_subdivisions(IPT, globMSH, groupMax, group, groupComm, stepProc, procExtent, overlap)
+    call setGrid(subdivisionCoords, globMSH%xMinGlob, stepProc, IPT%localizationLevel*IPT%nFields, inverse=.true.)
+    !if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
 
 
     !Making all realizations
-    if(rang == 0) write(*,*) " "
-    if(rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
-    call wLog("-> SAMPLING----------------------------------------")
-    allocate(HDF5Name(product(IPT%nFields)))
-    do i = 1, product(IPT%nFields)
-        if(rang == 0) write(*,*) " "
-        if(rang == 0) write(*,*) " "
-        if(rang == 0) write(*,*)  "-> Making Field ", i
-        call wLog("-> Making Field")
-        fieldNumber = i;
-        if(mod(i, groupMax) == group) then
-            !call wLog("Proc")
-            !call wLog(rang)
-            !call wLog("dealing with field")
-            !call wLog(fieldNumber)
-            !call wLog("     Trying communication")
-            call MPI_BARRIER(groupComm, code)
-            call single_realization(IPT, globMSH, writeFiles, outputStyle, sameFolder, &
-                                    groupComm, fieldNumber, subdivisionCoords(:,i), HDF5Name(i))
+!    if(rang == 0) write(*,*) " "
+!    if(rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
+!    call wLog("-> SAMPLING----------------------------------------")
+!    allocate(HDF5Name(product(IPT%nFields*IPT%localizationLevel)))
+!    do i = 1, product(IPT%nFields*IPT%localizationLevel)
+!        if(rang == 0) write(*,*) " "
+!        if(rang == 0) write(*,*) " "
+!        if(rang == 0) write(*,*)  "-> Making Field ", i
+!        call wLog("-> Making Field")
+!        fieldNumber = i;
+!        if(mod(i, groupMax) == group) then
+!            !call wLog("Proc")
+!            !call wLog(rang)
+!            !call wLog("dealing with field")
+!            !call wLog(fieldNumber)
+!            !call wLog("     Trying communication")
+!            call MPI_BARRIER(groupComm, code)
+!            call single_realization(IPT, globMSH, writeFiles, outputStyle, sameFolder, &
+!                                    groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
+!
+!        end if
+!    end do
 
-        end if
-    end do
     call finalize_MESH(globMSH)
 
     !Combining realizations (localization)
     if(rang == 0) write(*,*) " "
     if(rang == 0) write(*,*) "-> COMBINING----------------------------------------"
     call wLog("-> COMBINING----------------------------------------")
-    call combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder)
+    call combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, stepProc, procExtent, overlap)
 
 
 	!Deallocating
@@ -240,6 +243,10 @@ program main_RandomField
 
             call create_folder(log_folder_name, results_path, rang, comm, compiler)
 
+            call wLog("-> Setting folder path")
+            single_path = string_join_many(results_path,"/",results_folder_name)
+            call wLog("     single_path = "//trim(single_path))
+
             !create xmf and h5 folders
             if(writeFiles) then
                 path = string_vec_join([results_path,"/",results_folder_name])
@@ -280,6 +287,7 @@ program main_RandomField
             !if(allocated(locDims)) deallocate(locDims)
             !if(allocated(procStart)) deallocate(procStart)
             !if(allocated(periods)) deallocate(periods)
+            if(allocated(overlap)) deallocate(overlap)
             if(allocated(HDF5Name)) deallocate(HDF5Name)
             if(allocated(stepProc)) deallocate(stepProc)
             if(allocated(subdivisionCoords)) deallocate(subdivisionCoords)

@@ -25,7 +25,7 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
 
-        subroutine build_subdivisions(IPT, globMSH, groupMax, group, groupComm, stepProc)
+        subroutine build_subdivisions(IPT, globMSH, groupMax, group, groupComm, stepProc, procExtent, overlap)
 
             implicit none
             !INPUT
@@ -34,6 +34,8 @@ contains
             type(MESH), intent(out)  :: globMSH
             integer, intent(out) :: group, groupMax, groupComm
             double precision, dimension(:), intent(out) :: stepProc
+            double precision, dimension(:), intent(out) :: procExtent
+            double precision, dimension(:), intent(out) :: overlap
             !LOCAL
             integer :: code
 
@@ -41,18 +43,21 @@ contains
 
             call init_MESH(globMSH, IPT, IPT%comm, product(IPT%nFields), IPT%rang)
 
-            call wLog("-> set_procPerDim")
+            call wLog("->  set_procPerDim")
             globMSH%procPerDim  = IPT%nFields
             globMSH%independent = .true.
             call wLog("     globMSH%procPerDim")
             call wLog(globMSH%procPerDim)
             call wLog("-> round_basic_inputs")
             call round_basic_inputs(globMSH, globMSH%xStep, globMSH%overlap)
+            overlap = globMSH%overlap
             call wLog("-> set_global_extremes")
             call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, &
                                      globMSH%procStart, stepProc)
             call wLog("     globMSH%procExtent = ")
             call wLog(globMSH%procExtent)
+
+            procExtent = globMSH%procExtent
 
             !DEFINING GROUPS AND COMMUNICATORS
             group    = IPT%rang/IPT%nProcPerField
@@ -75,7 +80,7 @@ contains
         !---------------------------------------------------------------------------------
 
         subroutine single_realization(IPT, globMSH, writeFiles, outputStyle, sameFolder, &
-                                      fieldComm, fieldNumber, subdivisionStart, h5fullPath)
+                                      fieldComm, fieldNumber, subdivisionStart, stepProc, h5fullPath)
 
             implicit none
             !INPUT
@@ -85,7 +90,7 @@ contains
             logical, intent(in) :: sameFolder
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
             integer, intent(in) :: fieldComm, fieldNumber
-            double precision, dimension(:), intent(in) :: subdivisionStart
+            double precision, dimension(:), intent(in) :: subdivisionStart, stepProc
 
             !LOCAL
             type(RF)      :: RDF
@@ -104,6 +109,7 @@ contains
             character(len=100) :: BBoxPartFileName, BBoxPath
             character(len=*)   :: h5fullPath
             integer(kind=8) :: xNTotal
+            integer, dimension(IPT%nDim_gen) :: globCoord
 
 
             validProc = .true.
@@ -126,6 +132,9 @@ contains
             MSH%procPerDim(MSH%nDim) = newNbProcs
             MSH%coords = 0
             MSH%coords(MSH%nDim) = newRang
+            globCoord = nint((subdivisionStart - globMSH%xMinGlob)/stepProc)
+            call wLog("  globCoord = ")
+            call wLog(globCoord)
 
             call wLog("-> set_local_bounding_box")
 
@@ -168,10 +177,6 @@ contains
                 !i = size(RDF%xPoints,2)
                 !if(i>50) i = 50
                 !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
-
-                call wLog("-> Setting folder path")
-                single_path = string_join_many(results_path,"/",results_folder_name)
-                call wLog("     single_path = "//trim(single_path))
 
                 !Discovering the total number of points in all procs
                 call MPI_ALLREDUCE (MSH%xNTotal, all_xNTotal,1,MPI_INTEGER, &
@@ -225,7 +230,10 @@ contains
                     call wLog("outputStyle");
                     call wLog(outputStyle);
                     if(RDF%rang == 0) write(*,*) "-> Writing 'Bounding Box' XMF and hdf5 files"
-                    BBoxPartFileName = string_join_many(BBoxFileName,"_part",numb2String(fieldNumber,5))
+                    BBoxPartFileName = string_join_many(BBoxFileName,"_L00")
+                    do i = 1, size(globCoord)
+                        BBoxPartFileName = string_join_many(BBoxPartFileName,"_",numb2String(globCoord(i),3))
+                    end do
 
                     if(outputStyle==1) then
                         call wLog("   (Parallel)");
@@ -285,13 +293,15 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder)
+        subroutine combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, &
+                                        stepProc, procExtent, overlap)
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
             logical, intent(in) :: writeFiles
             logical, intent(in) :: sameFolder
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
+            double precision, dimension(:), intent(in) :: stepProc, procExtent, overlap
 
             !LOCAL
             type(MESH) :: globMSH
@@ -302,18 +312,32 @@ contains
             character(len=200) :: randFieldFilePath
             character(len=100) :: BBoxPartFileName
             logical :: validProc
+            integer :: partitionType =1
+            integer :: locLevel, locIter
+            integer(HSIZE_T), dimension(2) :: locShape
+            type(IPT_RF) :: newIPT
+            double precision, dimension(IPT%nDim_mesh, product(IPT%nFields)) :: subdivisionCoords
+            double precision, dimension(:, :), allocatable :: offsetCoords
+            double precision, dimension(IPT%nDim_mesh) :: stepProc_level, procExtent_level
+            integer, dimension(IPT%nDim_mesh) :: procCoord, locStep
+            integer :: i
+
             !H5 LOCAL
             character(len=50) :: attr_Name, dset="samples"
             integer :: hdferr
             integer(HID_T) :: file_id, attr_id, space_id, dset_id, mem_id
-            integer(HSIZE_T), dimension(2) :: locShape
-            integer(HSIZE_T), dimension(2) :: zero2D
-            integer :: partitionType =1
+            double precision, dimension(IPT%nDim_mesh) :: ones
+            !integer(HSIZE_T), dimension(2) :: locShape
+            !integer(HSIZE_T), dimension(2) :: zero2D
 
             !Gluing fields together
             call wLog("     COMBINING SUBDIVISIONS")
             call wLog("     Waiting for the other procs")
             call MPI_BARRIER(IPT%comm, code)
+
+            ones = 1.0D0
+            call setGrid(subdivisionCoords, 0*ones, ones, IPT%nFields, inverse=.true.)
+            if (IPT%rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
 
             !all MPI_COMM_SIZE(IPT%comm, IPT%nb_procs, code)
             !call MPI_COMM_RANK(IPT%comm, IPT%rang, code)
@@ -321,10 +345,13 @@ contains
 
             if(product(IPT%nFields) > IPT%nb_procs) stop("Too little processors for this number of fields")
 
+            if(IPT%rang == 0) write(*,*)  "Dividing comunicator"
             group = 0
             if(IPT%rang < product(IPT%nFields)) then
                 group = 1
             end if
+            call wLog("     IPT%rang =")
+            call wLog(IPT%rang)
             call wLog("     group =")
             call wLog(group)
 
@@ -332,113 +359,203 @@ contains
 
             if(group == 1) then
 
-                call init_MESH(globMSH, IPT, groupComm, product(IPT%nFields), IPT%rang)
-                call init_RF(globRDF, IPT, groupComm, product(IPT%nFields), IPT%rang)
-                globMSH%procPerDim  = IPT%nFields
-                globMSH%independent = .true.
-                call wLog("     globMSH%procPerDim")
-                call wLog(globMSH%procPerDim)
-                call wLog("-> round_basic_inputs")
-                call round_basic_inputs(globMSH, globMSH%xStep, globMSH%overlap)
-                call wLog("-> set_global_extremes")
-                call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, globMSH%procStart)
-                call wLog("     globMSH%procExtent = ")
-                call wLog(globMSH%procExtent)
-                call wLog("-> set_communications_topology")
-                call set_communications_topology(globMSH)
-                call wLog("-> round_basic_inputs")
-                call round_basic_inputs(globMSH, globMSH%xStep, globMSH%overlap)
-                call wLog("-> set_global_extremes")
-                call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, globMSH%procStart)
-                call wLog("     globMSH%procStart = ")
-                call wLog(globMSH%procStart)
-                call wLog("     globMSH%procExtent = ")
-                call wLog(globMSH%procExtent)
-                call wLog("-> set_local_bounding_box")
-                call set_local_bounding_box(globMSH,&
-                                            globMSH%xMinBound, globMSH%xMaxBound, &
-                                            globMSH%xNStep, globMSH%xNTotal, globMSH%origin, validProc)
-                call wLog("-> set_overlap_geometry")
-                call set_overlap_geometry (globMSH, globMSH%xMinInt, globMSH%xMaxInt, globMSH%xMinExt, globMSH%xMaxExt, &
-                                           globMSH%xMaxNeigh, globMSH%xMinNeigh, globMSH%xOrNeigh, globMSH%nOvlpPoints)
+                call init_IPT_RF(newIPT, IPT%nDim_mesh, IPT%log_ID, IPT%rang)
+                call copy_IPT_RF(newIPT, IPT)
 
-                call wLog("-> Setting xPoints")
-                call set_xPoints(globMSH, globRDF, globRDF%xPoints_Local)
-                call wLog("      maxval(RDF%xPoints,2) = ")
-                call wLog(maxval(globRDF%xPoints,2))
-                call wLog( "      minval(RDF%xPoints,2) = ")
-                call wLog(minval(globRDF%xPoints,2))
+                newIPT%overlap = overlap
 
-                call wLog("-> Reading Random Field")
-                BBoxPartFileName = string_join_many(BBoxFileName,"_part",numb2String(IPT%rang+1,5))
-                randFieldFilePath = string_join_many(single_path,"/h5/",BBoxPartFileName,".h5")
-                call wLog("     Reading on:")
-                call wLog(randFieldFilePath)
-                call wLog("     Allocating random field")
-                call allocate_randField(globRDF, globMSH%xNStep, globRDF%randField_Local)
-                call wLog("     shape(globRDF%randField_Local)")
-                call wLog(shape(globRDF%randField_Local))
-                call wLog("     Read dataset")
-                !HDF5
-                call h5open_f(hdferr) ! Initialize FORTRAN interface.
-                call h5fopen_f(trim(randFieldFilePath), H5F_ACC_RDONLY_F, file_id, hdferr) !Open File
-                if(hdferr /= 0) stop("ERROR OPENING FILE inside read_RF_h5_File_Table")
-                call h5dopen_f(file_id, trim(dset), dset_id, hdferr)! Open Dataset
-                locShape = shape(globRDF%randField_Local)
-                call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, globRDF%randField_Local, locShape,  hdferr)
-                call h5dclose_f(dset_id, hdferr) !Close Dataset
-                call h5fclose_f(file_id, hdferr) ! Close the file.
-                call h5close_f(hdferr) ! Close FORTRAN interface.
+                do locLevel = 1, IPT%localizationLevel
+                !do locLevel = 1, 1 ! FOR TESTS
+                    if(IPT%rang == 0) write(*,*)  "  locLevel = ", locLevel, "-------------"
+                    call wLog("     locLevel -----------------------------------")
+                    call wLog(locLevel)
 
-                !call DispCarvalhol(globRDF%randField_Local, "globRDF%randField_Local")
+                    if (IPT%rang == 0) write(*,*) "locLevel = ", locLevel
+                    if (IPT%rang == 0) write(*,*) " "
 
-                if(globRDF%nb_procs > 1) then
-                    call wLog("")
-                    call wLog("GENERATING OVERLAP")
-                    call wLog("-------------------------------")
-                    if(globRDF%rang == 0) write(*,*)"GENERATING OVERLAP"
-                    if(globRDF%rang == 0) write(*,*) "-------------------------------"
-                    call wLog("")
+                    if(allocated(offsetCoords)) deallocate(offsetCoords)
+                    locStep = IPT%nFields**(IPT%localizationLevel-locLevel)
+                    allocate(offsetCoords(IPT%nDim_mesh, product(locStep)))
+                    call setGrid(offsetCoords, 0*ones, dble(IPT%nFields), locStep, inverse=.true.)
 
-                    if(globRDF%rang == 0) write(*,*) "    ->Applying Weighting Functions"
-                    call wLog("    ->Applying Weighting Functions on Field")
-                    call applyWeightingFunctions_OnMatrix(globRDF, globMSH, partitionType)
-                    if(globRDF%rang == 0) write(*,*) "    ->addNeighboursFields"
-                    call wLog("    ->addNeighboursFields")
-                    call addNeighboursFields(globRDF, globMSH)
-                end if
 
-                call wLog("-> Writing XMF and hdf5 files FOR GLOBAL FIELD");
+                    if (IPT%rang == 0) call DispCarvalhol(offsetCoords, "offsetCoords")
 
-                if(writeFiles) then
-                    call wLog("outputStyle");
-                    call wLog(outputStyle);
-                    if(globRDF%rang == 0) write(*,*) "-> Writing 'Bounding Box' XMF and hdf5 files"
-                    BBoxPartFileName = string_join_many(BBoxFileName,"_ALL")
-                    randFieldFilePath = string_join_many(single_path,"/h5/",BBoxPartFileName,".h5")
+                    do locIter = 1, size(offsetCoords,2)
+                    !do locIter = 1, 1 ! FOR TESTS
+                        if(IPT%rang == 0) write(*,*)  "     locIter = ", locIter
+                        call wLog("     Waiting for the other procs")
+                        call wLog("  locIter = ")
+                        call wLog(locIter)
+                        call MPI_BARRIER(groupComm, code)
 
-                    if(outputStyle==1) then
-                        call wLog("   (Parallel)");
-                        call wLog("minval(RDF%randField,1) =")
-                        call wLog(minval(globRDF%randField,1))
-                        call wLog("maxval(RDF%randField,1) =")
-                        call wLog(maxval(globRDF%randField,1))
-                        call write_Mono_XMF_h5(globRDF, globMSH, IPT%connectList, IPT%monotype, BBoxPartFileName, globRDF%rang, single_path, &
-                                               globMSH%comm, ["_ALL"], [0], fieldNumber, style=outputStyle, meshMod = msh_AUTO, &
-                                               HDF5FullPath = randFieldFilePath, writeDataSet = IPT%writeDataSet)
-                    else
-                        call wLog("   (Per Proc)");
-                        call write_Mono_XMF_h5(globRDF, globMSH, IPT%connectList, IPT%monotype, BBoxPartFileName, globRDF%rang, single_path, &
-                                               globMSH%comm, ["_ALL"], [0], 0, style=outputStyle, meshMod = msh_AUTO, &
-                                               HDF5FullPath = randFieldFilePath, writeDataSet = IPT%writeDataSet)
 
-                    end if
-                end if
+                        !call wLog(" subdivisionCoords(:,IPT%rang) -----------------------------------")
+                        !call wLog(subdivisionCoords(:,IPT%rang+1))
+                        !call wLog(" IPT%nFields*offsetCoords(:,locIter) -----------------------------------")
+                        !call wLog(IPT%nFields*offsetCoords(:,locIter))
+
+                        procCoord = nint(subdivisionCoords(:,IPT%rang+1) + offsetCoords(:,locIter))
+                        call wLog("     procCoord -----------------------------------")
+                        call wLog(procCoord)
+
+                        newIPT%xMinGlob = IPT%xMinGlob &
+                                          + (dble(locLevel)*offsetCoords(:,locIter)*stepProc)
+                        newIPT%xMaxGlob = newIPT%xMinGlob &
+                                          + dble(locLevel*IPT%nFields)*procExtent &
+                                          - dble((locLevel*IPT%nFields)-1)*(procExtent-stepProc)
+
+                        call wLog("     newIPT%xMinGlob")
+                        call wLog(newIPT%xMinGlob)
+                        call wLog("     newIPT%xMaxGlob")
+                        call wLog(newIPT%xMaxGlob)
+
+                        call init_MESH(globMSH, newIPT, groupComm, product(IPT%nFields), IPT%rang)
+                        call init_RF(globRDF, newIPT, groupComm, product(IPT%nFields), IPT%rang)
+                        globMSH%procPerDim  = IPT%nFields
+                        globMSH%independent = .true.
+                        globMSH%coords      = subdivisionCoords(:,IPT%rang+1)
+                        call wLog("     globMSH%procPerDim")
+                        call wLog(globMSH%procPerDim)
+                        call wLog("-> round_basic_inputs")
+                        call round_basic_inputs(globMSH, globMSH%xStep, globMSH%overlap)
+
+                        !Redefined at each localization level
+                        !procExtent_level = procExtent + dble((2**(locLevel-1))-1)*stepProc
+                        !stepProc_level   = procExtent_level - globMSH%overlap/2.0D0
+
+                        call wLog("-> set_global_extremes")
+                        call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, globMSH%procStart)
+
+                        !"STOP ERROR, no mesh division algorithm for this number of procs"
+
+                        call wLog("     globMSH%procExtent = ")
+                        call wLog(globMSH%procExtent)
+                        call wLog("     globMSH%xMaxGlob = ")
+                        call wLog(globMSH%xMaxGlob)
+                        call wLog("     globMSH%procStart = ")
+                        call wLog(globMSH%procStart)
+                        call wLog("-> set_communications_topology")
+                        call set_communications_topology(globMSH)
+                        call wLog("     globMSH%procStart = ")
+                        call wLog(globMSH%procStart)
+                        call wLog("     globMSH%procExtent = ")
+                        call wLog(globMSH%procExtent)
+                        call wLog("-> set_local_bounding_box")
+                        call set_local_bounding_box(globMSH,&
+                                                    globMSH%xMinBound, globMSH%xMaxBound, &
+                                                    globMSH%xNStep, globMSH%xNTotal, globMSH%origin, validProc)
+                        call wLog("-> set_overlap_geometry")
+                        call set_overlap_geometry (globMSH, globMSH%xMinInt, globMSH%xMaxInt, globMSH%xMinExt, globMSH%xMaxExt, &
+                                                   globMSH%xMaxNeigh, globMSH%xMinNeigh, globMSH%xOrNeigh, globMSH%nOvlpPoints)
+
+                        call wLog("-> Setting xPoints")
+                        call set_xPoints(globMSH, globRDF, globRDF%xPoints_Local)
+                        call wLog("      maxval(RDF%xPoints,2) = ")
+                        call wLog(maxval(globRDF%xPoints,2))
+                        call wLog( "      minval(RDF%xPoints,2) = ")
+                        call wLog(minval(globRDF%xPoints,2))
+
+                        call wLog("-> Reading Random Field")
+
+                        BBoxPartFileName = string_join_many(BBoxFileName,"_L",numb2String(locLevel-1,2))
+                        do i = 1, size(procCoord)
+                            BBoxPartFileName = string_join_many(BBoxPartFileName,"_",numb2String(procCoord(i),3))
+                        end do
+                        randFieldFilePath = string_join_many(single_path,"/h5/",BBoxPartFileName,".h5")
+
+                        call wLog("     single_path =")
+                        call wLog(single_path)
+                        call wLog("     BBoxPartFileName =")
+                        call wLog(BBoxPartFileName)
+                        call wLog("     File:")
+                        call wLog(randFieldFilePath)
+!
+!                        call wLog("     Allocating random field")
+!                        call allocate_randField(globRDF, globMSH%xNStep, globRDF%randField_Local)
+!                        call wLog("     shape(globRDF%randField_Local)")
+!                        call wLog(shape(globRDF%randField_Local))
+!                        call wLog("     Read dataset")
+!                        !write(*,*) randFieldFilePath
+!                        !HDF5
+!                        call h5open_f(hdferr) ! Initialize FORTRAN interface.
+!                        call h5fopen_f(trim(randFieldFilePath), H5F_ACC_RDONLY_F, file_id, hdferr) !Open File
+!                        if(hdferr /= 0) then
+!                            write(*,*) "Inside rang ", IPT%rang
+!                            stop("ERROR OPENING FILE inside read_RF_h5_File_Table")
+!                        end if
+!                        call h5dopen_f(file_id, trim(dset), dset_id, hdferr)! Open Dataset
+!                        locShape = shape(globRDF%randField_Local)
+!                        call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, globRDF%randField_Local, locShape,  hdferr)
+!                        call h5dclose_f(dset_id, hdferr) !Close Dataset
+!                        call h5fclose_f(file_id, hdferr) ! Close the file.
+!                        call h5close_f(hdferr) ! Close FORTRAN interface.
+!
+!                        !call DispCarvalhol(globRDF%randField_Local, "globRDF%randField_Local")
+!
+!                        if(globRDF%nb_procs > 1) then
+!                            call wLog("")
+!                            call wLog("GENERATING OVERLAP")
+!                            call wLog("-------------------------------")
+!                            if(globRDF%rang == 0) write(*,*)"GENERATING OVERLAP"
+!                            if(globRDF%rang == 0) write(*,*) "-------------------------------"
+!                            call wLog("")
+!
+!                            if(globRDF%rang == 0) write(*,*) "    ->Applying Weighting Functions"
+!                            call wLog("    ->Applying Weighting Functions on Field")
+!                            call applyWeightingFunctions_OnMatrix(globRDF, globMSH, partitionType)
+!                            if(globRDF%rang == 0) write(*,*) "    ->addNeighboursFields"
+!                            call wLog("    ->addNeighboursFields")
+!                            call addNeighboursFields(globRDF, globMSH)
+!                        end if
+!
+!                        call wLog("-> Writing XMF and hdf5 files FOR GLOBAL FIELD");
+!
+!                        if(writeFiles) then
+!                            call wLog("outputStyle");
+!                            call wLog(outputStyle);
+!                            if(globRDF%rang == 0) write(*,*) "-> Writing 'Bounding Box' XMF and hdf5 files"
+!                            !BBoxPartFileName = string_join_many(BBoxFileName,"_ALL")
+!                            BBoxPartFileName = string_join_many(BBoxFileName,"_L",numb2String(locLevel,2))
+!                            do i = 1, size(procCoord)
+!                                BBoxPartFileName = string_join_many(BBoxPartFileName,"_", &
+!                                                   numb2String(int(offsetCoords(i,locIter)/IPT%nFields(i)),3))
+!                            end do
+!                            call wLog("  fileName");
+!                            call wLog(BBoxPartFileName);
+!                            randFieldFilePath = string_join_many(single_path,"/h5/",BBoxPartFileName,".h5")
+!
+!                            if(outputStyle==1) then
+!                                call wLog("   (Parallel)");
+!                                call wLog("minval(RDF%randField,1) =")
+!                                call wLog(minval(globRDF%randField,1))
+!                                call wLog("maxval(RDF%randField,1) =")
+!                                call wLog(maxval(globRDF%randField,1))
+!                                call write_Mono_XMF_h5(globRDF, globMSH, IPT%connectList, IPT%monotype, BBoxPartFileName, globRDF%rang, single_path, &
+!                                                       globMSH%comm, ["_ALL"], [0], fieldNumber, style=outputStyle, meshMod = msh_AUTO, &
+!                                                       writeDataSet = IPT%writeDataSet)
+!                            else
+!                                call wLog("   (Per Proc)");
+!                                call write_Mono_XMF_h5(globRDF, globMSH, IPT%connectList, IPT%monotype, BBoxPartFileName, globRDF%rang, single_path, &
+!                                                       globMSH%comm, ["_ALL"], [0], 0, style=outputStyle, meshMod = msh_AUTO, &
+!                                                       writeDataSet = IPT%writeDataSet)
+!
+!                            end if
+!                        end if
+
+                        call finalize_MESH(globMSH)
+                        call finalize_RF(globRDF)
+
+                    end do
+
+
+                end do
+
+                call finalize_IPT_RF(newIPT)
 
             end if
 
-            call finalize_MESH(globMSH)
-            call finalize_RF(globRDF)
+            if(allocated(offsetCoords)) deallocate(offsetCoords)
 
         end subroutine combine_subdivisions
 

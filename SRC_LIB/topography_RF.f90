@@ -149,7 +149,7 @@ contains
         call wLog(stepProc)
 
         procExtent = delta_Proc
-        procStart  = stepProc*dble(MSH%coords)
+        procStart  = xMinGlob + stepProc*dble(MSH%coords)
         if(present(stepProc_out)) stepProc_out = stepProc
 
     end subroutine set_global_extremes
@@ -871,9 +871,7 @@ contains
 
         periods(:) = .false.
 
-        call wLog("-> set_procPerDim")
-        call set_procPerDim (MSH, MSH%procPerDim)
-        call wLog("     MSH%procPerDim")
+        call wLog("MSH%procPerDim = ")
         call wLog(MSH%procPerDim)
         call wLog("-> MPI_CART_CREATE")
         call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
@@ -882,12 +880,12 @@ contains
         call wLog("     MSH%coords")
         call wLog(MSH%coords)
 
-        if(MSH%independent) then
+        !if(MSH%independent) then
             call wLog("-> set_neighbours")
             call set_neighbours (MSH)
             call wLog("-> get_NeighbourCriteria")
             call get_NeighbourCriteria (MSH)
-        end if
+        !end if
 
     end subroutine set_communications_topology
     !-----------------------------------------------------------------------------------------------
