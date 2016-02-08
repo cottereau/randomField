@@ -47,13 +47,9 @@ contains
         call wLog("     IN   MSH%independent =  ")
         call wLog(MSH%independent)
 
-        if(MSH%independent) then
-            overlap = ceiling(overlap*MSH%corrL/(2*MSH%xStep)) * 2*MSH%xStep/MSH%corrL
-        else
-            overlap = 0.0D0
-        end if
-
-        where(MSH%procPerDim == 1) overlap = 0.0D0
+        where(MSH%procPerDim == 1)  overlap = 0.0D0
+        overlap = dble(nint(overlap*MSH%corrL/(MSH%xStep))) * MSH%xStep/MSH%corrL
+        where(MSH%procPerDim /= 1 .and. overlap < 2.0D0*MSH%xStep/MSH%corrL)  overlap = 2.0D0*MSH%xStep/MSH%corrL
 
         call wLog("     OUT  overlap =  ")
         call wLog(overlap)
@@ -323,9 +319,11 @@ contains
         xMinInt = xMinExt
         xMaxInt = xMaxExt
 
-        do neighPos = 1, 2*MSH%nDim
+        do neighPos = 1, size(MSH%neigh)
 
-            if(MSH%neigh(neighPos) < 0) cycle
+            if(MSH%neigh(neighPos) < 0) cycle !Testing neighbour existence
+
+            if(sum(abs(MSH%neighShift(:,neighPos))) /= 1) cycle !Take only the main directions
 
             where(MSH%neighShift(:,neighPos) < 0)
                 xMinInt = xMinExt + MSH%overlap*MSH%corrL
@@ -348,7 +346,6 @@ contains
             if(MSH%neigh(neighPos) < 0) cycle
 
             where(MSH%neighShift(:,neighPos) > 0)
-                !MSH%xMaxNeigh(:,neighPos) = MSH%xMaxExt - MSH%xStep - MSH%overlap*corrL*(1.0D0-ovlpFraction)
                 xMaxNeigh(:,neighPos) = MSH%xMaxBound
                 xMinNeigh(:,neighPos) = MSH%xMaxInt + MSH%xStep
                 xOrNeigh(:,neighPos)  = MSH%xMaxInt
@@ -361,6 +358,16 @@ contains
                 xMinNeigh(:,neighPos) = MSH%xMinBound
                 xOrNeigh(:,neighPos)  = MSH%xMinInt
             end where
+
+            if(any(xMinNeigh(:,neighPos)>xMaxNeigh(:,neighPos))) then
+                call wLog("ERROR!!!!!!  Inside 'set_overlap_geometry' problem on neighPos")
+                call wLog(neighPos)
+                call wLog("xMinNeigh(:,neighPos) = ")
+                call wLog(xMinNeigh(:,neighPos))
+                call wLog("xMaxNeigh(:,neighPos) = ")
+                call wLog(xMaxNeigh(:,neighPos))
+                stop(" ")
+            end if
 
             nOvlpPoints = nOvlpPoints + &
                           product(find_xNStep(xMinNeigh(:,neighPos), xMaxNeigh(:,neighPos), MSH%xStep))
@@ -859,32 +866,95 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_communications_topology(MSH)
+    subroutine set_communications_topology(MSH, coords, neigh, neighShift, considerNeighbour, &
+                                           mappingFromShift, op_neigh)
 
         implicit none
 
-        !INPUT AND OUTPUT
-        type(MESH) :: MSH
+        !INPUT
+        type(MESH), intent(in) :: MSH
+        !OUTPUT
+        integer, dimension(:), intent(out) :: coords
+        integer, dimension(:), intent(out) :: neigh
+        integer, dimension(:,:), intent(out) :: neighShift
+        logical, dimension(:), intent(out) :: considerNeighbour
+        integer, dimension(:), intent(out) :: mappingFromShift
+        integer, dimension(:), intent(out) :: op_neigh
         !LOCAL
-        integer :: code
-        logical, dimension(MSH%nDim) :: periods
+        double precision, dimension(MSH%nDim, product(MSH%procPerDim)) :: subdivisionCoords
+        double precision, dimension(MSH%nDim, 3**MSH%nDim) :: neighboursCoords
+        double precision, dimension(MSH%nDim) :: ones
+        integer, dimension(MSH%nDim) :: deltaShift
+        integer :: neighRank, coordComp, coordCompPos
 
-        periods(:) = .false.
+        !Creating grids
+        ones = 1.0D0
+        call setGrid(subdivisionCoords, 0*ones, ones, MSH%procPerDim, .true.)
+        call setGrid(neighboursCoords, -1*ones, ones, int(ones)*3, .true.)
 
-        call wLog("MSH%procPerDim = ")
-        call wLog(MSH%procPerDim)
-        call wLog("-> MPI_CART_CREATE")
-        call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
-        call wLog("-> MPI_CART_COORDS")
-        call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
-        call wLog("     MSH%coords")
-        call wLog(MSH%coords)
+        call DispCarvalhol(subdivisionCoords, "subdivisionCoords", unit_in=MSH%log_ID)
+        call DispCarvalhol(neighboursCoords, "neighboursCoords", unit_in=MSH%log_ID)
+
+        !Initialization
+        neighShift(:,:) = 0
+        mappingFromShift(:) = -1
+        neigh(:) = -1
+        op_neigh(:) = -1
+
+        coords = subdivisionCoords(:,MSH%rang+1)
+
+        call wLog("coords = ")
+        call wLog(coords)
+
+        do neighRank = 1, size(subdivisionCoords, 2)
+
+            if(neighRank == MSH%rang+1) cycle
+
+            deltaShift = nint(subdivisionCoords(:,neighRank) - coords)
+
+            do coordComp = 1, size(neighboursCoords, 2)
+
+                if(coordComp == (size(neighboursCoords, 2)-1)/2 + 1) cycle !Because in the middle we have our own rank
+
+                coordCompPos = coordComp
+                if(coordCompPos > (size(neighboursCoords, 2)-1)/2) coordCompPos = coordCompPos -1 !Because in the middle we have our own rank
+                neighShift(:,coordCompPos) = nint(neighboursCoords(:,coordComp))
+
+                if(all(deltaShift == nint(neighboursCoords(:,coordComp)))) then
+                    neigh(coordCompPos) = neighRank-1
+                    mappingFromShift(findLabel(neighShift(:,coordCompPos))) = neighRank-1
+                else if(all(-deltaShift == nint(neighboursCoords(:,coordComp)))) then
+                    op_neigh(coordCompPos) = neighRank-1
+                end if
+
+            end do
+
+
+        end do
+
+        !Criteria to consider or not this neighbour
+        considerNeighbour = .true.
+        where(neigh < 0) considerNeighbour = .false.
+
+        !if (MSH%rang == 0) call show_MESHneigh(MSH, name="MSH NEIGHBOURS", onlyExisting=.false., unit_in=SCREEN)
+        !call show_MESHneigh(MSH, onlyExisting = .false., forLog = .true.)
+
+        !where(minval(MSH%neighShift,1) < 0) MSH%considerNeighbour = .false.
+
+        !call wLog("MSH%procPerDim = ")
+        !call wLog(MSH%procPerDim)
+        !call wLog("-> MPI_CART_CREATE")
+        !call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
+        !call wLog("-> MPI_CART_COORDS")
+        !call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
+        !call wLog("     MSH%coords")
+        !call wLog(MSH%coords)
 
         !if(MSH%independent) then
-            call wLog("-> set_neighbours")
-            call set_neighbours (MSH)
-            call wLog("-> get_NeighbourCriteria")
-            call get_NeighbourCriteria (MSH)
+            !call wLog("-> set_neighbours")
+            !call set_neighbours (MSH)
+            !call wLog("-> get_NeighbourCriteria")
+            !call get_NeighbourCriteria (MSH)
         !end if
 
     end subroutine set_communications_topology
@@ -900,39 +970,43 @@ contains
 
         !LOCAL VARIABLES
         integer :: i, j, code, delta;
-        integer, dimension(:), allocatable :: shift
+        integer, dimension(MSH%nDim) :: shift
 
-        allocate(shift(MSH%nDim))
-
-        !write(*,*) "set_neighbours"
+        !write(*,*) "set_neighbour!Opposite directions are neighbours, 1 is opposite to 2, 3 to 4 and so on
 
         !Defining lateral neighbours
         if(MSH%nDim == 1) then
             shift = [-1]
             call find_rank (MSH, shift, 1)
-            shift = [1]
+            !shift = [1]
+            shift = -shift
             call find_rank (MSH, shift, 2)
         else if(MSH%nDim == 2) then
             shift = [0, -1]
             call find_rank (MSH, shift, 1)
-            shift = [0, 1]
+            !shift = [0, 1]
+            shift = -shift
             call find_rank (MSH, shift, 2)
             shift = [-1, 0]
             call find_rank (MSH, shift, 3)
-            shift = [1, 0]
+            !shift = [1, 0]
+            shift = -shift
             call find_rank (MSH, shift, 4)
         else if(MSH%nDim == 3) then
             shift = [0, 0, -1]
             call find_rank (MSH, shift, 1)
-            shift = [0, 0, 1]
+            !shift = [0, 0, 1]
+            shift = -shift
             call find_rank (MSH, shift, 2)
             shift = [0, -1, 0]
             call find_rank (MSH, shift, 3)
-            shift = [0, 1, 0]
+            !shift = [0, 1, 0]
+            shift = -shift
             call find_rank (MSH, shift, 4)
             shift = [-1, 0, 0]
             call find_rank (MSH, shift, 5)
-            shift = [1, 0, 0]
+            !shift = [1, 0, 0]
+            shift = -shift
             call find_rank (MSH, shift, 6)
         end if
 !        do i = 0, MSH%nDim - 1
@@ -944,65 +1018,75 @@ contains
         if(MSH%nDim == 2) then
             shift = [-1, -1]
             call find_rank (MSH, shift, 5)
-            shift = [1, -1]
+            !shift = [1, 1]
+            shift = -shift
             call find_rank (MSH, shift, 6)
-            shift = [-1, 1]
+            shift = [1, -1]
             call find_rank (MSH, shift, 7)
-            shift = [1, 1]
+            !shift = [-1, 1]
+            shift = -shift
             call find_rank (MSH, shift, 8)
         else if(MSH%nDim == 3) then
             shift = [-1, -1, -1]
             call find_rank (MSH, shift, 19)
-            shift = [1, -1, -1]
+            !shift = [1, 1, 1]
+            shift = -shift
             call find_rank (MSH, shift, 20)
-            shift = [-1, 1, -1]
+            shift = [1, -1, -1]
             call find_rank (MSH, shift, 21)
-            shift = [1, 1, -1]
+            !shift = [-1, 1, 1]
+            shift = -shift
             call find_rank (MSH, shift, 22)
-
-            shift = [-1, -1, 1]
+            shift = [1, 1, -1]
             call find_rank (MSH, shift, 23)
-            shift = [1, -1, 1]
+            !shift = [-1, -1, 1]
+            shift = -shift
             call find_rank (MSH, shift, 24)
-            shift = [-1, 1, 1]
+            shift = [-1, 1, -1]
             call find_rank (MSH, shift, 25)
-            shift = [1, 1, 1]
+            !shift = [1, -1, 1]
+            shift = -shift
             call find_rank (MSH, shift, 26)
+
         end if
 
         !Defining vertex neighbours
         if(MSH%nDim == 3) then
             shift = [-1, -1, 0]
             call find_rank (MSH, shift, 7)
-            shift = [1, -1, 0]
+            !shift = [1, 1, 0]
+            shift = -shift
             call find_rank (MSH, shift, 8)
             shift = [-1, 1, 0]
             call find_rank (MSH, shift, 9)
-            shift = [1, 1, 0]
+            !shift = [1, -1, 0]
+            shift = -shift
             call find_rank (MSH, shift, 10)
 
             shift = [-1, 0, -1]
             call find_rank (MSH, shift, 11)
-            shift = [1, 0, -1]
+            !shift = [1, 0, 1]
+            shift = -shift
             call find_rank (MSH, shift, 12)
             shift = [-1, 0, 1]
             call find_rank (MSH, shift, 13)
-            shift = [1, 0, 1]
+            !shift = [1, 0, -1]
+            shift = -shift
             call find_rank (MSH, shift, 14)
 
             shift = [0, -1, -1]
             call find_rank (MSH, shift, 15)
-            shift = [0, 1, -1]
+            !shift = [0, 1, 1]
+            shift = -shift
             call find_rank (MSH, shift, 16)
             shift = [0, -1, 1]
             call find_rank (MSH, shift, 17)
-            shift = [0, 1, 1]
+            !shift = [0, 1, -1]
+            shift = -shift
             call find_rank (MSH, shift, 18)
         end if
 
         call set_shift(MSH)
-
-        deallocate(shift)
 
     end subroutine set_neighbours
 
@@ -1063,6 +1147,15 @@ contains
 
         if(possible) then
             call MPI_CART_RANK (MSH%topComm,pos,MSH%neigh(neighPos),code)
+            MSH%mappingFromShift(findLabel(shift)) = MSH%neigh(neighPos)
+            !call wLog(" MSH%neigh(neighPos) = ")
+            !call wLog(MSH%neigh(neighPos))
+            !call wLog(" shift = ")
+            !call wLog(shift)
+            !call wLog(" findLabel(shift) = ")
+            !call wLog(findLabel(shift))
+        else
+            MSH%mappingFromShift(findLabel(shift)) = -1
         end if
 
         deallocate(pos)

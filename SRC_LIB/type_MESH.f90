@@ -25,7 +25,7 @@ module type_MESH
         logical :: independent
             !nDim dependent
         integer         , dimension(:), allocatable :: xNStep, procPerDim;
-        integer         , dimension(:), allocatable :: neigh, coords;
+        integer         , dimension(:), allocatable :: neigh, coords, op_neigh;
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
         double precision, dimension(:), allocatable :: xStep, corrL
         double precision, dimension(:), allocatable :: procStart, procExtent
@@ -40,7 +40,14 @@ module type_MESH
         logical, dimension(:), allocatable :: considerNeighbour
         double precision, dimension(:), allocatable :: overlap !Size of the overlap (in corrL)
         integer, dimension(:)  , allocatable :: origin
+        integer, dimension(:)  , allocatable :: mappingFromShift
         logical :: init = .false.
+
+        !coords - Coordinates vector on the comunications Carte
+        !procPerDim - number of processor in each direction
+        !neigh - rang of the neighbour in a given direction (if there is not it should be -1)
+        !op_neigh - rang of the neighbour in the oposite direction (if there is not it should be -1)
+        !procStart - minimum coordinate that this processor will write on the HDF5 (defines origin)
 
     end type MESH
 
@@ -49,11 +56,12 @@ module type_MESH
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine init_MESH(MESH_a, IPT, comm, nb_procs, rang)
+        subroutine init_MESH(MESH_a, IPT, comm, rang, newNbProcs)
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
-            integer, intent(in) :: comm, nb_procs, rang
+            integer, intent(in) :: comm, rang
+            integer, intent(in), optional :: newNbProcs
             !OUTPUT
             type(MESH) :: MESH_a
             !LOCAL
@@ -74,12 +82,14 @@ module type_MESH
             allocate(MESH_a%xMaxBound(nDim))
             allocate(MESH_a%xMinBound(nDim))
             allocate(MESH_a%neigh((3**nDim)-1))
+            allocate(MESH_a%op_neigh((3**nDim)-1))
             allocate(MESH_a%xMaxNeigh(nDim,(3**nDim)-1))
             allocate(MESH_a%xMinNeigh(nDim,(3**nDim)-1))
             allocate(MESH_a%xOrNeigh(nDim,(3**nDim)-1))
             allocate(MESH_a%indexNeigh(2,(3**nDim)-1))
             allocate(MESH_a%neighShift(nDim,(3**nDim)-1))
             allocate(MESH_a%considerNeighbour((3**nDim)-1))
+            allocate(MESH_a%mappingFromShift((3**nDim)-1))
             allocate(MESH_a%overLap(nDim))
             allocate(MESH_a%pointsPerCorrL(nDim))
             allocate(MESH_a%corrL(nDim))
@@ -90,7 +100,13 @@ module type_MESH
             MESH_a%log_ID   = IPT%log_ID
             MESH_a%nDim     = IPT%nDim_mesh
             MESH_a%comm     = comm
-            MESH_a%nb_procs = nb_procs
+            if(present(newNbProcs)) then
+                MESH_a%nb_procs = newNbProcs
+                MESH_a%procPerDim = -1
+            else
+                MESH_a%nb_procs = product(IPT%nFields)
+                MESH_a%procPerDim = IPT%nFields
+            end if
             MESH_a%rang     = rang
             MESH_a%meshMod  = IPT%meshMod
             MESH_a%xMaxGlob = IPT%xMaxGlob
@@ -100,7 +116,6 @@ module type_MESH
             MESH_a%pointsPerCorrL = IPT%pointsPerCorrL
             MESH_a%overlap(:)     = IPT%overlap
             MESH_a%independent    = IPT%independent
-            MESH_a%procPerDim = IPT%nFields
 
             MESH_a%xMaxBound     = -1
             MESH_a%xMinBound     = -1
@@ -110,12 +125,12 @@ module type_MESH
             MESH_a%xNStep   = -1
             MESH_a%xMaxInt  = -1
             MESH_a%xMinInt  = -1
-            MESH_a%procPerDim = -1
             MESH_a%coords(:)  = -1
             MESH_a%xMaxNeigh(:,:) = 0
             MESH_a%xMinNeigh(:,:) = 0
             MESH_a%xOrNeigh(:,:) = 0
             MESH_a%indexNeigh(:,:) = -1
+            MESH_a%mappingFromShift(:) = -1
             MESH_a%neigh(:) = -2 !-1 is already the default when the proc is in the topology border
             MESH_a%neighShift(:,:) = 0
             MESH_a%considerNeighbour = .true.
@@ -228,7 +243,7 @@ module type_MESH
             integer, intent(in), optional :: unit_in
             !LOCAL
             character(len = 3) :: nDim, space
-            character(len = 50) :: fmtNum, fmtChar, fmtDble
+            character(len = 50) :: fmtNum, fmtChar
             integer :: i
             integer :: unit
             logical :: active
@@ -258,18 +273,18 @@ module type_MESH
 
                 if(present(name)) write(unit,*) "|  ", name
 
-                fmtNum = "(I10, A1, "//nDim//"I6, A1, "//nDim//"F6.2, A1, "//nDim//"F6.2)"
-                fmtDble = "(I10, A1, "//nDim//"F6.2, A1, "//nDim//"F6.2, "//nDim//"F6.2, A1, "//nDim//"F6.2)"
-                fmtChar = "(A10, A"//space//", A"//space//", A"//space//")"
+                fmtChar = "(A14, A"//space//", A"//space//", A"//space//")"
+                fmtNum = "(I6, A3, I5, A1, "//nDim//"I6, A1, "//nDim//"F6.2, A1, "//nDim//"F6.2)"
 
                 if(MESH_a%init) then
 
-                    write(unit,fmtChar) "Neighbour", "|Shift                 ", "|xMin                    ", "|xMax                  "
+                    write(unit,fmtChar) "Neighbour/ op","|Shift                 ", "|xMin                    ", "|xMax                  "
 
                     do i = 1, size(MESH_a%neigh)
                         if(onlyExisting .and. MESH_a%neigh(i)<0) cycle
-                        write(unit,fmtNum) MESH_a%neigh(i), "|", MESH_a%neighShift(:,i), "|", &
-                            MESH_a%xMinNeigh(:,i), "|", MESH_a%xMaxNeigh(:,i)
+                        write(unit,fmtNum) MESH_a%neigh(i), " / ", MESH_a%op_neigh(i), &
+                                           "|", MESH_a%neighShift(:,i), "|", &
+                                           MESH_a%xMinNeigh(:,i), "|", MESH_a%xMaxNeigh(:,i)
                     end do
 
                 else
@@ -282,6 +297,62 @@ module type_MESH
             end if
 
         end subroutine show_MESHneigh
+
+        !-----------------------------------------------------------------------------------------------
+        !-----------------------------------------------------------------------------------------------
+        !-----------------------------------------------------------------------------------------------
+        !-----------------------------------------------------------------------------------------------
+        function findLabel(neighShift) result(label)
+
+            implicit none
+            !INPUT
+            integer, dimension(:), intent(in) :: neighShift
+
+            !OUTPUT
+            integer :: label
+
+            !LOCAL
+            integer :: i, nDim
+
+            nDim = size(neighShift)
+
+            label = 0
+
+            do i = 1, nDim
+                label = label + neighShift(i)*3**(nDim - i)
+            end do
+
+            if(label > 0) label = label - 1 !Because no neighbour has shift (0,0,0)
+
+            label = label + 1 +(3**(nDim)-1)/2
+
+            !call wLog(" label = ")
+            !call wLog(label)
+
+            !In 3D labels go from 1 (-1,-1,-1) to 26 (1, 1, 1)
+
+
+        end function findLabel
+
+        !-----------------------------------------------------------------------------------------------
+        !-----------------------------------------------------------------------------------------------
+        !-----------------------------------------------------------------------------------------------
+        !-----------------------------------------------------------------------------------------------
+        function findShiftRang(MESH_a, neighShift) result(rang)
+
+            implicit none
+            !INPUT
+            !INPUT
+            type(MESH), intent(in) :: MESH_a
+            integer, dimension(:), intent(in) :: neighShift
+            !OUTPUT
+            integer :: rang
+
+            rang = MESH_a%mappingFromShift(findLabel(neighShift))
+            call wLog(" rang = ")
+            call wLog(rang)
+
+        end function findShiftRang
 
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
@@ -317,6 +388,8 @@ module type_MESH
             if (allocated(MESH_a%origin)) deallocate(MESH_a%origin)
             if (allocated(MESH_a%procExtent)) deallocate(MESH_a%procExtent)
             if (allocated(MESH_a%procStart)) deallocate(MESH_a%procStart)
+            if (allocated(MESH_a%mappingFromShift)) deallocate(MESH_a%mappingFromShift)
+            if (allocated(MESH_a%op_neigh)) deallocate(MESH_a%op_neigh)
 
 
             MESH_a%init = .false.

@@ -138,28 +138,30 @@ program main_RandomField
 
 
     !Making all realizations
-!    if(rang == 0) write(*,*) " "
-!    if(rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
-!    call wLog("-> SAMPLING----------------------------------------")
-!    allocate(HDF5Name(product(IPT%nFields*IPT%localizationLevel)))
-!    do i = 1, product(IPT%nFields*IPT%localizationLevel)
-!        if(rang == 0) write(*,*) " "
-!        if(rang == 0) write(*,*) " "
-!        if(rang == 0) write(*,*)  "-> Making Field ", i
-!        call wLog("-> Making Field")
-!        fieldNumber = i;
-!        if(mod(i, groupMax) == group) then
-!            !call wLog("Proc")
-!            !call wLog(rang)
-!            !call wLog("dealing with field")
-!            !call wLog(fieldNumber)
-!            !call wLog("     Trying communication")
-!            call MPI_BARRIER(groupComm, code)
-!            call single_realization(IPT, globMSH, writeFiles, outputStyle, sameFolder, &
-!                                    groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
-!
-!        end if
-!    end do
+    if(.false.)then
+    if(rang == 0) write(*,*) " "
+    if(rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
+    call wLog("-> SAMPLING----------------------------------------")
+    allocate(HDF5Name(product(IPT%nFields*IPT%localizationLevel)))
+    do i = 1, product(IPT%nFields*IPT%localizationLevel)
+        if(rang == 0) write(*,*) " "
+        if(rang == 0) write(*,*) " "
+        if(rang == 0) write(*,*)  "-> Making Field ", i
+        call wLog("-> Making Field")
+        fieldNumber = i;
+        if(mod(i, groupMax) == group) then
+            !call wLog("Proc")
+            !call wLog(rang)
+            !call wLog("dealing with field")
+            !call wLog(fieldNumber)
+            !call wLog("     Trying communication")
+            call MPI_BARRIER(groupComm, code)
+            call single_realization(IPT, globMSH, writeFiles, outputStyle, sameFolder, &
+                                    groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
+
+        end if
+    end do
+    end if
 
     call finalize_MESH(globMSH)
 

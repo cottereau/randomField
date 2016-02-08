@@ -13,6 +13,87 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    subroutine setGrid(xPoints, xMinBound, xStep, xNStep, inverse)
+
+        implicit none
+
+        !INPUT
+        double precision, dimension(:)  , intent(in) :: xMinBound
+        integer, dimension(:), intent(in) :: xNStep
+        double precision, dimension(:), intent(in) :: xStep
+        logical, intent(in), optional :: inverse
+        !OUTPUT
+        double precision, dimension(:,:), intent(out) :: xPoints
+
+        !LOCAL
+        integer(kind=8) :: totalSize
+        integer :: nDim
+        integer(kind=8) :: sizePattern, unityMult, patternMult
+        integer :: start, end, i, d
+        logical :: effec_Inverse
+
+        totalSize = product(xNStep)
+        nDim = size(xNStep)
+
+        if(product(xNStep) /= size(xPoints,2)) then
+            write(*,*) "ERROR, inside set Grid shape(xPoints) and xNStep are different"
+            write(*,*) "shape(xPoints) = ", shape(xPoints)
+            write(*,*) "xNStep         = ", xNStep
+            stop(" ")
+        end if
+
+        effec_Inverse = .false.
+        if(present(inverse)) effec_Inverse =inverse
+
+        if(effec_Inverse) then
+            do d = nDim, 1, -1
+                sizePattern = product(xNStep(d:nDim))
+                unityMult   = sizePattern/xNStep(d)
+                patternMult = totalSize/sizePattern
+
+                !Building the basic pattern
+                do i=1, xNStep(d)
+                    start = (i-1)*unityMult + 1
+                    end   = start + unityMult - 1
+                    xPoints(d, start:end) = xMinBound(d) + xStep(d)*dble(i -1)
+                end do
+
+                !Replicating the pattern
+                do i=2, patternMult
+                    start = (i-1)*sizePattern + 1
+                    end   = start + sizePattern - 1
+                    xPoints(d, start:end) = xPoints(d, 1:sizePattern)
+                end do
+            end do
+        else
+            do d = 1, nDim
+                sizePattern = product(xNStep(1:d))
+                unityMult   = sizePattern/xNStep(d)
+                patternMult = totalSize/sizePattern
+
+                !Building the basic pattern
+                do i=1, xNStep(d)
+                    start = (i-1)*unityMult + 1
+                    end   = start + unityMult - 1
+                    xPoints(d, start:end) = xMinBound(d) + xStep(d)*dble(i -1)
+                end do
+
+                !Replicating the pattern
+                do i=2, patternMult
+                    start = (i-1)*sizePattern + 1
+                    end   = start + sizePattern - 1
+                    xPoints(d, start:end) = xPoints(d, 1:sizePattern)
+                end do
+            end do
+        end if
+
+
+    end subroutine setGrid
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     subroutine get_Permutation(pos, qmax, nStep, pVec, qmin, snapExtremes, verbose)
 
         implicit none
