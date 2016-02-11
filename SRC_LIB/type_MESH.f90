@@ -48,6 +48,7 @@ module type_MESH
         !neigh - rang of the neighbour in a given direction (if there is not it should be -1)
         !op_neigh - rang of the neighbour in the oposite direction (if there is not it should be -1)
         !procStart - minimum coordinate that this processor will write on the HDF5 (defines origin)
+        !xMaxBound, xMinBound - Bounding box for generation in this proc. It limitates the values of xPoints
 
     end type MESH
 

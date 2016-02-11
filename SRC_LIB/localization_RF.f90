@@ -505,47 +505,18 @@ subroutine addNeighboursFieldsV2(RDF, MSH)
         if(MSH%neigh(direction) < 0) snd = .false. !Check if this direction exists
 
         if(snd) then
+            call wLog(" ")
+            call wLog(" SENDING ==============")
             !Defining slice that should be sent
             !call wLog("DIMENSIONING GOING SLICE!!!")
 
-            xMinDir = MSH%xMaxGlob
-            xMaxDir = MSH%xMinGlob
-
-            do i =1, size(MSH%neigh)
-                !call wLog(" ")
-                !call wLog("i =")
-                !call wLog(i)
-                !call wLog("MSH%neigh(i) =")
-                !call wLog(MSH%neigh(i))
-
-                if(MSH%neigh(i) < 0) cycle
-
-                shiftMask = .false.
-                tempShift = MSH%neighShift(:, i)
-
-                where(tempShift == dirShift .or. dirShift == 0) shiftMask = .true.
-
-                !call wLog("dirShift =")
-                !call wLog(dirShift)
-                !call wLog("tempShift =")
-                !call wLog(tempShift)
-
-                if(all(shiftMask)) then
-                    !call wLog("SENDING SLICE!!!")
-                    where(xMinDir > MSH%xMinNeigh(:, i)) xMinDir = MSH%xMinNeigh(:, i)
-                    where(xMaxDir < MSH%xMaxNeigh(:, i)) xMaxDir = MSH%xMaxNeigh(:, i)
-                end if
-            end do
-
+            xMinDir = MSH%xMinNeigh(:, direction)
+            xMaxDir = MSH%xMaxNeigh(:, direction)
             minPos = nint((xMinDir - MSH%xMinBound(:))/MSH%xStep) + 1
             maxPos = nint((xMaxDir - MSH%xMinBound(:))/MSH%xStep) + 1
             totalSize = (product(maxPos - minPos + 1))
             tag       = neighRank
-        end if
 
-        if(snd) then
-
-            call wLog(" SENDING ==============")
             call wLog("totalSize")
             call wLog(totalSize)
             call wLog("minPos")
@@ -560,13 +531,24 @@ subroutine addNeighboursFieldsV2(RDF, MSH)
             call wLog("    TO  rang ")
             call wLog(neighRank)
 
+            if(MSH%nDim == 2) then
+                call wLog("Point in minimal position = ")
+                call wLog(RDF%xPoints_2D(:,minPos(1),minPos(2)))
+                call wLog("Point in maximal position = ")
+                call wLog(RDF%xPoints_2D(:,maxPos(1),maxPos(2)))
+                call MPI_ISEND (RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+                    totalSize, MPI_DOUBLE_PRECISION, &
+                    neighRank, tag, RDF%comm, request, code)
+            end if
             if(MSH%nDim == 3) then
                 call wLog("Point in minimal position = ")
                 call wLog(RDF%xPoints_3D(:,minPos(1),minPos(2),minPos(3)))
                 call wLog("Point in maximal position = ")
                 call wLog(RDF%xPoints_3D(:,maxPos(1),maxPos(2),maxPos(3)))
+                call MPI_ISEND (RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                    totalSize, MPI_DOUBLE_PRECISION, &
+                    neighRank, tag, RDF%comm, request, code)
             end if
-
         else
 
             call wLog(" not sending ===========")
@@ -587,37 +569,12 @@ subroutine addNeighboursFieldsV2(RDF, MSH)
         end do
 
         if(rcv) then
+            call wLog(" ")
+            call wLog(" RECEIVING ==============")
             !Defining slice that should be sent
 
-            xMinDir = MSH%xMaxGlob
-            xMaxDir = MSH%xMinGlob
-
-            !call wLog("DIMENSIONING COMMING SLICE!!!")
-            !call wLog("dirShift =")
-            !call wLog(dirShift)
-
-            do i =1, size(MSH%neigh)
-                !call wLog(" ")
-                !call wLog("i =")
-                !call wLog(i)
-                !call wLog("MSH%neigh(i) =")
-                !call wLog(MSH%neigh(i))
-                if(MSH%neigh(i) < 0) cycle
-
-                shiftMask = .false.
-                tempShift = MSH%neighShift(:, i)
-
-                where(tempShift == dirShift .or. dirShift == 0) shiftMask = .true.
-
-                !call wLog("tempShift =")
-                !call wLog(tempShift)
-
-                if(all(shiftMask)) then
-                    !call wLog("RECEIVING SLICE!!!")
-                    where(xMinDir > MSH%xMinNeigh(:, i)) xMinDir = MSH%xMinNeigh(:, i)
-                    where(xMaxDir < MSH%xMaxNeigh(:, i)) xMaxDir = MSH%xMaxNeigh(:, i)
-                end if
-            end do
+            xMinDir = MSH%xMinNeigh(:, op_direction)
+            xMaxDir = MSH%xMaxNeigh(:, op_direction)
 
             minPos = nint((xMinDir - MSH%xMinBound(:))/MSH%xStep) + 1
             maxPos = nint((xMaxDir - MSH%xMinBound(:))/MSH%xStep) + 1
@@ -625,13 +582,6 @@ subroutine addNeighboursFieldsV2(RDF, MSH)
             neighRank = MSH%op_neigh(direction)
             tag       = myRank
 
-        end if
-
-
-
-        if(rcv) then
-            call wLog(" ")
-            call wLog(" RECEIVING ==============")
             call wLog("totalSize")
             call wLog(totalSize)
             call wLog("minPos")
@@ -646,13 +596,30 @@ subroutine addNeighboursFieldsV2(RDF, MSH)
             call wLog("    FROM  rang ")
             call wLog(neighRank)
 
+            if(MSH%nDim == 2) then
+                call wLog("Point in minimal position = ")
+                call wLog(RDF%xPoints_2D(:,minPos(1),minPos(2)))
+                call wLog("Point in maximal position = ")
+                call wLog(RDF%xPoints_2D(:,maxPos(1),maxPos(2)))
+                call MPI_RECV (TRF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+                    totalSize, MPI_DOUBLE_PRECISION, &
+                    neighRank, tag, RDF%comm, status, code)
+                RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = &
+                    TRF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) &
+                    + RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2))
+            end if
             if(MSH%nDim == 3) then
                 call wLog("Point in minimal position = ")
                 call wLog(RDF%xPoints_3D(:,minPos(1),minPos(2),minPos(3)))
                 call wLog("Point in maximal position = ")
                 call wLog(RDF%xPoints_3D(:,maxPos(1),maxPos(2),maxPos(3)))
+                call MPI_RECV (TRF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                    totalSize, MPI_DOUBLE_PRECISION, &
+                    neighRank, tag, RDF%comm, status, code)
+                RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)) = &
+                    TRF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)) &
+                    + RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3))
             end if
-
         else
             call wLog(" not receiving ==============")
         end if

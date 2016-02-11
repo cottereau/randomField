@@ -131,10 +131,10 @@ program main_RandomField
     allocate(stepProc(IPT%nDim_mesh))
     allocate(procExtent(IPT%nDim_mesh))
     allocate(overlap(IPT%nDim_mesh))
-    allocate(subdivisionCoords(IPT%nDim_mesh, product(IPT%localizationLevel*IPT%nFields)))
+    allocate(subdivisionCoords(IPT%nDim_mesh, product(IPT%nFields**IPT%localizationLevel)))
     call build_subdivisions(IPT, globMSH, groupMax, group, groupComm, stepProc, procExtent, overlap)
-    call setGrid(subdivisionCoords, globMSH%xMinGlob, stepProc, IPT%localizationLevel*IPT%nFields, inverse=.true.)
-    !if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
+    call setGrid(subdivisionCoords, globMSH%xMinGlob, stepProc, IPT%nFields**IPT%localizationLevel, inverse=.true.)
+    if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
 
 
     !Making all realizations
@@ -142,8 +142,8 @@ program main_RandomField
     if(rang == 0) write(*,*) " "
     if(rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
     call wLog("-> SAMPLING----------------------------------------")
-    allocate(HDF5Name(product(IPT%nFields*IPT%localizationLevel)))
-    do i = 1, product(IPT%nFields*IPT%localizationLevel)
+    allocate(HDF5Name(product(IPT%nFields**IPT%localizationLevel)))
+    do i = 1, product(IPT%nFields**IPT%localizationLevel)
         if(rang == 0) write(*,*) " "
         if(rang == 0) write(*,*) " "
         if(rang == 0) write(*,*)  "-> Making Field ", i

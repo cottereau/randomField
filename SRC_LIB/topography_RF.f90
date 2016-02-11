@@ -111,7 +111,7 @@ contains
         where(ovlp_Tot <= 0.0D0) ovlp_Tot = 0.0D0
         call wLog("        OVERLAP = ")
         call wLog(ovlp)
-        call wLog("        OVERLAP TOTAL = ")
+        call wLog("        OVERLAP SUM = ")
         call wLog(ovlp_Tot)
         Novlp_Tot = (MSH%xMaxGlob - MSH%xMinGlob) - ovlp_Tot
         call wLog("        NON-OVERLAP TOTAL (rest) = ")
@@ -136,7 +136,7 @@ contains
         call wLog(MSH%xMaxGlob)
 
         !Extent of a proc
-        delta_Proc = (Novlp_Tot)/dble(MSH%procPerDim) + 2.0D0*ovlp - 2*MSH%xStep
+        delta_Proc = (Novlp_Tot)/dble(MSH%procPerDim) + 2.0D0*ovlp -2.0D0*MSH%xStep
         where(MSH%procPerDim == 1)  delta_Proc = (Novlp_Tot)/dble(MSH%procPerDim)
         stepProc   =  Novlp + ovlp
         call wLog("        delta_Proc = ")
@@ -177,6 +177,9 @@ contains
 
         xMinBound = MSH%procStart
         xMaxBound = MSH%procStart + MSH%procExtent
+        !where(MSH%coords == 0) xMinBound = MSH%procStart
+        !where(MSH%coords == MSH%procPerDim-1) xMaxBound = MSH%procStart + MSH%procExtent
+
         validProc = .true.
 
         if(.not. MSH%independent) then
@@ -296,9 +299,11 @@ contains
         xMinExt = MSH%xMinBound
         xMaxExt = MSH%xMaxBound
 
-        do neighPos = 1, 2*MSH%nDim
+        do neighPos = 1, size(MSH%neigh)
 
             if(MSH%neigh(neighPos) < 0) cycle
+
+            if(sum(abs(MSH%neighShift(:,neighPos))) /= 1) cycle ! We need only the "pure directions"
 
             where(MSH%neighShift(:,neighPos) < 0)
                 xMinExt = MSH%xMinBound - MSH%xStep
