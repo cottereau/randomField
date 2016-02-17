@@ -18,6 +18,7 @@ module type_inputRF
         integer :: nDim_mesh
         integer :: meshMod
         double precision, dimension(:), allocatable :: xMaxGlob, xMinGlob;
+        double precision, dimension(:), allocatable :: xMaxGlob_in, xMinGlob_in;
         integer         , dimension(:), allocatable :: pointsPerCorrL;
         integer         , dimension(:), allocatable :: procPerDim
         !UNV
@@ -59,6 +60,8 @@ contains
 
             if(.not. allocated(IPT%xMaxGlob)) allocate(IPT%xMaxGlob(nDim))
             if(.not. allocated(IPT%xMinGlob)) allocate(IPT%xMinGlob(nDim))
+            if(.not. allocated(IPT%xMaxGlob_in)) allocate(IPT%xMaxGlob_in(nDim))
+            if(.not. allocated(IPT%xMinGlob_in)) allocate(IPT%xMinGlob_in(nDim))
             if(.not. allocated(IPT%pointsPerCorrL)) allocate(IPT%pointsPerCorrL(nDim))
             if(.not. allocated(IPT%corrL)) allocate(IPT%corrL(nDim))
             if(.not. allocated(IPT%overlap)) allocate(IPT%overlap(nDim))
@@ -68,9 +71,11 @@ contains
             IPT%log_ID = log_file_RF_ID
             IPT%rang   = rang
             IPT%init   = .true.
-            IPT%xMaxGlob   = -1.0D0
+            IPT%xMaxGlob = -1.0D0
             IPT%xMinGlob = -1.0D0
-            IPT%pointsPerCorrL   = -1.0D0
+            IPT%xMaxGlob_in = -1.0D0
+            IPT%xMinGlob_in = -1.0D0
+            IPT%pointsPerCorrL = -1.0D0
             IPT%corrL   = -1.0D0
             IPT%overlap = -1.0D0
 
@@ -94,6 +99,8 @@ contains
             if(allocated(IPT%overlap)) deallocate(IPT%overlap)
             if(allocated(IPT%procPerDim)) deallocate(IPT%procPerDim)
             if(allocated(IPT%nFields)) deallocate(IPT%nFields)
+            if(allocated(IPT%xMaxGlob_in)) deallocate(IPT%xMaxGlob_in)
+            if(allocated(IPT%xMinGlob_in)) deallocate(IPT%xMinGlob_in)
 
         end subroutine finalize_IPT_RF
 
@@ -112,6 +119,8 @@ contains
 
             IPT%xMaxGlob = IPT_orig%xMaxGlob
             IPT%xMinGlob = IPT_orig%xMinGlob
+            IPT%xMinGlob_in = IPT_orig%xMinGlob_in
+            IPT%xMinGlob_in = IPT_orig%xMinGlob_in
             IPT%pointsPerCorrL = IPT_orig%pointsPerCorrL
             IPT%corrL   = IPT_orig%corrL
             IPT%overlap = IPT_orig%overlap
@@ -190,9 +199,11 @@ contains
                 case(1)
                     if(IPT%rang==0) write(*,*) "   Mesh automatic"
                     call wLog("    Mesh automatic")
-                    call read_DataTable(dataTable, "Min", IPT%xMinGlob)
-                    call read_DataTable(dataTable, "Max", IPT%xMaxGlob)
+                    call read_DataTable(dataTable, "Min", IPT%xMinGlob_in)
+                    call read_DataTable(dataTable, "Max", IPT%xMaxGlob_in)
                     call read_DataTable(dataTable, "pointsPerCorrL", IPT%pointsPerCorrL)
+                    IPT%xMinGlob = IPT%xMinGlob_in
+                    IPT%xMaxGlob = IPT%xMaxGlob_in
                 case(2)
                     stop("Inside read_mesh_input UNV not updated")
                     if(IPT%rang==0) write(*,*) "   Mesh UNV"
@@ -209,7 +220,9 @@ contains
                     !                  IPT%rang, IPT%nb_procs, IPT%comm)
                     call wLog("-> defining_UNV_extremes")
                     if(IPT%rang==0) write(*,*) "-> defining_UNV_extremes"
-                    call get_Global_Extremes_Mesh(IPT%coordList, IPT%comm, IPT%xMinGlob, IPT%xMaxGlob)
+                    call get_Global_Extremes_Mesh(IPT%coordList, IPT%comm, IPT%xMinGlob_in, IPT%xMaxGlob_in)
+                    IPT%xMinGlob = IPT%xMinGlob_in
+                    IPT%xMaxGlob = IPT%xMaxGlob_in
                     if(IPT%rang==0) write(*,*) " IPT%xMinGlob = ", IPT%xMinGlob
                     if(IPT%rang==0) write(*,*) " IPT%xMaxGlob = ", IPT%xMaxGlob
 !                    call DispCarvalhol(transpose(IPT%connectList), "transpose(IPT%connectList)", &
@@ -354,6 +367,8 @@ contains
                 write(unit,*) " MESH -----------------"
                 write(unit,*) " nDim_mesh = ", IPT%nDim_mesh
                 write(unit,*) " meshMod = ", IPT%meshMod
+                write(unit,*) " xMaxGlob_in = ", IPT%xMaxGlob_in
+                write(unit,*) " xMinGlob_in = ", IPT%xMinGlob_in
                 write(unit,*) " xMaxGlob = ", IPT%xMaxGlob
                 write(unit,*) " xMinGlob = ", IPT%xMinGlob
                 write(unit,*) " pointsPerCorrL = ", IPT%pointsPerCorrL

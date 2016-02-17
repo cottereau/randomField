@@ -266,7 +266,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine set_overlap_geometry (MSH, xMinInt, xMaxInt, xMinExt, xMaxExt, &
-                                     xMaxNeigh, xMinNeigh, xOrNeigh, nOvlpPoints)
+                                     xMaxNeigh, xMinNeigh, xOrNeigh, nOvlpPoints, nOvlpMax)
 
         implicit none
 
@@ -276,11 +276,12 @@ contains
         !OUTPUT
         double precision, dimension(:)  , intent(out) :: xMinInt, xMaxInt, xMinExt, xMaxExt
         double precision, dimension(:,:), intent(out) :: xMaxNeigh, xMinNeigh, xOrNeigh
-        integer(kind=8), intent(out) :: nOvlpPoints
+        integer(kind=8), intent(out) :: nOvlpPoints, nOvlpMax
 
         !LOCAL VARIABLES
         double precision :: ovlpFraction = 1.0D0
         integer :: neighPos
+        integer :: nOvlpPoints_Neigh
 
 
         call wLog("    ")
@@ -346,6 +347,7 @@ contains
         !Dimensioning overlapping area
         call wLog("    Dimensioning neighbours limits")
         nOvlpPoints = 0
+        nOvlpMax    = 0
 
         do neighPos = 1, size(MSH%neigh)
             if(MSH%neigh(neighPos) < 0) cycle
@@ -374,8 +376,10 @@ contains
                 stop(" ")
             end if
 
-            nOvlpPoints = nOvlpPoints + &
-                          product(find_xNStep(xMinNeigh(:,neighPos), xMaxNeigh(:,neighPos), MSH%xStep))
+            nOvlpPoints_Neigh = product(find_xNStep(xMinNeigh(:,neighPos), xMaxNeigh(:,neighPos), MSH%xStep))
+
+            nOvlpPoints = nOvlpPoints + nOvlpPoints_Neigh
+            if(nOvlpPoints_Neigh > nOvlpMax) nOvlpMax = nOvlpPoints_Neigh
         end do
 
         call show_MESHneigh(MSH, " ", onlyExisting = .true., forLog = .true.)

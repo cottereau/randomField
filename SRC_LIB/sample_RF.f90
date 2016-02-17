@@ -25,6 +25,106 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
 
+        subroutine redefineIPTlimits(IPT, xMinGlob, xMaxGlob, localizationLevel)
+
+            implicit none
+            !INPUT
+            type(IPT_RF), intent(in)  :: IPT
+            !OUTPUT
+            double precision, dimension(:), intent(out) :: xMinGlob
+            double precision, dimension(:), intent(out) :: xMaxGlob
+            integer, intent(inout) :: localizationLevel
+
+            !LOCAL
+            type(MESH) :: globMSH
+            integer :: code
+            double precision, dimension(IPT%nDim_mesh) :: ratio
+            double precision, dimension(IPT%nDim_mesh) :: Novlp_Now, procExtent, Ovlp_Now
+            double precision, dimension(IPT%nDim_mesh) :: xRangeTotal, xMaxTotal, xMinTotal, xRangeGlob
+            double precision, dimension(IPT%nDim_mesh) :: overlap
+            logical :: locLevelOK
+
+            call wLog("-> Redefining input xMinGlob, xMinGlob based on localization level")
+            locLevelOK = .false.
+
+
+            call init_MESH(globMSH, IPT, IPT%comm, IPT%rang)
+
+            call wLog("->  set_procPerDim")
+            call wLog("     globMSH%procPerDim")
+            call wLog(globMSH%procPerDim)
+            call wLog("-> round_basic_inputs")
+            call round_basic_inputs(globMSH, globMSH%xStep, globMSH%overlap)
+            call wLog("-> set_global_extremes")
+            call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, &
+                                     globMSH%procStart)
+
+
+            xMaxTotal   = globMSH%xMaxGlob
+            xMinTotal   = globMSH%xMinGlob
+            xRangeTotal = xMaxTotal - xMinTotal
+            overlap     = globMSH%overlap
+
+            call wLog("xMaxTotal = ")
+            call wLog(xMaxTotal)
+            call wLog("xMinTotal = ")
+            call wLog(xMinTotal)
+            call wLog("xRangeTotal = ")
+            call wLog(xRangeTotal)
+            call finalize_MESH(globMSH)
+
+            do while(.not. locLevelOK)
+
+                xRangeGlob = (xRangeTotal + overlap*dble((IPT%nFields**(IPT%localizationLevel-1)) - 1))&
+                             /dble(IPT%nFields**(IPT%localizationLevel-1))
+                call wLog("xRangeGlob = ")
+                call wLog(xRangeGlob)
+
+                if(all(xRangeGlob < 0)) then
+                    if(IPT%rang == 0) then
+                        write(*,*) "Localization level not adapted to mesh requirements, will be reduced"
+                        write(*,*) "OLD localizationLevel = ", localizationLevel
+                    end if
+                    call wLog("Localization level not adapted to mesh requirements, will be reduced")
+                    call wLog("OLD localizationLevel = ")
+                    call wLog(localizationLevel)
+
+                    localizationLevel = localizationLevel -1
+
+                    if(IPT%rang == 0) write(*,*) "NEW localizationLevel = ", localizationLevel
+                    call wLog("NEW localizationLevel = ")
+                    call wLog(localizationLevel)
+
+                    if(localizationLevel < 0) then
+                        !stop ("ERROR inside redefineIPTlimits, localization level smaller than 0")
+                        locLevelOK = .true.
+                        write(*,*) "ERROR NEGATIVE LOCALIZATION ON RANK = ", IPT%rang
+                        call wLog("ERROR NEGATIVE LOCALIZATION ON RANK = ")
+                        call wLog(IPT%rang)
+                        call wLog(localizationLevel)
+                    end if
+                else
+                    locLevelOK = .true.
+                    xMinGlob   = xMinTotal
+                    xMaxGlob   = xMinTotal + xRangeGlob
+
+
+                    call wLog("xMinGlob")
+                    call wLog(xMinGlob)
+                    call wLog("xMaxGlob")
+                    call wLog(xMaxGlob)
+
+                end if
+
+            end do
+
+        end subroutine redefineIPTlimits
+
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+
         subroutine build_subdivisions(IPT, globMSH, groupMax, group, groupComm, stepProc, procExtent, overlap)
 
             implicit none
@@ -36,21 +136,20 @@ contains
             double precision, dimension(:), intent(out) :: stepProc
             double precision, dimension(:), intent(out) :: procExtent
             double precision, dimension(:), intent(out) :: overlap
+
             !LOCAL
             integer :: code
 
-            !periods(:) = .false.
-
-            call init_MESH(globMSH, IPT, IPT%comm, product(IPT%nFields), IPT%rang)
+            call init_MESH(globMSH, IPT, IPT%comm, IPT%rang)
 
             call wLog("->  set_procPerDim")
-            globMSH%procPerDim  = IPT%nFields
             globMSH%independent = .true.
             call wLog("     globMSH%procPerDim")
             call wLog(globMSH%procPerDim)
             call wLog("-> round_basic_inputs")
             call round_basic_inputs(globMSH, globMSH%xStep, globMSH%overlap)
             overlap = globMSH%overlap
+
             call wLog("-> set_global_extremes")
             call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, &
                                      globMSH%procStart, stepProc)
@@ -224,6 +323,8 @@ contains
                 call wLog (RDF%gen_CPU_Time)
                 all_t3 = -1.0D0
 
+                !RDF%randField = 1.0D0 ! For Tests
+
                 call wLog("-> Writing XMF and hdf5 files");
 
                 if(writeFiles) then
@@ -374,9 +475,9 @@ contains
                 totalFieldPerDim = IPT%nFields**(IPT%localizationLevel)
                 if (IPT%rang == 0) write(*,*) "totalFieldPerDim = ", totalFieldPerDim
 
-                !do locLevel = 1, IPT%localizationLevel
+                do locLevel = 1, IPT%localizationLevel
                 !do locLevel = 1, 1 ! FOR TESTS
-                do locLevel = 3, 3 ! FOR TESTS
+                !do locLevel = 3, 3 ! FOR TESTS
                     if(IPT%rang == 0) write(*,*)  "  locLevel = ", locLevel, "-------------"
                     call wLog("     locLevel -----------------------------------")
                     call wLog(locLevel)
@@ -483,7 +584,8 @@ contains
 
                         call wLog("-> set_overlap_geometry")
                         call set_overlap_geometry (globMSH, globMSH%xMinInt, globMSH%xMaxInt, globMSH%xMinExt, globMSH%xMaxExt, &
-                                                   globMSH%xMaxNeigh, globMSH%xMinNeigh, globMSH%xOrNeigh, globMSH%nOvlpPoints)
+                                                   globMSH%xMaxNeigh, globMSH%xMinNeigh, globMSH%xOrNeigh,                      &
+                                                   globMSH%nOvlpMax, globMSH%nOvlpPoints)
 
                         call wLog("-> Setting xPoints")
                         call set_xPoints(globMSH, globRDF, globRDF%xPoints_Local)
@@ -542,6 +644,7 @@ contains
                             call wLog("    ->addNeighboursFields")
                             !call addNeighboursFields(globRDF, globMSH)
                             call addNeighboursFieldsV2(globRDF, globMSH)
+                            !call addNeighboursFields2B(globRDF, globMSH)
                         end if
 
                         call wLog("-> Writing XMF and hdf5 files FOR GLOBAL FIELD");
@@ -574,7 +677,7 @@ contains
                             else
                                 call wLog("   (Per Proc)");
                                 call write_Mono_XMF_h5(globRDF, globMSH, IPT%connectList, IPT%monotype, BBoxPartFileName, globRDF%rang, single_path, &
-                                                       globMSH%comm, ["_ALL"], [0], 0, style=outputStyle, meshMod = msh_AUTO, &
+                                                       globMSH%comm, ["_procOnlyShape"], [IPT%rang], 0, style=outputStyle, meshMod = msh_AUTO, &
                                                        writeDataSet = IPT%writeDataSet)
 
                             end if

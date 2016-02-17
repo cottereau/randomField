@@ -19,7 +19,7 @@ module type_MESH
             !nDim independent
         integer :: meshMod, method
         integer :: nDim = -1
-        integer(kind=8) :: xNTotal, nOvlpPoints
+        integer(kind=8) :: xNTotal, nOvlpPoints, nOvlpMax
         !integer :: xNTotal
         !integer :: xNTotal = -1, xNInit = -1, xNEnd = -1, xNGlob = -1
         logical :: independent

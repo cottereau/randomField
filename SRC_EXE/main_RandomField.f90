@@ -124,6 +124,23 @@ program main_RandomField
         stop(" ")
     end if
 
+    !Changing xMaxGlob and xMinGlob according to localization level
+    if(rang == 0) write(*,*) "-> REDEFINE xMaxGlob and xMinGlob----------------------------------------"
+    call wLog("-> REDEFINE xMaxGlob and xMinGlob----------------------------------------")
+    call redefineIPTlimits(IPT, IPT%xMinGlob, IPT%xMaxGlob, IPT%localizationLevel)
+    if(rang == 0) write(*,*) "IPT%xMinGlob"
+    if(rang == 0) write(*,*) IPT%xMinGlob
+    if(rang == 0) write(*,*) "IPT%xMaxGlob"
+    if(rang == 0) write(*,*) IPT%xMaxGlob
+    if(rang == 0) write(*,*) "IPT%localizationLevel"
+    if(rang == 0) write(*,*) IPT%localizationLevel
+    call wLog("IPT%xMinGlob")
+    call wLog(IPT%xMinGlob)
+    call wLog("IPT%xMaxGlob")
+    call wLog(IPT%xMaxGlob)
+    call wLog("IPT%localizationLevel")
+    call wLog(IPT%localizationLevel)
+
     !Building Subdivisions
     if(rang == 0) write(*,*) " "
     if(rang == 0) write(*,*) "-> DIVIDING----------------------------------------"
@@ -132,13 +149,14 @@ program main_RandomField
     allocate(procExtent(IPT%nDim_mesh))
     allocate(overlap(IPT%nDim_mesh))
     allocate(subdivisionCoords(IPT%nDim_mesh, product(IPT%nFields**IPT%localizationLevel)))
-    call build_subdivisions(IPT, globMSH, groupMax, group, groupComm, stepProc, procExtent, overlap)
+    call build_subdivisions(IPT, globMSH, groupMax, &
+                            group, groupComm, stepProc, procExtent, overlap)
     call setGrid(subdivisionCoords, globMSH%xMinGlob, stepProc, IPT%nFields**IPT%localizationLevel, inverse=.true.)
-    if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
-
+    !if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
+    if(rang == 0) write(*,*) "Max Coord = ", subdivisionCoords(:, size(subdivisionCoords,2)) + stepProc
 
     !Making all realizations
-    if(.false.)then
+    if(.true.)then
     if(rang == 0) write(*,*) " "
     if(rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
     call wLog("-> SAMPLING----------------------------------------")
