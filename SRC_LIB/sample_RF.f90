@@ -408,7 +408,7 @@ contains
             type(MESH) :: globMSH
             type(RF)   :: globRDF
             integer(HSIZE_T), dimension(IPT%nDim_gen) :: offset, locDims
-            integer :: group, fieldNumber, groupComm
+            integer :: group, fieldNumber, groupComm, groupMax
             integer :: code
             character(len=200) :: randFieldFilePath
             character(len=100) :: BBoxPartFileName
@@ -422,7 +422,7 @@ contains
             double precision, dimension(IPT%nDim_mesh) :: stepProc_level, procExtent_level
             integer, dimension(IPT%nDim_mesh) :: procCoord, locStep
             integer, dimension(IPT%nDim_mesh) :: totalFieldPerDim, nFields_level, nFields_level_before
-            integer :: i
+            integer :: i, validProcGroup, validProcComm, prodNFields
 
             !H5 LOCAL
             character(len=50) :: attr_Name, dset="samples"
@@ -444,15 +444,19 @@ contains
             if(product(IPT%nFields) > IPT%nb_procs) stop("Too little processors for this number of fields")
 
             if(IPT%rang == 0) write(*,*)  "Dividing comunicator"
-            group = 0
-            if(IPT%rang < product(IPT%nFields)) then
-                group = 1
-            end if
+            prodNFields = product(IPT%nFields)
+            group    = IPT%rang/prodNFields
+            groupMax = IPT%nb_procs/prodNFields
+
             call wLog("     IPT%rang =")
             call wLog(IPT%rang)
             call wLog("     group =")
             call wLog(group)
 
+            validProcGroup = 0
+            if(group < groupMax) validProcGroup = 1
+
+            call MPI_COMM_SPLIT(IPT%comm, validProcGroup, IPT%rang, validProcComm, code)
             call MPI_COMM_SPLIT(IPT%comm, group, IPT%rang, groupComm, code)
 
             call wLog("TESTING---------------")
@@ -465,13 +469,16 @@ contains
             call wLog("groupComm")
             call wLog(groupComm)
 
-            if(group == 1) then
+            if(validProcGroup == 1) then
 
                 call init_IPT_RF(newIPT, IPT%nDim_mesh, IPT%log_ID, IPT%rang)
                 call copy_IPT_RF(newIPT, IPT)
 
                 newIPT%overlap = overlap
                 newIPT%independent = .true.
+                newIPT%comm = groupComm
+                call MPI_COMM_RANK(groupComm, newIPT%rang, code)
+                call MPI_COMM_SIZE(groupComm, newIPT%nb_procs, code)
                 totalFieldPerDim = IPT%nFields**(IPT%localizationLevel)
                 if (IPT%rang == 0) write(*,*) "totalFieldPerDim = ", totalFieldPerDim
 
@@ -482,8 +489,10 @@ contains
                     call wLog("     locLevel -----------------------------------")
                     call wLog(locLevel)
 
-                    if (IPT%rang == 0) write(*,*) "locLevel = ", locLevel
-                    if (IPT%rang == 0) write(*,*) " "
+                    if(IPT%rang == 0) write(*,*)  "  Syncyng Procs  "
+                    call wLog("     Syncing Procs")
+                    call MPI_BARRIER(validProcComm, code) !We need all the procs to finish before going to next localizationLevel
+
 
                     if(allocated(offsetCoords)) deallocate(offsetCoords)
                     nFields_level = IPT%nFields**(locLevel)
@@ -502,6 +511,15 @@ contains
 
                     do locIter = 1, size(offsetCoords,2)
                     !do locIter = 1, 1 ! FOR TESTS
+
+                        !write(*,*) "BEFORE RANG ", IPT%rang ,"locIter = ", locIter, "group =", group
+                        !write(*,*) "mod(locIter-1, groupMax)  ", mod(locIter-1, groupMax)
+
+                        if(mod(locIter-1, groupMax) /= group) cycle
+
+                        !write(*,*) "          AFTER RANG ", IPT%rang ,"locIter = ", locIter
+                        !write(*,*) "F1 RANG ", IPT%rang ,"locIter = ", locIter
+
                         if(IPT%rang == 0) write(*,*)  "     locIter = ", locIter
                         call wLog("     Waiting for the other procs")
                         call wLog("  locIter = ")
@@ -510,11 +528,11 @@ contains
 
 
                         call wLog(" subdivisionCoords(:,IPT%rang+1)")
-                        call wLog(subdivisionCoords(:,IPT%rang+1))
+                        call wLog(subdivisionCoords(:,newIPT%rang+1))
                         call wLog(" (offsetCoords(:,locIter)/(stepProc*nFields_level_before))")
                         call wLog((offsetCoords(:,locIter)/(stepProc*nFields_level_before)))
 
-                        procCoord = nint(subdivisionCoords(:,IPT%rang+1)) + &
+                        procCoord = nint(subdivisionCoords(:,newIPT%rang+1)) + &
                                     nint(offsetCoords(:,locIter)/(stepProc*nFields_level_before))
                         call wLog("     procCoord -----------------------------------")
                         call wLog(procCoord)
@@ -529,12 +547,14 @@ contains
                         !                  + dble(locLevel*IPT%nFields)*procExtent &
                         !                  - dble((locLevel*IPT%nFields)-1)*(procExtent-stepProc)
 
+                        !write(*,*) "F2 RANG ", IPT%rang ,"locIter = ", locIter
+
                         call wLog("     newIPT%xMinGlob")
                         call wLog(newIPT%xMinGlob)
                         call wLog("     newIPT%xMaxGlob")
                         call wLog(newIPT%xMaxGlob)
-                        call init_MESH(globMSH, newIPT, groupComm, IPT%rang)
-                        call init_RF(globRDF, newIPT, groupComm, product(IPT%nFields), IPT%rang)
+                        call init_MESH(globMSH, newIPT, groupComm, newIPT%rang)
+                        call init_RF(globRDF, newIPT, groupComm, product(IPT%nFields), newIPT%rang)
                         call wLog("-> set_communications_topology")
                         call set_communications_topology(globMSH, globMSH%coords, globMSH%neigh, &
                                                          globMSH%neighShift, globMSH%considerNeighbour, &
@@ -545,6 +565,8 @@ contains
 
                         call wLog("-> set_global_extremes")
                         call set_global_extremes(globMSH, globMSH%xMaxGlob, globMSH%xMinGlob, globMSH%procExtent, globMSH%procStart)
+
+                        !write(*,*) "F3 RANG ", IPT%rang ,"locIter = ", locIter
 
                         !We take the value on the last iteration for the next level
                         !if(locIter == size(offsetCoords,2)) then
@@ -586,6 +608,8 @@ contains
                         call set_overlap_geometry (globMSH, globMSH%xMinInt, globMSH%xMaxInt, globMSH%xMinExt, globMSH%xMaxExt, &
                                                    globMSH%xMaxNeigh, globMSH%xMinNeigh, globMSH%xOrNeigh,                      &
                                                    globMSH%nOvlpMax, globMSH%nOvlpPoints)
+
+                        !write(*,*) "F4 RANG ", IPT%rang ,"locIter = ", locIter
 
                         call wLog("-> Setting xPoints")
                         call set_xPoints(globMSH, globRDF, globRDF%xPoints_Local)
@@ -629,6 +653,7 @@ contains
                         call h5fclose_f(file_id, hdferr) ! Close the file.
                         call h5close_f(hdferr) ! Close FORTRAN interface.
                        !call DispCarvalhol(globRDF%randField_Local, "globRDF%randField_Local")
+                        !write(*,*) "F6 RANG ", IPT%rang ,"locIter = ", locIter
                         if(globRDF%nb_procs > 1) then
                             call wLog("")
                             call wLog("GENERATING OVERLAP")
@@ -644,8 +669,8 @@ contains
                             call wLog("    ->addNeighboursFields")
                             !call addNeighboursFields(globRDF, globMSH)
                             call addNeighboursFieldsV2(globRDF, globMSH)
-                            !call addNeighboursFields2B(globRDF, globMSH)
                         end if
+                        !write(*,*) "              F7 RANG ", IPT%rang ,"locIter = ", locIter
 
                         call wLog("-> Writing XMF and hdf5 files FOR GLOBAL FIELD");
 

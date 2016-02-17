@@ -184,11 +184,14 @@ program main_RandomField
     call finalize_MESH(globMSH)
 
     !Combining realizations (localization)
-    if(rang == 0) write(*,*) " "
-    if(rang == 0) write(*,*) "-> COMBINING----------------------------------------"
-    call wLog("-> COMBINING----------------------------------------")
-    call combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, stepProc, procExtent, overlap)
-
+    if(product(IPT%nFields) /= 1) then
+        if(rang == 0) write(*,*) " "
+        if(rang == 0) write(*,*) "-> COMBINING----------------------------------------"
+        call wLog("-> COMBINING----------------------------------------")
+        call combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, stepProc, procExtent, overlap)
+    else
+        if(rang == 0) write(*,*) "-> NOTHING TO BE COMBINED----------------------------------------"
+    end if
 
 	!Deallocating
 	call deallocate_all()

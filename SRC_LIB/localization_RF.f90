@@ -452,6 +452,8 @@ contains
 
         call wLog ("Inside addNeighboursFieldsV2")
 
+        !write(*,*) "              FA RANG ", RDF%rang
+
 
         !Buffer allocation
         call wLog ("Allocating buffer")
@@ -505,6 +507,8 @@ contains
         call wLog(" ")
 
         do direction = 1, size(MSH%neigh)
+
+            !write(*,*) "              FB RANG ", RDF%rang
 
             call MPI_BARRIER(MSH%comm, code) !This is necessary so we can reduce the size of the buffer
 
@@ -589,6 +593,8 @@ contains
             dirShift   = -dirShift
             neighShift = -neighShift
             neighRank  = MSH%op_neigh(direction)
+
+            !write(*,*) "              FC RANG ", RDF%rang
 
             if(MSH%op_neigh(direction) < 0) rcv = .false. !Check if this direction exists
 
