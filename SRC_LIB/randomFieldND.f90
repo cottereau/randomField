@@ -674,12 +674,13 @@ contains
     !---------------------------------------------------------------------------------
     !---------------------------------------------------------------------------------
     !---------------------------------------------------------------------------------
-    subroutine normalize_randField(RDF, xNTotal, randField)
+    subroutine normalize_randField(RDF, xNTotal, randField, minPos, maxPos)
         implicit none
         !INPUT OUTPUT
         double precision, dimension(:,:), intent(inout) :: randField
         !INPUT
         integer(kind=8), intent(in) :: xNTotal
+        integer, dimension(:), intent(in) :: minPos, maxPos
         type(RF), intent(in) :: RDF
         !LOCAL
         double precision, dimension(RDF%Nmc) :: sumRF, sumRFsquare
@@ -692,21 +693,24 @@ contains
 
         call wLog("Calculating Average and stdVar")
 
-        !Calculating
-        call wLog("sumRF(1) = ")
-        call wLog(sumRF(1))
-        call wLog("sumRFsquare(1) = ")
-        call wLog(sumRFsquare(1))
 
         !Total Number of Points
         call wLog("xNTotal = ")
         call wLog(xNTotal)
 
         !Average Correction
-        sumRF(:)       = sum( RDF%randField    , dim = 1)
+        if(RDF%nDim == 2) sumRF(:) = sum(RDF%RF_2D(minPos(1):maxPos(1), &
+                                                   minPos(2):maxPos(2)))
+        if(RDF%nDim == 3) sumRF(:) = sum(RDF%RF_3D(minPos(1):maxPos(1), &
+                                                   minPos(2):maxPos(2), &
+                                                   minPos(3):maxPos(3)))
+
+        !sumRF(:)       = sum( RDF%randField    , dim = 1)
+        call wLog("sumRF(1) = ")
+        call wLog(sumRF(1))
         call MPI_ALLREDUCE (sumRF,totalSumRF,RDF%Nmc,MPI_DOUBLE_PRECISION, &
                             MPI_SUM,RDF%comm,code)
-        evntAvg      = totalSumRF/xNTotal;
+        evntAvg      = totalSumRF/dble(xNTotal);
         call wLog("Initial Average = ")
         call wLog(evntAvg)
 
@@ -715,16 +719,30 @@ contains
         end do
 
         !Verifying Average
-        sumRF(:)       = sum( RDF%randField    , dim = 1)
+        if(RDF%nDim == 2) sumRF(:) = sum(RDF%RF_2D(minPos(1):maxPos(1), &
+                                                   minPos(2):maxPos(2)))
+        if(RDF%nDim == 3) sumRF(:) = sum(RDF%RF_3D(minPos(1):maxPos(1), &
+                                                   minPos(2):maxPos(2), &
+                                                   minPos(3):maxPos(3)))
+        !sumRF(:)       = sum( RDF%randField    , dim = 1)
         call MPI_ALLREDUCE (sumRF,totalSumRF,RDF%Nmc,MPI_DOUBLE_PRECISION, &
                             MPI_SUM,RDF%comm,code)
-        evntAvg      = totalSumRF/xNTotal;
+        evntAvg      = totalSumRF/dble(xNTotal);
         call wLog("Final Average = ")
         call wLog(evntAvg)
 
 
         !Standard Deviation Correction
-        sumRFsquare(:) = sum((RDF%randField)**2, dim = 1)
+        if(RDF%nDim == 2) sumRFsquare(:) = sum((RDF%RF_2D(minPos(1):maxPos(1), &
+                                                          minPos(2):maxPos(2)) &
+                                                           )**2.0D0)
+        if(RDF%nDim == 3) sumRFsquare(:) = sum((RDF%RF_3D(minPos(1):maxPos(1), &
+                                                          minPos(2):maxPos(2), &
+                                                          minPos(3):maxPos(3)) &
+                                                          )**2.0D0)
+        !sumRFsquare(:) = sum((RDF%randField)**2, dim = 1)
+        call wLog("sumRFsquare(1) = ")
+        call wLog(sumRFsquare(1))
         call MPI_ALLREDUCE (sumRFsquare,totalSumRFsquare,RDF%Nmc,MPI_DOUBLE_PRECISION, &
                             MPI_SUM,RDF%comm,code)
         evntStdDev   = sqrt(totalSumRFsquare/dble(xNTotal)) !Mean of random field is supposed to be 0
@@ -735,7 +753,14 @@ contains
         end do
 
         !Verifying Standard Deviation
-        sumRFsquare(:) = sum((RDF%randField)**2, dim = 1)
+        if(RDF%nDim == 2) sumRFsquare(:) = sum((RDF%RF_2D(minPos(1):maxPos(1), &
+                                                          minPos(2):maxPos(2)) &
+                                                           )**2.0D0)
+        if(RDF%nDim == 3) sumRFsquare(:) = sum((RDF%RF_3D(minPos(1):maxPos(1), &
+                                                          minPos(2):maxPos(2), &
+                                                          minPos(3):maxPos(3)) &
+                                                          )**2.0D0)
+        !sumRFsquare(:) = sum((RDF%randField)**2.0D0, dim = 1)
         call MPI_ALLREDUCE (sumRFsquare,totalSumRFsquare,RDF%Nmc,MPI_DOUBLE_PRECISION, &
                             MPI_SUM,RDF%comm,code)
         evntStdDev   = sqrt(totalSumRFsquare/dble(xNTotal)) !Mean of random field is supposed to be 0

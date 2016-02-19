@@ -35,6 +35,7 @@ program main_RandomField
     character(len=30)  :: rangChar;
     character(len=200) :: path, logFilePath
     integer, dimension(:), allocatable :: seed
+    double precision, dimension(5) :: times, all_times
 
     !DEVEL
     !integer, dimension(2) :: nFields = [2,1] !Number of independent fields in each dimension
@@ -53,6 +54,8 @@ program main_RandomField
     call init_communication(MPI_COMM_WORLD, IPT%comm, IPT%rang, IPT%nb_procs)
     rang = IPT%rang
     IPT%writeDataSet = writeDataSet
+
+    times(1) = MPI_Wtime() !Initial Time
 
     if(IPT%rang == 0)then
         write(*,*)
@@ -116,6 +119,10 @@ program main_RandomField
 #ifdef MAKELOG
     call show_IPT_RF(IPT, forLog_in=.true.)
 #endif
+
+    times(2) = MPI_Wtime() !Reading Inputs
+
+
     !Initial allocation---------------------------------------------
     call allocate_init()
 
@@ -155,6 +162,8 @@ program main_RandomField
     !if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
     if(rang == 0) write(*,*) "Max Coord = ", subdivisionCoords(:, size(subdivisionCoords,2)) + stepProc
 
+    times(3) = MPI_Wtime() !Organizing Collective Writing
+
     !Making all realizations
     if(.true.)then
     if(rang == 0) write(*,*) " "
@@ -183,15 +192,30 @@ program main_RandomField
 
     call finalize_MESH(globMSH)
 
+    times(4) = MPI_Wtime() !Generation Time
+
     !Combining realizations (localization)
     if(product(IPT%nFields) /= 1) then
         if(rang == 0) write(*,*) " "
         if(rang == 0) write(*,*) "-> COMBINING----------------------------------------"
         call wLog("-> COMBINING----------------------------------------")
-        call combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, stepProc, procExtent, overlap)
+        call combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, stepProc, procExtent, overlap, times(1))
     else
         if(rang == 0) write(*,*) "-> NOTHING TO BE COMBINED----------------------------------------"
     end if
+
+    times(5) = MPI_Wtime() !Localization Time
+
+    call MPI_ALLREDUCE (times, all_times, size(times), MPI_DOUBLE_PRECISION, MPI_SUM, IPT%comm,code)
+
+    if(rang == 0) write(*,*) ""
+    if(rang == 0) write(*,*) ""
+    if(rang == 0) write(*,*) "AVERAGE TIMES (WALL)------------------------ "
+    if(rang == 0) write(*,*) "Reading Inputs   = ", (all_times(2) - all_times(1))/dble(IPT%nb_procs)
+    if(rang == 0) write(*,*) "Pre Organization = ", (all_times(3) - all_times(2))/dble(IPT%nb_procs)
+    if(rang == 0) write(*,*) "Generation       = ", (all_times(4) - all_times(3))/dble(IPT%nb_procs)
+    if(rang == 0) write(*,*) "Localization     = ", (all_times(5) - all_times(4))/dble(IPT%nb_procs)
+    if(rang == 0) write(*,*) ""
 
 	!Deallocating
 	call deallocate_all()

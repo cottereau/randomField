@@ -159,6 +159,7 @@ contains
             IPT%nDim_gen = IPT_orig%nDim_gen
             IPT%fieldAvg = IPT_orig%fieldAvg
             IPT%fieldVar = IPT_orig%fieldVar
+            IPT%margiFirst = IPT_orig%margiFirst
             IPT%corrL = IPT_orig%corrL
             IPT%overlap = IPT_orig%overlap
             IPT%corrMod = IPT_orig%corrMod

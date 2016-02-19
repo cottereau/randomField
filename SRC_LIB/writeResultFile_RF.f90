@@ -1144,7 +1144,8 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_generation_spec(MSH, RDF, folderpath, name, timeVec)
+    subroutine write_generation_spec(MSH, RDF, folderpath, name, onlyLocalization, &
+                                     nFields, locLevel, timeVec)
 
         implicit none
 
@@ -1152,7 +1153,10 @@ contains
         type(RF)   :: RDF
         type(MESH) :: MSH
         character (len=*)             , intent(in) :: folderpath, name;
-        double precision, dimension(:), intent(in), optional :: timeVec
+        logical, intent(in) :: onlyLocalization
+        double precision, dimension(:), intent(in), optional :: timeVec;
+        integer, dimension(:), intent(in) :: nFields
+        integer, intent(in) :: locLevel
 
         !LOCAL
         integer :: fileId, code
@@ -1172,6 +1176,10 @@ contains
             write(fileId,*) "FILE:", name
             write(fileId,*) "--nb_procs-----------------------"
             write(fileId,fmt = "(I20)") RDF%nb_procs
+            write(fileId,*) "--nFields-----------------------"
+            write(fileId,*) nFields
+            write(fileId,*) "--locLevel-----------------------"
+            write(fileId,*) locLevel
             write(fileId,*) "--nDim-----------------------"
             write(fileId,fmt = "(I20)") RDF%nDim
             write(fileId,*) "--xMinGlob-----------------------"
@@ -1182,18 +1190,22 @@ contains
             write(fileId,fmt = doubleFmt) MSH%xMinExt
             write(fileId,*) "--xMax_Loc-----------------------"
             write(fileId,fmt = doubleFmt) MSH%xMaxExt
-            write(fileId,*) "--kMax_Loc-----------------------"
-            write(fileId,fmt = doubleFmt) RDF%kMax
             write(fileId,*) "--xNTotal_Loc-----------------------"
             write(fileId,fmt = "(I20)") MSH%xNTotal
+
+            if(.not. onlyLocalization) then
+            write(fileId,*) "--kMax_Loc-----------------------"
+            write(fileId,fmt = doubleFmt) RDF%kMax
             write(fileId,*) "--kNTotal_Loc-----------------------"
             write(fileId,fmt = "(I20)") RDF%kNTotal
+            write(fileId,*) "--sum_kNTotal-----------------------"
+            write(fileId,fmt = "(I20)") sum_kNTotal
+            end if
+
             write(fileId,*) "--xStep-----------------------"
             write(fileId,fmt = doubleFmt) MSH%xStep
             write(fileId,*) "--sum_xNTotal-----------------------"
             write(fileId,fmt = "(I20)") sum_xNTotal
-            write(fileId,*) "--sum_kNTotal-----------------------"
-            write(fileId,fmt = "(I20)") sum_kNTotal
             write(fileId,*) "--corrL-----------------------"
             write(fileId,fmt = doubleFmt) RDF%corrL
             write(fileId,*) "--corrMod-----------------------"
@@ -1208,19 +1220,16 @@ contains
             write(fileId,fmt = "(I20)") RDF%Nmc
             write(fileId,*) "--method-----------------------"
             write(fileId,*) RDF%method
-            !if(RDF%method == ISOTROPIC) write(fileId,*) "ISOTROPIC"
-            !if(RDF%method == SHINOZUKA) write(fileId,*) "SHINOZUKA"
-            !if(RDF%method == RANDOMIZATION) write(fileId,*) "RANDOMIZATION"
-            write(fileId,*) "--independent-----------------------"
-            if(MSH%overlap(1) == -2.0D0) then
-                write(fileId,*) .true. !Exception for monoproc cases
-            else
-                write(fileId,*) RDF%independent
-            end if
+            write(fileId,*) "--locLevel-----------------------"
+            write(fileId,*) locLevel
+            write(fileId,*) "--nFields-----------------------"
+            write(fileId,*) nFields
             write(fileId,*) "--overlap-----------------------"
             write(fileId,*) MSH%overlap
+            if(.not. onlyLocalization) then
             write(fileId,*) "--Seed-----------------------"
             write(fileId,fmt = "(I20)") RDF%seed
+            end if
             write(fileId,*) "--SeedStart-----------------------"
             write(fileId,fmt = "(I20)") RDF%seedStart
             if(present(timeVec)) then
