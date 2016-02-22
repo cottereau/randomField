@@ -433,7 +433,7 @@ contains
             integer :: hdferr
             integer(HID_T) :: file_id, attr_id, space_id, dset_id, mem_id
             double precision, dimension(IPT%nDim_mesh) :: ones
-            logical :: delete_intermediate_files = .true.
+            logical :: delete_intermediate_files = .false.
 
             !Gluing fields together
 

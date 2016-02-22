@@ -14,55 +14,6 @@ module localization_RF
 
 contains
 
-    !    !-----------------------------------------------------------------------------------------------
-    !    !-----------------------------------------------------------------------------------------------
-    !    !-----------------------------------------------------------------------------------------------
-    !    !-----------------------------------------------------------------------------------------------
-    !    subroutine get_neighbours_info (RDF, MSH)
-    !        implicit none
-    !
-    !        !INPUT OUTPUT
-    !        type(RF), intent(inout) :: RDF
-    !
-    !        !INPUT
-    !        type(MESH), intent(in) :: MSH
-    !
-    !        !LOCAL
-    !        integer :: neighPos, stage, direction
-    !        integer, allocatable, dimension(:) :: tempSeed
-    !        integer :: request, code, tag
-    !        integer, dimension(MPI_STATUS_SIZE) :: status
-    !
-    !        do neighPos = 1, size(MSH%neigh)
-    !            if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
-    !            call calculate_random_seed(tempSeed, RDF%seedStart+MSH%neigh(neighPos))
-    !            RDF%neighSeed(:,neighPos) = tempSeed
-    !        end do
-    !
-    !        do stage = 1, 2 !Sending and then receiving
-    !
-    !            do neighPos = 1, size(MSH%neigh)
-    !
-    !                if(MSH%neigh(neighPos) < 0) cycle !Check if this neighbour exists
-    !
-    !                if(stage == 1) then
-    !                    tag = findTag(MSH, neighPos, neighPos, send = .true.)
-    !                    call MPI_ISEND (RDF%xRange(:), RDF%nDim, MPI_DOUBLE_PRECISION, &
-    !                        MSH%neigh(neighPos), tag, RDF%comm, request, code)
-    !                else if(stage == 2) then
-    !                    tag = findTag(MSH, neighPos, neighPos, send = .false.)
-    !                    call MPI_RECV (RDF%neighRange(:,neighPos), RDF%nDim, MPI_DOUBLE_PRECISION, &
-    !                        MSH%neigh(neighPos), tag, RDF%comm, status, code)
-    !                end if
-    !
-    !            end do
-    !
-    !        end do
-    !
-    !        deallocate(tempSeed)
-    !
-    !    end subroutine get_neighbours_info
-
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -458,7 +409,7 @@ contains
         !Buffer allocation
         call wLog ("Allocating buffer")
         !overEst = MSH%nDim + 1
-        overEst = 1
+        overEst = 2
         call MPI_TYPE_SIZE(MPI_DOUBLE_PRECISION,double_size,code)
         overHead = int(1+(MPI_BSEND_OVERHEAD*1.)/double_size)
         bufferSize = overEst*(MSH%nOvlpMax+overHead)

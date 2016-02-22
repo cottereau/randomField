@@ -22,7 +22,7 @@ program main_Stat
     integer :: nDim, Nmc, method, corrMod, margiFirst
     type(STAT) :: STA
     character(len=70) :: testeChar, testInt
-    character(len=200) :: resPath ! = "./results/res/h5/samples-ALLprocStruct.h5"
+    character(len=200) :: resPath
     character(len=200), parameter :: meshPath = "./mesh_input"
     character(len=200), parameter :: genPath = "./gen_input"
     character(len=200), parameter :: statPath = "./stat_input"
@@ -34,6 +34,9 @@ program main_Stat
 
     comm = MPI_COMM_WORLD
     call init(comm)
+    STA%comm     = comm
+    STA%rang     = rang
+    STA%nb_procs = nb_procs
 
     if(STA%rang == 0) then
         write(*,*) "How many files? "
@@ -41,6 +44,7 @@ program main_Stat
         write(*,*) "nFiles = ", nFiles
     end if
 
+    call MPI_BCAST (nFiles, 1, MPI_INTEGER, 0, STA%comm, code)
 
     if(STA%rang == 0) then
         write(*,*) "  -----------------------------------------------"
@@ -48,6 +52,9 @@ program main_Stat
         write(*,*) "  -----------------------------------------------"
         write(*,*) " "
     end if
+
+    !write(*,*) "STA%rang = ", STA%rang
+
     do i = 1, nFiles
         if(STA%rang == 0) then
             write(*,*) "File ", i
@@ -55,20 +62,26 @@ program main_Stat
             write(*,*) "path = ", resPath
         end if
 
-!        STA%comm     = comm
-!        STA%rang     = rang
-!        STA%nb_procs = nb_procs
-!
-!        call read_RF_h5_File_Attributes()
-!        call set_Local_Range()
-!        call set_Sk_Dir()
-!        call read_RF_h5_File_Table()
-!        call calculate_average_and_stdVar_MPI(STA)
-!        call rebuild_Sk(STA)
-!        !call rebuild_corrL(STA, STA%corrL_out)
-!        call show_STAT(STA, "HEY STAT", 6)
-!        if(STA%rang == 0) call write_StatisticsOnH5(STA)
-!        call finalize_STAT(STA)
+        call MPI_BCAST (resPath, len(resPath), MPI_CHARACTER, 0, STA%comm, code)
+
+        !write(*,*) "path = ", resPath
+
+        if(STA%rang == 0) write(*,*) "-> Reading HDF5 Attributes"
+        call read_RF_h5_File_Attributes()
+        if(STA%rang == 0) write(*,*) "-> Setting Local Range"
+        call set_Local_Range()
+        call set_Sk_Dir()
+        if(STA%rang == 0) write(*,*) "-> Reading HDF5 Tables"
+        call read_RF_h5_File_Table()
+        if(STA%rang == 0) write(*,*) "-> Calculating Average and StdVar"
+        call calculate_average_and_stdVar_MPI(STA)
+        if(STA%rang == 0) write(*,*) "-> Recontructing Spectrum"
+        call rebuild_Sk(STA)
+        if(STA%rang == 0) write(*,*) "-> Calculating Correlation Length"
+        call rebuild_corrL(STA, STA%corrL_out)
+        if(STA%rang == 0) write(*,*) "-> Writing Statistics on File"
+        if(STA%rang == 0) call write_StatisticsOnH5(STA, resPath)
+        call finalize_STAT(STA)
 
     end do
 
@@ -114,8 +127,8 @@ program main_Stat
 
             !READING SCALARS----------------------------
             !BOOL
-            attr_name = "independent"
-            call read_h5attr_bool(file_id, trim(adjustL(attr_name)), STA%independent)
+            !attr_name = "independent"
+            !call read_h5attr_bool(file_id, trim(adjustL(attr_name)), STA%independent)
 
             !INTEGERS
             attr_name = "nDim"
@@ -155,10 +168,11 @@ program main_Stat
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine write_StatisticsOnH5(STA)
+        subroutine write_StatisticsOnH5(STA, resPath)
             implicit none
             !INPUT
             type(STAT) :: STA
+            character(len=*), intent(in) :: resPath
             !LOCAL
             character(len=50) :: attr_name
             integer(HID_T)  :: file_id       !File identifier
@@ -166,13 +180,15 @@ program main_Stat
             integer :: i
             logical :: attr_exists
 
+            write(*,*) "Writing statistics on: ", trim(resPath)
             call h5open_f(error) ! Initialize FORTRAN interface.
             call h5fopen_f(trim(resPath), H5F_ACC_RDWR_F, file_id, error) !Open File
 
             !DOUBLE
+            !write(*,*) "DOUBLE"
             attr_name = "globalAvg"
             call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            !write(*,*) "attr_exists = ", attr_exists
+            !write(*,*) "attr_exists 1 = ", attr_exists
             if(attr_exists) then
                 call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
             end if
@@ -180,7 +196,7 @@ program main_Stat
 
             attr_name = "globalStdDev"
             call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            !write(*,*) "attr_exists = ", attr_exists
+            !write(*,*) "attr_exists 2 = ", attr_exists
             if(attr_exists) then
                 call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
             end if
@@ -188,9 +204,10 @@ program main_Stat
 
 
             !DOUBLE VEC
+            !write(*,*) "DOUBLE VEC"
             attr_name = "evntAvg"
             call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            !write(*,*) "attr_exists = ", attr_exists
+            !write(*,*) "attr_exists 3 = ", attr_exists
             if(attr_exists) then
                 call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
             end if
@@ -199,7 +216,7 @@ program main_Stat
 
             attr_name = "evntStdDev"
             call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            !write(*,*) "attr_exists = ", attr_exists
+            !write(*,*) "attr_exists 4 = ", attr_exists
             if(attr_exists) then
                 call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
             end if
@@ -208,17 +225,17 @@ program main_Stat
 
             attr_name = "corrL_out"
             call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-            !write(*,*) "attr_exists = ", attr_exists
+            !write(*,*) "attr_exists 5 = ", attr_exists
             if(attr_exists) then
                 call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
             end if
             call write_h5attr_real_vec(file_id, attr_name, STA%corrL_out)
 
-
+            !write(*,*) "Sk"
             do i = 1, STA%nDim
                 attr_name = stringNumb_join("Sk_",i)
                 call h5aexists_by_name_f(file_id, ".", trim(adjustL(attr_name)), attr_exists, error)
-                !write(*,*) "attr_exists = ", attr_exists
+                !write(*,*) "attr_exists 6 7 8= ", attr_exists
                 if(attr_exists) then
                     call h5adelete_f(file_id, trim(adjustL(attr_name)), error)
                 end if
@@ -245,7 +262,6 @@ program main_Stat
 
             periods(:) = .false.
 
-            write(*,*) "-> Setting Local Range"
             call set_procPerDim_2 (STA, STA%procPerDim)
             call MPI_CART_CREATE (STA%comm, STA%nDim, STA%procPerDim, periods, .false., topComm, code)
             call MPI_CART_COORDS (topComm, STA%rang, STA%nDim, STA%coords, code)
@@ -292,11 +308,11 @@ program main_Stat
         logProc2   = log(dble(STA%nb_procs))/log(2.0D0)
 
         if (areEqual(procRootDim, dble(nint(procRootDim)))) then
-            call wLog("    Exact Division")
+            if(STA%rang == 0) write(*,*) "    Exact Division"
             procPerDim(:) = nint(dble(STA%nb_procs)**(1.0d0/STA%nDim))
 
         else if(areEqual(logProc2, dble(nint(logProc2)))) then
-            call wLog("    Power of two")
+            if(STA%rang == 0) write(*,*) "    Power of two"
 
             procPerDim(:) = 1
             if(STA%nb_procs /= 1) then
@@ -310,8 +326,7 @@ program main_Stat
             stop ("ERROR, inside 'set_procPerDim_2', no mesh division algorithm for this number of procs")
         end if
 
-        call wLog("    procPerDim = ")
-        call wLog(procPerDim)
+        if(STA%rang == 0) write(*,*) "    procPerDim = ", procPerDim
 
     end subroutine set_procPerDim_2
 
@@ -358,7 +373,7 @@ program main_Stat
             !double precision, dimension(:,:), allocatable :: locRF
 
             locDims(:) = STA%localRange(:,2) - STA%localRange(:,1) + 1
-            write(*,*) " locDims = ", locDims
+            !write(*,*) " locDims = ", locDims
 
             if(STA%rang == 0) write(*,*) " Searching for file: ",resPath
             call h5open_f(hdferr) ! Initialize FORTRAN interface.
@@ -378,16 +393,16 @@ program main_Stat
             offset = STA%localRange(:,1)-1
             locShape = shape(STA%randField)
             zero2D = 0
-            write(*,*) " locShape = ", locShape
-            write(*,*) " offset   = ", offset
-            write(*,*) " locDims  = ", locDims
+            !write(*,*) " locShape = ", locShape
+            !write(*,*) " offset   = ", offset
+            !write(*,*) " locDims  = ", locDims
             !For hyperslab lecture
             !IN
-            if(STA%independent) then
+            !if(STA%independent) then
                 call h5sselect_hyperslab_f(space_id, H5S_SELECT_SET_F, offset, locDims, hdferr) !Select Hyperslab IN
-            else
-                write(*,*) "Developement to non-independent INPUT"
-            end if
+            !else
+            !    write(*,*) "Developement to non-independent INPUT"
+            !end if
             !call h5sselect_hyperslab_f(space_id, H5S_SELECT_OR, offset, locDims, hdferr) !Add Selection to he hyperslab IN
 
             !OUT

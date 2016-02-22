@@ -70,6 +70,8 @@ module type_STAT
             allocate(STAT_a%Sk_Ind(nDim,2))
             allocate(STAT_a%SkTot_Ind(nDim,2))
             allocate(STAT_a%corrL_out(nDim))
+            allocate(STAT_a%evntAvg(Nmc))
+            allocate(STAT_a%evntStdDev(Nmc))
             STAT_a%corrL  = -1
             STAT_a%xMinGlob = -1
             STAT_a%xMaxGlob = -1
@@ -175,6 +177,8 @@ module type_STAT
             if(allocated(STAT_a%SkTot_Dir))   deallocate(STAT_a%SkTot_Dir)
             if(allocated(STAT_a%SkTot_Ind))   deallocate(STAT_a%SkTot_Ind)
             if(allocated(STAT_a%corrL_out))   deallocate(STAT_a%corrL_out)
+            if(allocated(STAT_a%evntAvg))     deallocate(STAT_a%evntAvg)
+            if(allocated(STAT_a%evntStdDev))  deallocate(STAT_a%evntStdDev)
 
             STAT_a%init = .false.
 

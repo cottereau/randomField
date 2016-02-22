@@ -27,12 +27,12 @@ contains
         double precision, dimension(:), allocatable :: totalSumRF, totalSumRFsquare;
         double precision, dimension(:), allocatable :: sumRF_point, sumRFsquare_point
         double precision, dimension(:), allocatable :: totalSumRF_point, totalSumRFsquare_point
-        integer :: Nmc, xNTotal
+        integer :: Nmc, xNTotal, sum_xNTotal
         !integer, dimension(:), allocatable :: xNTotal_Vec, deplacement
         integer :: code, nb_procs, rang, comm
         integer :: i
 
-        write(*,*) "Calculating Average and stdVar"
+        !write(*,*) "Calculating Average and stdVar"
 
         Nmc     = size(STA%randField, 2)
         xNTotal = size(STA%randField, 1)
@@ -53,29 +53,34 @@ contains
         !allocate(deplacement(nb_procs))
 
         !Calculating
-        write(*,*) "sumRF(1) = ", sumRF(1)
-        write(*,*) "sumRFsquare(1) = ", sumRFsquare(1)
         !write(*,*) "sumRF_point(1) = ", sumRF_point(1)
         !write(*,*) "sumRFsquare_point(1) = ", sumRFsquare_point(1)
 
         !Total Number of Points
-        write(*,*) "xNTotal = ", xNTotal
+        !write(*,*) "xNTotal = ", xNTotal
 
         !By Event
         sumRF(:)       = sum( STA%randField    , dim = 1)
         sumRFsquare(:) = sum((STA%randField)**2, dim = 1)
+        !write(*,*) "sumRF(:) = ", sumRF(:)
+        !write(*,*) "sumRFsquare(:) = ", sumRFsquare(:)
         call MPI_ALLREDUCE (sumRF,totalSumRF,Nmc,MPI_DOUBLE_PRECISION, &
             MPI_SUM,comm,code)
         call MPI_ALLREDUCE (sumRFsquare,totalSumRFsquare,Nmc,MPI_DOUBLE_PRECISION, &
             MPI_SUM,comm,code)
-        STA%evntAvg      = totalSumRF/xNTotal;
-        STA%evntStdDev   = sqrt(totalSumRFsquare/dble(xNTotal) &
+        call MPI_ALLREDUCE (xNTotal,sum_xNTotal,1,MPI_INTEGER, &
+            MPI_SUM,comm,code)
+        STA%evntAvg      = totalSumRF/dble(sum_xNTotal);
+        STA%evntStdDev   = sqrt(totalSumRFsquare/dble(sum_xNTotal) &
             - (STA%evntAvg)**2)
 
         !Global
-        STA%globalAvg    = sum(totalSumRF)/dble(xNTotal*Nmc);
-        STA%globalStdDev = sqrt(sum(totalSumRFsquare)/dble(xNTotal*Nmc) &
-            - (STA%globalAvg)**2)
+        STA%globalAvg    = sum(totalSumRF)/dble(sum_xNTotal*Nmc);
+        STA%globalStdDev = sqrt(sum(totalSumRFsquare)/dble(sum_xNTotal*Nmc) &
+                            - (STA%globalAvg)**2)
+
+        !write(*,*) "STA%globalAvg    = ", STA%globalAvg
+        !write(*,*) "STA%globalStdDev = ", STA%globalStdDev
 
         !        !By Point
         !        sumRF_point(:)       = sum( STA%randField    , dim = 2)
@@ -175,27 +180,26 @@ contains
         integer :: delta
         double precision, dimension(:), allocatable :: Temp_SkTot_Dir
 
-        write(*,*) "rebuild_Sk"
+        !write(*,*) "rebuild_Sk"
 
         do i = 1, STA%nDim
             call rebuild_Sk_FFT(STA%randField(:,1), STA%xNStep_Loc, i, STA%nDim, &
                                 STA%Sk_Dir(STA%Sk_Ind(i,1):STA%Sk_Ind(i,2)),     &
-                                STA%corrL_out(i),&
                                 STA%globalAvg, STA%globalStdDev, &
                                 STA%xStep(i))
         end do
 
-        write(*,*) "Reducing Sk to one proc"
-        write(*,*) "STA%xNStep_Loc = ", STA%xNStep_Loc
+        !write(*,*) "Reducing Sk to one proc"
+        !write(*,*) "STA%xNStep_Loc = ", STA%xNStep_Loc
         do i = 1, STA%nDim
             call MPI_ALLREDUCE (STA%xNStep_Loc(i), nPointsMin(i), 1, MPI_INTEGER, &
                                 MPI_MIN, STA%comm, code)
         end do
 
-        write(*,*) "nPointsMin BEFORE = ", nPointsMin
+        !write(*,*) "nPointsMin BEFORE = ", nPointsMin
 
         nPointsMin = nPointsMin/2; !We'll only save half of the correlation function (symmetric)
-        write(*,*) "nPointsMin = ", nPointsMin
+        !write(*,*) "nPointsMin = ", nPointsMin
 
         allocate(STA%SkTot_Dir(sum(nPointsMin)))
 
@@ -236,7 +240,7 @@ contains
 !            do i = 1, STA%nDim
 !                call dispCarvalhol(STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2)), &
 !                                   "STA%SkTot_Dir(STA%SkTot_Ind(i,1):STA%SkTot_Ind(i,2))", unit_in=6)
-!            end do
+ !           end do
 !        end if
 
     end subroutine rebuild_Sk
@@ -245,7 +249,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine rebuild_Sk_FFT(randFieldVec, xNStep, dir, nDim, Sk_part, corrL_out, avg, stdDev, xStep)
+    subroutine rebuild_Sk_FFT(randFieldVec, xNStep, dir, nDim, Sk_part, avg, stdDev, xStep)
         implicit none
         !INPUT
         double precision, dimension(:), intent(in), target :: randFieldVec
@@ -254,7 +258,7 @@ contains
         double precision, intent(in) :: avg, stdDev, xStep
         !OUTPUT
         double precision, dimension(:), intent(out) :: Sk_part
-        double precision,               intent(out) :: corrL_out
+        !double precision,               intent(out) :: corrL_out
         !LOCAL
         double complex  , dimension(size(randFieldVec)), target :: SkVec
         double complex  , dimension(:,:)  , pointer :: Sk_2D
@@ -398,11 +402,11 @@ contains
 
         !write(*,*) "Sk_part = ", Sk_part
 
-        corrL_out = (       &
-                     sum(Sk_part) &
-                     -(Sk_part(1) + Sk_part(size(Sk_part)))/2.0D0 &
-                     +(Sk_part(1) + Sk_part(2))/2.0D0 &
-                     )*xStep
+        !corrL_out = (       &
+        !             sum(Sk_part) &
+        !             -(Sk_part(1) + Sk_part(size(Sk_part)))/2.0D0 &
+        !             +(Sk_part(1) + Sk_part(2))/2.0D0 &
+        !             )*xStep
 
         if(associated(Sk_2D)) nullify(Sk_2D)
         if(associated(Sk_3D)) nullify(Sk_3D)
