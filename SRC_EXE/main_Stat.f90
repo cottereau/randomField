@@ -81,6 +81,9 @@ program main_Stat
         call rebuild_corrL(STA, STA%corrL_out)
         if(STA%rang == 0) write(*,*) "-> Writing Statistics on File"
         if(STA%rang == 0) call write_StatisticsOnH5(STA, resPath)
+
+        call show_STAT(STA, "Calculated Statistics", 6)
+
         call finalize_STAT(STA)
 
     end do

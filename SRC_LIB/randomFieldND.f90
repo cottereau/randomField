@@ -399,7 +399,7 @@ contains
             call wLog("Defining kPoints")
             call set_kPoints(RDF, MSH%xStep)
             call wLog("Defining SkVec")
-            call set_SkVec(RDF)
+            call set_SkVec(RDF, RDF%corrL)
 
             !call wLog("SkVec")
             !do i = 1, size(RDF%SkVec)

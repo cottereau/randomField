@@ -107,30 +107,34 @@ contains
 
             case(FFT)
                 RDF%kNStep(:) = find_xNStep(xMaxExt = RDF%xRange, xStep=xStep)
+                !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/((RDF%xRange)**1.0D0) * RDF%kDelta(:) !Redefinition of kMax (divided by 2 because of symmetric plane)
+                !RDF%kMax(:)   = 2.0D0*PI/(periodMult*RDF%xRange)
+                !RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1);
+                RDF%kDelta(:) = 2.0D0*PI/(periodMult*RDF%xRange)
+                RDF%kMax(:)   = ((RDF%kNStep(:) - 1) * RDF%kDelta(:))/1.0D0
+                !RDF%kDelta(:) = RDF%kDelta(:)
+                !RDF%kDelta(:) = RDF%kMax(:)/dble(RDF%kNStep(:))
                 !RDF%kNStep(:) = RDF%xNStep(:);
-                RDF%kDelta(:) = RDF%kDelta(:)
                 RDF%kNTotal   = product(RDF%kNStep);
                 !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
                 !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(1.0D0)) * RDF%kDelta(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
-                RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(1.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
 
-
-                if(RDF%independent) then
-                    call wLog("RDF%kNStep = ")
-                    call wLog(RDF%kNStep)
-                    call wLog("RDF%kMax = ")
-                    call wLog(RDF%kMax)
-                    call wLog("RDF%kNTotal = ")
-                    allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
-                    call wLog("shape(RDF%kPoints) = ")
-                    call wLog(shape(RDF%kPoints))
-                    call wLog(RDF%kNTotal)
-                    !call wLog("RDF%kPoints = ")
-                    do i = 1, RDF%kNTotal
-                        call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
-                        !call wLog(RDF%kPoints(:, i))
-                    end do
-                else
+                !if(RDF%independent) then
+                !    call wLog("RDF%kNStep = ")
+                !    call wLog(RDF%kNStep)
+                !    call wLog("RDF%kMax = ")
+                !    call wLog(RDF%kMax)
+                !    call wLog("RDF%kNTotal = ")
+                !    allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
+                !    call wLog("shape(RDF%kPoints) = ")
+                !    call wLog(shape(RDF%kPoints))
+                !    call wLog(RDF%kNTotal)
+                !    !call wLog("RDF%kPoints = ")
+                !    do i = 1, RDF%kNTotal
+                !        call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
+                !        !call wLog(RDF%kPoints(:, i))
+                !    end do
+                !else
                     call wLog("RDF%kNInit = ")
                     call wLog(RDF%kNInit)
                     call wLog("RDF%kNEnd = ")
@@ -149,7 +153,7 @@ contains
                                              snapExtremes = .true., &
                                              verbose = .true.);
                     end do
-                end if
+                !end if
 
         end select
 
@@ -159,27 +163,40 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_SkVec(RDF);
+    subroutine set_SkVec(RDF, corrL_in);
         implicit none
 
         !OBS: corrL is supposed = 1. The complete formula is RDF%SkVec = product(corrL) * exp(-dot_product(kVector**2, corrL_effec**2)/(4.0d0*pi))
 
         !INPUT OUTPUT
         type(RF) :: RDF
+        double precision, dimension(:), optional, intent(in) :: corrL_in
         !LOCAL
         integer :: i, freqK = 6
+        double precision, dimension(RDF%nDim) :: corrL
+
+        corrL(:) = 1.0D0
+        if(present(corrL_in)) corrL = corrL_in
 
         if(allocated(RDF%SkVec)) deallocate(RDF%SkVec)
         allocate(RDF%SkVec(size(RDF%kPoints,2)))
 
+
         call wLog("RDF%corrMod")
         call wLog(RDF%corrMod)
+
+        !write(*,*) "Inside set_SkVec, corrL = ", corrL
 
         select case(RDF%corrMod)
 
             case(cm_GAUSSIAN)
+                RDF%SkVec(:) = 1.0D0
+                !write(*,*) "Gaussian Correlation Model"
                 call wLog("cm_GAUSSIAN")
-                RDF%SkVec = exp(-sum(RDF%kPoints**(2.0D0), 1)/(4.0d0*pi))
+                do i = 1, RDF%nDim
+                    RDF%SkVec(:) = RDF%SkVec(:) * corrL(i) * exp(-((RDF%kPoints(i,:)**2.0D0) * (corrL(i)**2.0D0))/(4.0d0*pi))
+                end do
+                !call DispCarvalhol(RDF%SkVec, "RDF%SkVec")
             case(cm_COS)
                 call wLog("cm_COS")
                 RDF%SkVec = 0

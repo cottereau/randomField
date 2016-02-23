@@ -395,7 +395,7 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         subroutine combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, &
-                                        stepProc, procExtent, overlap, all_t1)
+                                        stepProc, procExtent, overlap, all_t1, delete_intermediate_files)
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
@@ -404,6 +404,7 @@ contains
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
             double precision, dimension(:), intent(in) :: stepProc, procExtent, overlap
             double precision, intent(in) :: all_t1
+            logical, intent(in) :: delete_intermediate_files
 
             !LOCAL
             type(MESH) :: globMSH
@@ -433,7 +434,6 @@ contains
             integer :: hdferr
             integer(HID_T) :: file_id, attr_id, space_id, dset_id, mem_id
             double precision, dimension(IPT%nDim_mesh) :: ones
-            logical :: delete_intermediate_files = .false.
 
             !Gluing fields together
 
@@ -669,8 +669,8 @@ contains
                             maxPosProc = find_xNStep(globMSH%xMinGlob, globMSH%xMaxBound , globMSH%xStep) - globMSH%origin + 1
                             call wLog("     Normalizing sample")
                             xNTotal = product(nint((globMSH%xMaxGlob-globMSH%xMinGlob)/globMSH%xStep) +1)
-                            !call normalize_randField(globRDF, xNTotal, globRDF%randField, minPosProc, maxPosProc)
-                            !call multiVariateTransformation (globRDF%margiFirst, globRDF%fieldAvg, globRDF%fieldVar, globRDF%randField)
+                            call normalize_randField(globRDF, xNTotal, globRDF%randField, minPosProc, maxPosProc)
+                            call multiVariateTransformation (globRDF%margiFirst, globRDF%fieldAvg, globRDF%fieldVar, globRDF%randField)
                             call write_generation_spec(globMSH, globRDF, single_path, "singleGen", &
                                                        .true., IPT%nFields, IPT%localizationLevel)
                         end if

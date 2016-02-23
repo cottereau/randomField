@@ -27,6 +27,7 @@ program main_RandomField
     logical :: writeDataSet = .true.
     logical :: sameFolder = .true.
     integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
+    logical :: delete_intermediate_files = .false.
 
 	!LOCAL VARIABLES
     logical            :: file_exist
@@ -195,14 +196,15 @@ program main_RandomField
     times(4) = MPI_Wtime() !Generation Time
 
     !Combining realizations (localization)
-    if(product(IPT%nFields) /= 1) then
+    !if(product(IPT%nFields) /= 1) then
         if(rang == 0) write(*,*) " "
         if(rang == 0) write(*,*) "-> COMBINING----------------------------------------"
         call wLog("-> COMBINING----------------------------------------")
-        call combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, stepProc, procExtent, overlap, times(1))
-    else
-        if(rang == 0) write(*,*) "-> NOTHING TO BE COMBINED----------------------------------------"
-    end if
+        call combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, stepProc, procExtent, &
+                                  overlap, times(1), delete_intermediate_files)
+    !else
+        !if(rang == 0) write(*,*) "-> NOTHING TO BE COMBINED----------------------------------------"
+    !end if
 
     times(5) = MPI_Wtime() !Localization Time
 

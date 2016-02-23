@@ -127,6 +127,7 @@ contains
             MSH%xMaxBound(i)   = MSH%xMaxBound(i)/RDF%corrL(i)
             MSH%xMinBound(i)   = MSH%xMinBound(i)/RDF%corrL(i)
             MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)/RDF%corrL(i)
+            RDF%xRange(i)      = RDF%xRange(i)/RDF%corrL(i)
         end do
 
         if(RDF%independent) then
@@ -220,6 +221,7 @@ contains
             MSH%xMaxBound(i)   = MSH%xMaxBound(i)*RDF%corrL(i)
             MSH%xMinBound(i)   = MSH%xMinBound(i)*RDF%corrL(i)
             MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)*RDF%corrL(i)
+            RDF%xRange(i)      = RDF%xRange(i)*RDF%corrL(i)
         end do
 
         !RDF%randField = RDF%rang ! For Tests
