@@ -8,17 +8,16 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine create_folder(folder, path, rang, comm, compiler)
+    subroutine create_folder(folder, path, rang, comm)
 
         implicit none
         !INPUT
         character(len = *), intent(in) :: folder, path
         integer, intent(in) :: rang, comm
-        integer, intent(in) :: compiler !1 for gfortran and 2 for ifort
         !LOCAL
         character(len = 200) command, fullName
         integer :: code
-        logical :: dirExists
+
 
         !if(rang==0) write(*,*) "creating Folder"
 
@@ -43,12 +42,11 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine delete_folder(folder, path, rang, comm, compiler)
+    subroutine delete_folder(folder, path, comm)
         implicit none
         !INPUT
         character(len = *), intent(in) :: folder, path
-        integer, intent(in) :: rang, comm
-        integer, intent(in) :: compiler !1 for gfortran and 2 for ifort
+        integer, intent(in) :: comm
         !LOCAL
         character(len = 200) command, fullName
 
@@ -56,11 +54,11 @@ contains
 
         fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
 
-        if(folderExist (folder, path, compiler)) then
-            write (*,*) "WARNING!!! Directory: '", trim(fullName) ,"' will be deleted"
-            command = 'rm -r '// trim(adjustL(fullName))
-            call system(command)
-        end if
+        !if(folderExist (folder, path, compiler)) then
+        write (*,*) "WARNING!!! Directory: '", trim(fullName) ,"' will be deleted"
+        command = 'rm -r '// trim(adjustL(fullName))
+        call system(command)
+        !end if
 
         call MPI_BARRIER (comm ,code)
 
@@ -70,12 +68,11 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine rename_folder(folder, path, newName, rang, comm, compiler)
+    subroutine rename_folder(folder, path, newName, comm)
         implicit none
         !INPUT
         character(len = *), intent(in) :: folder, path, newName
-        integer, intent(in) :: rang, comm
-        integer, intent(in) :: compiler !1 for gfortran and 2 for ifort
+        integer, intent(in) :: comm
         !LOCAL
         character(len = 200) command, fullName_new, fullName_old
         integer :: code
@@ -83,36 +80,36 @@ contains
         fullName_old = trim(adjustL(path)) // "/" // trim(adjustL(folder))
         fullName_new = trim(adjustL(path)) // "/" // trim(adjustL(newName))
 
-        if(folderExist (folder, path, compiler)) then
-            write (*,*) "WARNING!!! Directory: '", trim(fullName_old) ,"' will be renamed to: ", trim(fullName_new)
-            command = 'mv '// trim(adjustL(fullName_old))//" "//trim(adjustL(fullName_new))
-            call system(command)
-        end if
+        !if(folderExist (folder, path, compiler)) then
+        write (*,*) "WARNING!!! Directory: '", trim(fullName_old) ,"' will be renamed to: ", trim(fullName_new)
+        command = 'mv '// trim(adjustL(fullName_old))//" "//trim(adjustL(fullName_new))
+        call system(command)
+        !end if
 
         call MPI_BARRIER (comm ,code)
 
     end subroutine rename_folder
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    function folderExist (folder, path, compiler) result (dirExists)
-        implicit none
-        !INPUT
-        character(len = *), intent(in) :: folder, path
-        integer, intent(in) :: compiler !1 for gfortran and 2 for ifort
-        !OUTPUT
-        logical :: dirExists
-        !LOCAL
-        character(len = 200) fullName
-
-        !fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
-
-        !if(compiler == 1) inquire( file=trim(fullName)//'/.', exist=dirExists )  ! Works with gfortran, but not ifort
-        !if(compiler == 2) inquire( directory=fullName, exist=dirExists )         ! Works with ifort, but not gfortran
-        dirExists=.false.
-    end function folderExist
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    function folderExist (folder, path, compiler) result (dirExists)
+!        implicit none
+!        !INPUT
+!        character(len = *), intent(in) :: folder, path
+!        integer, intent(in) :: compiler !1 for gfortran and 2 for ifort
+!        !OUTPUT
+!        logical :: dirExists
+!        !LOCAL
+!        character(len = 200) fullName
+!
+!        !fullName = trim(adjustL(path)) // "/" // trim(adjustL(folder))
+!
+!        !if(compiler == 1) inquire( file=trim(fullName)//'/.', exist=dirExists )  ! Works with gfortran, but not ifort
+!        !if(compiler == 2) inquire( directory=fullName, exist=dirExists )         ! Works with ifort, but not gfortran
+!        dirExists=.false.
+!    end function folderExist
 
 end module systemUt_RF
 

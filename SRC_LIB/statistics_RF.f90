@@ -29,8 +29,7 @@ contains
         double precision, dimension(:), allocatable :: totalSumRF_point, totalSumRFsquare_point
         integer :: Nmc, xNTotal, sum_xNTotal
         !integer, dimension(:), allocatable :: xNTotal_Vec, deplacement
-        integer :: code, nb_procs, rang, comm
-        integer :: i
+        integer :: code, comm
 
         !write(*,*) "Calculating Average and stdVar"
 
@@ -175,9 +174,9 @@ contains
         !INPUT
         type(STAT) :: STA
         !LOCAL
-        integer :: i, comm, code
+        integer :: i, code
         integer, dimension(STA%nDim) :: nPointsMin
-        integer :: delta
+        integer(kind=8) :: delta
         double precision, dimension(:), allocatable :: Temp_SkTot_Dir
 
         !write(*,*) "rebuild_Sk"
@@ -185,8 +184,7 @@ contains
         do i = 1, STA%nDim
             call rebuild_Sk_FFT(STA%randField(:,1), STA%xNStep_Loc, i, STA%nDim, &
                                 STA%Sk_Dir(STA%Sk_Ind(i,1):STA%Sk_Ind(i,2)),     &
-                                STA%globalAvg, STA%globalStdDev, &
-                                STA%xStep(i))
+                                STA%globalAvg, STA%globalStdDev)
         end do
 
         !write(*,*) "Reducing Sk to one proc"
@@ -249,13 +247,13 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine rebuild_Sk_FFT(randFieldVec, xNStep, dir, nDim, Sk_part, avg, stdDev, xStep)
+    subroutine rebuild_Sk_FFT(randFieldVec, xNStep, dir, nDim, Sk_part, avg, stdDev)
         implicit none
         !INPUT
         double precision, dimension(:), intent(in), target :: randFieldVec
         integer(kind=8), dimension(:), intent(in) :: xNStep
         integer, intent(in) :: dir, nDim
-        double precision, intent(in) :: avg, stdDev, xStep
+        double precision, intent(in) :: avg, stdDev
         !OUTPUT
         double precision, dimension(:), intent(out) :: Sk_part
         !double precision,               intent(out) :: corrL_out
@@ -264,7 +262,7 @@ contains
         double complex  , dimension(:,:)  , pointer :: Sk_2D
         double complex  , dimension(:,:,:), pointer :: Sk_3D
         integer*8 plan
-        integer :: howMany, sizeDir, i, j, k
+        integer(kind=8) :: sizeDir, i, j, k
 
         SkVec = (randFieldVec - avg)/stdDev; !Field normalization
 
@@ -277,7 +275,6 @@ contains
         end if
 
         !Making FFT
-        howMany = product(xNStep)/xNStep(dir)
         sizeDir = xNStep(dir)
 
         !write(*,*) "Making FFT"
@@ -397,7 +394,7 @@ contains
         !write(*,*) "After iFFT = ", real(SkVec(1:10))
 
         !Taking real part
-        Sk_part = SkVec(1:xNStep(dir))
+        Sk_part = real(SkVec(1:xNStep(dir)))
         !Sk_part = Sk_part/Sk_part(1)
 
         !write(*,*) "Sk_part = ", Sk_part

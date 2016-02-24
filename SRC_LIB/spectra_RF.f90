@@ -22,8 +22,7 @@ contains
         double precision, dimension(:),   intent(out) :: kMax;
 
         !LOCAL VARIABLES
-        double precision :: pi = 3.1415926535898
-        integer          :: i, nDim
+        integer          :: nDim
 
         nDim = size(kMax)
 
@@ -58,10 +57,10 @@ contains
 
         !LOCAL
         integer :: i
-        integer ::kNLocal
+        integer(kind=8) :: i_long, kNLocal
         double precision :: kAdjust    = 1.0D0 !"kNStep minimum" multiplier
         double precision :: periodMult = 1.1D0 !"range" multiplier
-        double precision :: rAdjust    = 1.0D0 !"rNStep minimum" multiplier
+        double precision :: rAdjust    = 5.0D0 !"kNStep minimum" multiplier (isotropic)
 
         if(allocated(RDF%kPoints)) deallocate(RDF%kPoints)
 
@@ -70,18 +69,18 @@ contains
         select case (RDF%method)
             case(ISOTROPIC)
                 RDF%kDelta(1) = 2.0D0*PI/(periodMult*sqrt(sum(RDF%xRange**2))) !Diagonal
-                RDF%kNStep(1) = 1 + 5.0D0*kAdjust*(ceiling(maxval(RDF%kMax)/RDF%kDelta(1))); !Number of points in k
+                RDF%kNStep(1) = 1 + int(rAdjust*(ceiling(maxval(RDF%kMax)/RDF%kDelta(1)))); !Number of points in k
                 RDF%kDelta(1) = maxval(RDF%kMax)/(RDF%kNStep(1)-1); !Redefining kDelta after ceiling and adjust
                 RDF%kNTotal   = RDF%kNStep(1);
 
                 allocate(RDF%kPoints(1, RDF%kNTotal))
 
-                do i = 1, RDF%kNTotal
+                do i_long = 1, RDF%kNTotal
                     call get_Permutation(i, [RDF%kMax(1)], [RDF%kNStep(1)], RDF%kPoints(:, i), snapExtremes = .true.);
                 end do
 
             case(SHINOZUKA)
-                RDF%kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:))); !Number of points in k
+                RDF%kNStep(:)   = 1 + int(kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:)))); !Number of points in k
                 RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1); !Redefining kDelta after ceiling and adjust
                 RDF%kNTotal = product(RDF%kNStep);
 
@@ -90,12 +89,12 @@ contains
 
                 allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
 
-                do i = 1, RDF%kNTotal
+                do i_long = 1, RDF%kNTotal
                     call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
                 end do
 
             case(RANDOMIZATION)
-                RDF%kNStep(:)   = 1 + kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:))); !Number of points in k
+                RDF%kNStep(:)   = 1 + int(kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:)))); !Number of points in k
                 RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1); !Redefining kDelta after ceiling and adjust
                 RDF%kNTotal = product(RDF%kNStep);
 
@@ -142,17 +141,19 @@ contains
                     kNLocal = RDF%kNEnd - RDF%kNInit + 1
                     call wLog("kNLocal = ")
                     call wLog(kNLocal)
+                    call wLog("HERE !!!!!!!!!!!!")
                     allocate(RDF%kPoints(RDF%nDim, kNLocal))
                     call wLog("shape(RDF%kPoints) = ")
                     call wLog(shape(RDF%kPoints))
-                    do i = RDF%kNInit, RDF%kNEnd
-                        !if(i>541000) call wLog(i)
-                        !RDF%kPoints(:, i-RDF%kNInit+1) = 1
-                        call get_Permutation(i, RDF%kMax, RDF%kNStep, &
-                                             RDF%kPoints(:, i-RDF%kNInit+1), &
-                                             snapExtremes = .true., &
-                                             verbose = .true.);
-                    end do
+                    call wLog("Making kPoints= ")
+                    call setGrid(RDF%kPoints, dble(RDF%kNInit-1)*RDF%kDelta, RDF%kDelta, RDF%kNStep)
+!                    do i_long = RDF%kNInit, RDF%kNEnd
+!                        !if(i>541000) call wLog(i)
+!                        !RDF%kPoints(:, i-RDF%kNInit+1) = 1
+!                        call get_Permutation(int(i_long), RDF%kMax, RDF%kNStep, &
+!                                             RDF%kPoints(:, i_long-RDF%kNInit+1), &
+!                                             snapExtremes = .true.)
+!                    end do
                 !end if
 
         end select
@@ -227,7 +228,6 @@ contains
 
         !LOCAL VARIABLES
         double precision :: pi = 3.1415926535898
-        integer          :: i
         double precision, dimension(:), allocatable:: corrL_effec
 
         allocate(corrL_effec (size(rMax)))
@@ -280,24 +280,23 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine set_kArray_rand(corrMod, kArray_rand, kMaxScal, nDim);
+    subroutine set_kArray_rand(corrMod, kArray_rand, nDim);
         implicit none
         !INPUT
         integer, intent(in) :: corrMod;
-        double precision, optional :: kMaxScal
         integer :: nDim
 
         !OUTPUT
         double precision, dimension(:),  intent(out) :: kArray_rand;
 
         !LOCAL VARIABLES
-        integer :: i, j
-        double precision ::  bound,mean,cdf_x,q,sd,x, uniRand
+        integer :: i
+        double precision ::  bound,mean,cdf_x,q,sd,uniRand
         integer :: st, which
-        real :: av = 0.0
-        real :: gennor
-        real :: std = 1.0
-        real :: normRand
+        !real :: av = 0.0
+        !real :: gennor
+        !real :: std = 1.0
+        !real :: normRand
 
 !        mean = 0.0D0
 !        sd = 1.0D0
@@ -393,53 +392,6 @@ contains
         end do
 
     end subroutine set_kDelta_rand
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    function get_SpectrumND(kVector, corrMod, corrL) result (Sk)
-        ! Return Spectrum from a chosen correlation model
-        implicit none
-
-        !INPUT
-        double precision, dimension(:), intent(in) :: kVector;
-        integer                       , intent(in) :: corrMod
-        double precision, dimension(:), intent(in), optional :: corrL;
-
-        !OUTPUT
-        double precision :: Sk;
-
-        !LOCAL VARIABLES
-        integer :: j, nDim;
-        double precision, dimension(:), allocatable :: eta;
-        double precision :: pi = 3.1415926535898
-        double precision, dimension(:), allocatable:: corrL_effec
-
-        allocate(corrL_effec (size(kVector)))
-
-        if (present(corrL)) corrL_effec = corrL
-        if (.not. present(corrL)) corrL_effec = 1
-
-        Sk = 0;
-        nDim = size(kVector)
-
-        select case(corrMod)
-        case(cm_GAUSSIAN)
-
-            !REGIS
-            !Sk  = exp(-dot_product((kVector**2),(corrL_effec**2))/(4.0d0)); !Amplitude part "product(corrL)" is external to the function
-
-            !MEU
-            Sk = exp(-dot_product(kVector**2, corrL_effec**2)/(4.0d0*pi)); !Amplitude part "product(corrL)" is external to the function
-            !write(*,*) "Sk = ", Sk
-            !write(*,*) "kVector = ", kVector
-
-        end select
-
-        deallocate(corrL_effec)
-
-    end function get_SpectrumND
 
 end module spectra_RF
 !! Local Variables:

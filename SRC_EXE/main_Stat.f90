@@ -1,11 +1,11 @@
 program main_Stat
 
-	use mpi
-	use hdf5
-	use constants_RF
-	use hdf5_RF
-	use statistics_RF
-	use displayCarvalhol
+    use mpi
+    use hdf5
+    use constants_RF
+    use hdf5_RF
+    use statistics_RF
+    use displayCarvalhol
     use write_Log_File
     use readFile_RF
     use systemUt_RF
@@ -18,10 +18,10 @@ program main_Stat
     implicit none
 
     !INPUTS
-    integer :: code, commLocal, rang, nb_procs, comm;
-    integer :: nDim, Nmc, method, corrMod, margiFirst
+    integer :: code, rang, nb_procs, comm;
+
     type(STAT) :: STA
-    character(len=70) :: testeChar, testInt
+
     character(len=200) :: resPath
     character(len=200), parameter :: meshPath = "./mesh_input"
     character(len=200), parameter :: genPath = "./gen_input"
@@ -116,10 +116,10 @@ program main_Stat
             !LOCAL
             integer :: nDim, Nmc, method, corrMod, margiFirst
             logical :: independent
-            character(len=50) :: attr_Name, dset="samples"
+            character(len=50) :: attr_Name
             integer :: hdferr
-            integer(HID_T) :: file_id, attr_id, space_id, dset_id
-            double precision, dimension(:), allocatable :: locData
+            integer(HID_T) :: file_id
+
 
             if(STA%rang == 0) write(*,*) " Searching for file: ",resPath
 
@@ -177,9 +177,9 @@ program main_Stat
             type(STAT) :: STA
             character(len=*), intent(in) :: resPath
             !LOCAL
-            character(len=50) :: attr_name
+            character(len=200) :: attr_name
             integer(HID_T)  :: file_id       !File identifier
-            integer :: error, code
+            integer :: error
             integer :: i
             logical :: attr_exists
 
@@ -366,9 +366,9 @@ program main_Stat
         subroutine read_RF_h5_File_Table()
 
             !LOCAL
-            character(len=50) :: attr_Name, dset="samples"
+            character(len=50) :: dset="samples"
             integer :: hdferr
-            integer(HID_T) :: file_id, attr_id, space_id, dset_id, mem_id
+            integer(HID_T) :: file_id, space_id, dset_id, mem_id
             !integer(HSIZE_T), dimension(STA%nDim) :: dims, maxdims
             integer(HSIZE_T), dimension(STA%nDim) :: offset, locDims
             integer(HSIZE_T), dimension(2) :: locShape

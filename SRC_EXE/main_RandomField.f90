@@ -1,28 +1,28 @@
 program main_RandomField
 
-	use mpi
-	use constants_RF
-	use randomFieldND
-	use mesh_RF
-	use writeResultFile_RF
-	use displayCarvalhol
-	use charFunctions
-	use write_Log_File
-	use systemUt_RF
-	use common_variables_RF
-	use type_RF
-	use type_MESH
-	use type_inputRF
-	use calls_RF
-	use sample_RF
+    use mpi
+    use constants_RF
+    use randomFieldND
+    use mesh_RF
+    use writeResultFile_RF
+    use displayCarvalhol
+    use charFunctions
+    use write_Log_File
+    use systemUt_RF
+    use common_variables_RF
+    use type_RF
+    use type_MESH
+    use type_inputRF
+    use calls_RF
+    use sample_RF
 
 
 
     implicit none
 
     !INPUTS
-    integer :: nDim, Nmc;
-    integer :: compiler = 2 !1 for gfortran and 2 for ifort
+    !integer :: nDim;
+    !integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeFiles = .true.
     logical :: writeDataSet = .true.
     logical :: sameFolder = .true.
@@ -30,12 +30,12 @@ program main_RandomField
     logical :: delete_intermediate_files = .false.
 
 	!LOCAL VARIABLES
-    logical            :: file_exist
-    integer            :: i, baseStep, nIter
+    !logical            :: file_exist
+    integer            :: i
     integer            :: rang
-    character(len=30)  :: rangChar;
+
     character(len=200) :: path, logFilePath
-    integer, dimension(:), allocatable :: seed
+
     double precision, dimension(5) :: times, all_times
 
     !DEVEL
@@ -45,9 +45,9 @@ program main_RandomField
     !double precision, dimension(:), allocatable :: procStart
     type(MESH)            :: globMSH
     integer               :: group, groupComm, groupMax
-    integer               :: code, nTotalProcs
-    logical               :: validProc
-    double precision, dimension(:), allocatable :: stepProc, procExtent, overlap, meshStep
+    integer               :: code
+
+    double precision, dimension(:), allocatable :: stepProc, procExtent, overlap
     double precision, dimension(:,:), allocatable :: subdivisionCoords
     type(IPT_RF)  :: IPT
 
@@ -184,7 +184,7 @@ program main_RandomField
             !call wLog(fieldNumber)
             !call wLog("     Trying communication")
             call MPI_BARRIER(groupComm, code)
-            call single_realization(IPT, globMSH, writeFiles, outputStyle, sameFolder, &
+            call single_realization(IPT, globMSH, writeFiles, outputStyle, &
                                     groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
 
         end if
@@ -195,12 +195,15 @@ program main_RandomField
 
     times(4) = MPI_Wtime() !Generation Time
 
+    delete_intermediate_files = delete_intermediate_files !FOR TESTS
+    all_times = all_times !FOR TESTS
+
     !Combining realizations (localization)
     !if(product(IPT%nFields) /= 1) then
         if(rang == 0) write(*,*) " "
         if(rang == 0) write(*,*) "-> COMBINING----------------------------------------"
         call wLog("-> COMBINING----------------------------------------")
-        call combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, stepProc, procExtent, &
+        call combine_subdivisions(IPT, writeFiles, outputStyle, stepProc, procExtent, &
                                   overlap, times(1), delete_intermediate_files)
     !else
         !if(rang == 0) write(*,*) "-> NOTHING TO BE COMBINED----------------------------------------"
@@ -220,18 +223,18 @@ program main_RandomField
     if(rang == 0) write(*,*) ""
 
 	!Deallocating
-	call deallocate_all()
+    call deallocate_all()
 
-	if(rang == 0) then
-	    write(*,*) ""
-		write(*,*) "---------------------------------------------------------------------";
-	    write(*,*) "-----------------END RANDOM FIELD LIBRARY TEST-----------------------";
-		write(*,*) "---------------------------------------------------------------------";
+    if(rang == 0) then
         write(*,*) ""
-	end if
+        write(*,*) "---------------------------------------------------------------------";
+        write(*,*) "-----------------END RANDOM FIELD LIBRARY TEST-----------------------";
+        write(*,*) "---------------------------------------------------------------------";
+        write(*,*) ""
+    end if
 
     !Finalizing MPI
-	call end_communication()
+    call end_communication()
         !----------------------------------------------------------------------------------------------------
         !----------------------------------------------------------------------------------------------------
         !----------------------------------------------------------------------------------------------------
@@ -273,7 +276,6 @@ program main_RandomField
             !INPUT
             integer, intent(in) :: comm
             !LOCAL
-            logical :: dirExists
             integer, dimension(8) :: date_time
             integer :: code
             character(len=10), dimension(3) :: strings
@@ -290,7 +292,7 @@ program main_RandomField
             log_folder_name     = trim(adjustL(results_folder_name))//"/log"
             if(sameFolder) log_folder_name     = ".."
 
-            call create_folder(log_folder_name, results_path, rang, comm, compiler)
+            call create_folder(log_folder_name, results_path, rang, comm)
 
             call wLog("-> Setting folder path")
             single_path = string_join_many(results_path,"/",results_folder_name)
@@ -299,8 +301,8 @@ program main_RandomField
             !create xmf and h5 folders
             if(writeFiles) then
                 path = string_vec_join([results_path,"/",results_folder_name])
-                call create_folder("xmf", path, rang, comm, compiler)
-                call create_folder("h5", path, rang, comm, compiler)
+                call create_folder("xmf", path, rang, comm)
+                call create_folder("h5", path, rang, comm)
             end if
 
         end subroutine init_basic_folders

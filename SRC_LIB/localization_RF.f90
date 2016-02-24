@@ -116,7 +116,7 @@ contains
         integer, dimension(RDF%nDim) :: minPos, maxPos
         integer :: totalSize, double_size, overHead, overEst, bufferSize
         double precision, dimension(:), allocatable :: buffer
-        integer :: testrank = 1, testrank2 = 11
+        !integer :: testrank = 1, testrank2 = 11
         double precision, dimension(1:MSH%xNTotal), target :: tempRandField
         !integer, dimension(:), allocatable :: request
         integer, dimension(:)  , allocatable :: request
@@ -379,24 +379,23 @@ contains
         type(MESH), intent(in) :: MSH
 
         !LOCAL
-        integer :: i, direction, myRank
-        integer :: op_neighRank, neighPos, neighRank
-        integer, dimension(RDF%nDim) :: dirShift, neighShift, tempShift
-        integer, dimension(RDF%nDim) :: op_dirShift, op_neighShift
+        integer :: direction, myRank
+        integer :: neighRank
+        integer, dimension(RDF%nDim) :: dirShift, neighShift
+
         double precision, dimension(RDF%nDim) ::xMinDir, xMaxDir
-        integer :: op_direction, op_neighPos
+        integer :: op_direction
         integer :: code
         integer, dimension(RDF%nDim) :: minPos, maxPos
-        logical, dimension(RDF%nDim) :: shiftMask
         integer :: totalSize, double_size, overHead, overEst, bufferSize
         double precision, dimension(:), allocatable :: buffer
-        integer :: testrank = 1, testrank2 = 11
+        !integer :: testrank = 1, testrank2 = 11
         double precision, dimension(1:MSH%xNTotal), target :: tempRandField, tempRandField_Now
         !integer, dimension(:), allocatable :: request
         integer :: request
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer :: tag
-        logical :: sndRcv, snd, rcv
+        logical :: snd, rcv
         double precision, dimension(:, :), pointer :: TRF_2D, TRF_2D_Now
         double precision, dimension(:, :, :), pointer :: TRF_3D, TRF_3D_Now
 

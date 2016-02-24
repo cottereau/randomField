@@ -36,7 +36,7 @@ contains
 
         !LOCAL VARIABLES
         double precision :: normalVar, normalAvg
-        integer          :: error, code, i
+        integer          :: error, code
 
         select case (margiFirst)
         case(fom_GAUSSIAN)
@@ -80,8 +80,9 @@ contains
         double precision, dimension(:)   , allocatable :: dgemm_mult;
         double precision, dimension(:,:) , allocatable :: k_x_phi, kSign;
         double precision :: ampMult
-        integer :: testIndex = 65
-        integer :: n, i, j, m
+
+        integer :: n, i, m
+        integer(kind=8) :: j
         logical :: randomK
         integer(kind=8) :: xNTotal
 
@@ -208,10 +209,11 @@ contains
         !LOCAL
         double precision, dimension(:)  , allocatable :: gammaN, phiN, thetaN, psiN;
         double precision, dimension(RDF%nDim) :: rVec;
-        logical         , dimension(:)  , allocatable :: effectCalc;
+
         !double precision :: rMax, Sk
         !double precision, dimension(1) :: rMaxVec
-        integer          :: i, j, k, m;
+        integer          :: k
+        integer(kind=8)  :: j
         !integer          :: rNTotal;
         double precision :: step;
         double precision, dimension(MSH%xNTotal) :: dgemm_mult;
@@ -363,9 +365,9 @@ contains
         integer(C_INTPTR_T) :: alloc_local
         integer :: sliceSize
         integer :: kNLocal
-        integer, dimension(RDF%nDim) :: kNStepLocal
+
         double precision, dimension(:), allocatable :: gammaK, phiK
-        integer :: i, j, k, ind
+        integer(kind=8) :: i_long
         double precision :: trashNumber
         integer, dimension(RDF%nDim) :: xNStepGlob
         double precision :: ampMult
@@ -378,85 +380,85 @@ contains
         if(RDF%nDim >= 2) M = MSH%xNStep(2)
         if(RDF%nDim >= 3) N = MSH%xNStep(3)
 
-        if(RDF%independent) then
-            call wLog("    LOCAL")
-
-            if(RDF%nDim == 2) then
-                alloc_local = L*M
-                cdata = fftw_alloc_real(alloc_local)
-                call c_f_pointer(cdata, data_real_2D, [L, M])
-
-            else if(RDF%nDim == 3) then
-                alloc_local = L*M*N
-                cdata = fftw_alloc_real(alloc_local)
-                call c_f_pointer(cdata, data_real_3D, [L, M, N])
-
-            else
-                stop("Inside gen_Std_Gauss_FFT dimension not yet implemented for this generation method")
-
-            end if
-
-            call wLog("Defining kPoints")
-            call set_kPoints(RDF, MSH%xStep)
-            call wLog("Defining SkVec")
-            call set_SkVec(RDF, RDF%corrL)
-
-            !call wLog("SkVec")
-            !do i = 1, size(RDF%SkVec)
-            !    call wLog(RDF%SkVec(i))
-            !end do
-
-            !call gen_Std_Gauss_FFT_step2_monoproc(RDF, RDF%SkVec)
-
-            allocate(gammaK(RDF%kNTotal))
-            allocate(phik(RDF%kNTotal))
-
-            call wLog("shape(gammaK)")
-            call wLog(shape(gammaK))
-            call wLog("shape(phiK)")
-            call wLog(shape(phiK))
-            call wLog("shape(RDF%SkVec)")
-            call wLog(shape(RDF%SkVec))
-
-            call random_number(gammaK(:))
-            call random_number(phiK(:))
-
-            gammaK       = gammaK -0.5
-            !RDF%SkVec(:) = gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
-            RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
-            !RDF%randField(:,1) = RDF%SkVec
-
-            if(allocated(gammaK)) deallocate(gammaK)
-            if(allocated(phik))   deallocate(phik)
-
-
-            if(RDF%nDim == 2) then
-                plan = fftw_plan_r2r(RDF%nDim, [int(M), int(L)], data_real_2D, data_real_2D, &
-                                        [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
-                data_real_2D(:,:) = reshape(RDF%SkVec, [L, M])
-                call fftw_execute_r2r(plan, data_real_2D, data_real_2D)
-                !RDF%randField(:,1) = pack(data_real_2D(1:MSH%xNStep(1), 1:MSH%xNStep(2)), .true.)
-                RDF%randField(:,1) = reshape(data_real_2D, [L*M])
-                call fftw_destroy_plan(plan)
-
-            else if(RDF%nDim == 3) then
-                plan = fftw_plan_r2r(RDF%nDim, [int(N), int(M), int(L)], data_real_3D, data_real_3D, &
-                                        [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
-                data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M, N])
-                call fftw_execute_r2r(plan, data_real_3D, data_real_3D)
-                !RDF%randField(:,1) = pack(data_real_3D(1:MSH%xNStep(1), 1:MSH%xNStep(2), 1:MSH%xNStep(3)), .true.)
-                RDF%randField(:,1) = reshape(data_real_3D, [L*M*N])
-                call fftw_destroy_plan(plan)
-
-            else
-                stop("No FFT method implemented only for 2D and 3D cases")
-            end if
-
-            !RDF%randField(:,1) = RDF%SkVec(:) !FOR TESTS
-            !RDF%randField(:,1) = RDF%kPoints(:) !FOR TESTS
-            !RDF%randField(:,1) = RDF%rang!FOR TESTS
-
-        else
+!        if(RDF%independent) then
+!            call wLog("    LOCAL")
+!
+!            if(RDF%nDim == 2) then
+!                alloc_local = L*M
+!                cdata = fftw_alloc_real(alloc_local)
+!                call c_f_pointer(cdata, data_real_2D, [L, M])
+!
+!            else if(RDF%nDim == 3) then
+!                alloc_local = L*M*N
+!                cdata = fftw_alloc_real(alloc_local)
+!                call c_f_pointer(cdata, data_real_3D, [L, M, N])
+!
+!            else
+!                stop("Inside gen_Std_Gauss_FFT dimension not yet implemented for this generation method")
+!
+!            end if
+!
+!            call wLog("Defining kPoints")
+!            call set_kPoints(RDF, MSH%xStep)
+!            call wLog("Defining SkVec")
+!            call set_SkVec(RDF, RDF%corrL)
+!
+!            !call wLog("SkVec")
+!            !do i = 1, size(RDF%SkVec)
+!            !    call wLog(RDF%SkVec(i))
+!            !end do
+!
+!            !call gen_Std_Gauss_FFT_step2_monoproc(RDF, RDF%SkVec)
+!
+!            allocate(gammaK(RDF%kNTotal))
+!            allocate(phik(RDF%kNTotal))
+!
+!            call wLog("shape(gammaK)")
+!            call wLog(shape(gammaK))
+!            call wLog("shape(phiK)")
+!            call wLog(shape(phiK))
+!            call wLog("shape(RDF%SkVec)")
+!            call wLog(shape(RDF%SkVec))
+!
+!            call random_number(gammaK(:))
+!            call random_number(phiK(:))
+!
+!            gammaK       = gammaK -0.5
+!            !RDF%SkVec(:) = gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+!            RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+!            !RDF%randField(:,1) = RDF%SkVec
+!
+!            if(allocated(gammaK)) deallocate(gammaK)
+!            if(allocated(phik))   deallocate(phik)
+!
+!
+!            if(RDF%nDim == 2) then
+!                plan = fftw_plan_r2r(RDF%nDim, [int(M), int(L)], data_real_2D, data_real_2D, &
+!                                        [FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+!                data_real_2D(:,:) = reshape(RDF%SkVec, [L, M])
+!                call fftw_execute_r2r(plan, data_real_2D, data_real_2D)
+!                !RDF%randField(:,1) = pack(data_real_2D(1:MSH%xNStep(1), 1:MSH%xNStep(2)), .true.)
+!                RDF%randField(:,1) = reshape(data_real_2D, [L*M])
+!                call fftw_destroy_plan(plan)
+!
+!            else if(RDF%nDim == 3) then
+!                plan = fftw_plan_r2r(RDF%nDim, [int(N), int(M), int(L)], data_real_3D, data_real_3D, &
+!                                        [FFTW_REDFT01, FFTW_REDFT01, FFTW_REDFT01], FFTW_ESTIMATE)
+!                data_real_3D(:,:,:) = reshape(RDF%SkVec, [L, M, N])
+!                call fftw_execute_r2r(plan, data_real_3D, data_real_3D)
+!                !RDF%randField(:,1) = pack(data_real_3D(1:MSH%xNStep(1), 1:MSH%xNStep(2), 1:MSH%xNStep(3)), .true.)
+!                RDF%randField(:,1) = reshape(data_real_3D, [L*M*N])
+!                call fftw_destroy_plan(plan)
+!
+!            else
+!                stop("No FFT method implemented only for 2D and 3D cases")
+!            end if
+!
+!            !RDF%randField(:,1) = RDF%SkVec(:) !FOR TESTS
+!            !RDF%randField(:,1) = RDF%kPoints(:) !FOR TESTS
+!            !RDF%randField(:,1) = RDF%rang!FOR TESTS
+!
+!        else
             call wLog("    GLOBAL")
             call fftw_mpi_init()
 
@@ -493,8 +495,8 @@ contains
             end if
 
             !Defining kInit and kEnd
-            RDF%kNInit = local_LD_offset + 1
-            RDF%kNEnd  = RDF%kNInit + local_LastDim - 1
+            RDF%kNInit = int(local_LD_offset) + 1
+            RDF%kNEnd  = RDF%kNInit + int(local_LastDim) - 1
             call wLog("local_LD_offset")
             call wLog(local_LD_offset)
             call wLog("local_LastDim")
@@ -533,7 +535,7 @@ contains
             if(MSH%nDim==2) call wLog([int(L), int(local_LastDim)])
             if(MSH%nDim==3) call wLog([int(L), int(M), int(local_LastDim)])
 
-
+            call wLog("Before set_kPoints")
             call set_kPoints(RDF, MSH%xStep)
             call set_SkVec(RDF)
 
@@ -556,14 +558,14 @@ contains
             allocate(phik(kNLocal))
 
             !Putting away the random numbers from others k (that are in others procs)
-            do i = 1, RDF%kNInit-1
+            do i_long = 1, RDF%kNInit-1
                 call random_number(trashNumber)
             end do
             call random_number(gammaK(:))
-            do i = RDF%kNEnd+1, product(RDF%kNStep)
+            do i_long = RDF%kNEnd+1, product(RDF%kNStep)
                 call random_number(trashNumber)
             end do
-            do i = 1, RDF%kNInit-1
+            do i_long = 1, RDF%kNInit-1
                 call random_number(trashNumber)
             end do
             call random_number(phiK(:))
@@ -577,7 +579,7 @@ contains
 
             gammaK       = gammaK -0.5
             RDF%SkVec(:) =  gammak*sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
-!            !RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
+            !RDF%SkVec(:) =  sqrt(RDF%SkVec)*cos(2.0D0*PI*phik);
 
             if(allocated(gammaK)) deallocate(gammaK)
             if(allocated(phik))   deallocate(phik)
@@ -628,7 +630,7 @@ contains
             call wLog(RDF%kNInit)
             call wLog("RDF%kNEnd")
             call wLog(RDF%kNEnd)
-        end if
+!        end if
 
         if(allocated(gammaK)) deallocate(gammaK)
         if(allocated(phik)) deallocate(phik)

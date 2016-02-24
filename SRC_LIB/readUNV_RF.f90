@@ -11,10 +11,10 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine readUNV(path, nDim, coordList, connectList, monotype, rang, nb_procs, comm)
+    subroutine readUNV(path, nDim, coordList, connectList, monotype, rang, nb_procs)
         !INPUT
         character (len=*), intent(in) :: path
-        integer, intent(in)           :: nDim, rang, nb_procs, comm
+        integer, intent(in)           :: nDim, rang, nb_procs
 
         !OUTPUT
         double precision, dimension(:,:), allocatable, intent(out), optional :: coordList
@@ -24,14 +24,13 @@ contains
         !LOCAL
         integer :: fileID = 600
         character (len=200) :: line
-        integer :: stat, code
-        integer :: i
+        integer :: stat
         logical :: inside
         integer :: nNodes
         integer :: nNodesLoc, nodeStart, nodeEnd
         integer :: nElemLoc, elemStart, elemEnd
         integer :: nElem, maxConnect
-        integer, allocatable, dimension(:) :: elemSizes
+        !integer, allocatable, dimension(:) :: elemSizes
         integer, dimension(:)  , allocatable :: sizeList
 
         !integer, dimension(:,:), allocatable :: startEnd
@@ -178,10 +177,10 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine readUNV_many(pathList, nDim, coordList, connectList, monotype, rang, nb_procs, comm)
+    subroutine readUNV_many(pathList, nDim, coordList, connectList, monotype, rang, nb_procs)
         !INPUT
         character (len=*), dimension(:), intent(in) :: pathList
-        integer, intent(in)           :: nDim, rang, nb_procs, comm
+        integer, intent(in)           :: nDim, rang, nb_procs
 
         !OUTPUT
         double precision, dimension(:,:), allocatable, intent(out), optional :: coordList
@@ -191,14 +190,14 @@ contains
         !LOCAL
         integer :: fileID = 600
         character (len=200) :: line
-        integer :: stat, code
-        integer :: i, f
+        integer :: stat
+        integer :: f
         logical :: inside
         integer :: nNodes
         integer :: nNodesLoc, nodeStart, nodeEnd
         integer :: nElemLoc, elemStart, elemEnd
         integer :: nElem, maxConnect
-        integer, allocatable, dimension(:) :: elemSizes
+        !integer, allocatable, dimension(:) :: elemSizes
         integer, dimension(:)  , allocatable :: sizeList
         integer :: nFiles
         integer, dimension(size(pathList)) :: nElemFile, nNodesFile

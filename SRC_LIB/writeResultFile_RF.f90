@@ -17,8 +17,8 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_Mono_XMF_h5(RDF, MSH, connectList, monotype, fileName, rang, folderPath, &
-                                 communicator, labelsH5, indexesH5, indexXMF, style, meshMod, &
+    subroutine write_Mono_XMF_h5(RDF, MSH, fileName, rang, folderPath, &
+                                 communicator, labelsH5, indexesH5, indexXMF, style, &
                                  HDF5FullPath, writeDataSet)
 
         implicit none
@@ -26,15 +26,13 @@ contains
         !INPUTS
         type(RF), intent(in)   :: RDF;
         type(MESH), intent(in) :: MSH;
-        integer         , dimension(1:,1:), intent(in) :: connectList;
         character(len=*)                  , intent(in) :: filename;
         integer                           , intent(in) :: rang;
         character(len=*)                  , intent(in) :: folderPath
         integer                           , intent(in) :: communicator, indexXMF
         character(len=*), dimension(1:)   , intent(in) :: labelsH5
         integer         , dimension(1:)   , intent(in) :: indexesH5
-        integer, intent(in) :: meshMod
-        logical, intent(in) :: monotype, writeDataSet
+        logical, intent(in) :: writeDataSet
         integer, intent(in) :: style !1 for parallel h5 writing
                                      !2 for sequential per processor h5 writing
                                      !3 for gathered monoprocesor h5 writing
@@ -42,12 +40,10 @@ contains
         character(len=*), intent(out), optional :: HDF5FullPath
 
         !LOCAL
-        character(len=110), dimension(3) :: HDF5Names
-        integer, dimension(3) :: xSz, ySz
-        integer, dimension(MSH%nDim) :: sizeSamples
-        character(len=110) :: XMFName, HDF5Name, fileName2
-        integer :: error, i
 
+
+
+        character(len=110) :: XMFName, HDF5Name
 
         !!!!!!!!!!!!HDF5
         call wLog("-> Writing h5 file in"//trim(adjustL(folderPath))//"/h5");
@@ -59,7 +55,6 @@ contains
                 call write_pHDF5_Str(  MSH=MSH, &
                                        RDF=RDF, &
                                        fileName=fileName, &
-                                       rang=rang, &
                                        folderPath=trim(adjustL(folderPath))//"/h5", &
                                        communicator=communicator, &
                                        HDF5Name=HDF5Name, HDF5FullPath = HDF5FullPath, writeDataSet = writeDataSet)
@@ -84,7 +79,7 @@ contains
                 case(1)
                     call write_pHDF5_Str_XMF(HDF5Name, MSH, fileName, &
                                              rang, trim(adjustL(folderPath))//"/xmf", &
-                                             communicator, "../h5")
+                                             "../h5")
 
                 case(2)
                     call write_HDF5_Unstr_per_proc_XMF(1, [HDF5name], [size(RDF%xPoints,2)], [.true.], size(RDF%xPoints,1), XMFName, &
@@ -101,8 +96,8 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_UNV_XMF_h5(UNV_randField, UNV_xPoints, connectList, monotype, fileName, rang, folderPath, &
-                                 communicator, labelsH5, indexesH5, indexXMF)
+    subroutine write_UNV_XMF_h5(UNV_randField, UNV_xPoints, connectList, fileName, rang, folderPath, &
+                                 communicator, indexXMF)
 
         implicit none
 
@@ -113,15 +108,13 @@ contains
         integer                           , intent(in) :: rang;
         character(len=*)                  , intent(in) :: folderPath
         integer                           , intent(in) :: communicator, indexXMF
-        character(len=*), dimension(1:)   , intent(in) :: labelsH5
-        integer         , dimension(1:)   , intent(in) :: indexesH5
-        logical, intent(in) :: monotype
 
         !LOCAL
         character(len=110), dimension(3) :: HDF5Names
         integer, dimension(3) :: xSz, ySz
         character(len=110) :: XMFName, HDF5Name, fileName2
-        integer :: error
+
+
 
 
         !!!!!!!!!!!!HDF5
@@ -158,7 +151,7 @@ contains
 
         call write_pHDF5_Unstr_XMF(HDF5Names, xSz, ySz, XMFName, &
                                rang, trim(adjustL(folderPath))//"/xmf", &
-                               communicator, "../h5")
+                               "../h5")
 
     end subroutine write_UNV_XMF_h5
 
@@ -185,10 +178,10 @@ contains
 
         !HDF5 VARIABLES
         character(len=110)             :: fileHDF5Name, fullPath !File name
-        character(len=30)              :: eventName, coordName;        !Dataset names
+
         integer(HID_T)                 :: file_id       !File identifier
         integer(HID_T)                 :: dset_id       !Dataset identifier
-        integer(HID_T)                 :: dspace_id     !Dataspace identifier
+
         integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
         integer(HID_T)                 :: plist_id      ! Property list identifier
         integer(HID_T)                 :: filespace     ! Dataspace identifier in file
@@ -200,9 +193,9 @@ contains
         integer(HSSIZE_T), dimension(2) :: offset
 
         !LOCAL VARIABLES
-        integer :: yDim, xDim, i
+        integer :: yDim, xDim
         integer :: nb_procs
-        character (len=12) :: numberStr, rangStr;
+
         integer, dimension(:), allocatable :: all_n_Dim
         character(LEN=8) :: dsetname
 
@@ -254,8 +247,8 @@ contains
         !PREPARING ENVIROMENT
         dims = [yDim, sum(all_n_Dim)]
         if(transp) dims = [xDim, sum(all_n_Dim)]
-        ySz = dims(1)
-        xSz = dims(2)
+        ySz = int(dims(1))
+        xSz = int(dims(2))
         call h5open_f(error) ! Initialize FORTRAN interface.
         call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error) !creates property list (plist_id)
         call h5pset_fapl_mpio_f(plist_id, communicator, info, error) !sets property list
@@ -337,7 +330,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     subroutine write_pHDF5_Unstr_XMF(HDF5nameList, xSz, ySz, fileName, &
                                      rang, folderPath, &
-                                     communicator, HDF5relativePath)
+                                     HDF5relativePath)
         implicit none
 
         !INPUTS
@@ -346,13 +339,12 @@ contains
         character(len=*)                  , intent(in) :: filename;
         integer, intent(in) :: rang
         character(len=*)                  , intent(in) :: folderPath
-        integer                           , intent(in) :: communicator
         character(len=*)                  , intent(in) :: HDF5relativePath
 
         !LOCAL VARIABLES
-        integer             :: Nmc, i, j, file, nDim;
+        integer             :: Nmc, i, file, nDim;
         character (len=110) :: fileXMFName, fullPathXMF, HDF5path;
-        character (len=35)  :: eventName, meshName;
+
 
         !write(get_fileId(),*) "------------START Writing result XMF file-----------------------";
 
@@ -597,8 +589,8 @@ contains
         integer             :: Nmc, i, j, file, nb_procs, code;
         integer             :: effectComm
         character (len=110) :: fileXMFName, fullPathXMF, effecHDF5path;
-        character (len=35)  :: eventName, meshName;
-        character (len=50) , dimension(:), allocatable :: effectAttName;
+        character (len=100) :: meshName;
+        character (len=100) , dimension(:), allocatable :: effectAttName;
         integer            , dimension(:), allocatable :: all_nPointList
         character (len=110), dimension(:), allocatable :: all_HDF5nameList
         logical            , dimension(:), allocatable :: all_mask
@@ -741,7 +733,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_pHDF5_Str(MSH, RDF, fileName, rang, folderPath, &
+    subroutine write_pHDF5_Str(MSH, RDF, fileName, folderPath, &
                                  communicator, HDF5Name, HDF5FullPath, writeDataSet)
         implicit none
 
@@ -749,7 +741,7 @@ contains
         type(MESH), intent(in) :: MSH
         type(RF)  , intent(in) :: RDF
         character(len=*)                  , intent(in) :: filename;
-        integer                           , intent(in) :: rang;
+
         character(len=*)                  , intent(in) :: folderPath
         integer                           , intent(in) :: communicator
         logical                           , intent(in) :: writeDataSet
@@ -759,37 +751,33 @@ contains
 
         !HDF5 VARIABLES
         character(len=110)             :: fileHDF5Name, fullPath !File name
-        character(len=30)              :: eventName, coordName, attr_name;        !Dataset names
+
         integer(HID_T)                 :: file_id       !File identifier
         integer(HID_T)                 :: dset_id       !Dataset identifier
-        integer(HID_T)                 :: dspace_id     !Dataspace identifier
-        integer(HID_T)                 :: attr_id       !Attribute identifier
-        integer(HID_T)                 :: attrspace_id  !Attribute Space identifier
+
         integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
         integer(HID_T)                 :: plist_id      ! Property list identifier
-        integer(HID_T)                 :: filespace, filespace1D ! Dataspace identifier in file
+        integer(HID_T)                 :: filespace
         integer                        :: rank, rank1D !Dataset rank (number of dimensions)
         integer(HSIZE_T), dimension(MSH%nDim) :: dims !Dataset dimensions
-        integer(HSIZE_T), dimension(1) :: dims1D !Dataset dimensions
+
         integer                        :: error !Error flag
-        integer                        :: info, code
+        integer                        :: info
         integer(HSIZE_T) , dimension(MSH%nDim) :: countND
         integer(HSSIZE_T), dimension(MSH%nDim) :: offset
-        integer(HSIZE_T) , dimension(1) :: count1D, chunk_dims_1D
-        integer(HSSIZE_T), dimension(1) :: offset1D
-        integer(HSIZE_T), dimension(1) :: attr_dim
-        integer(SIZE_T) :: nElem1D
+        integer(HSIZE_T) , dimension(1) :: count1D
+
+
 
         !LOCAL VARIABLES
-        integer :: yDim, xDim, i, j, k
-        integer :: nb_procs
-        character (len=12) :: numberStr, rangStr;
+
+
+
         integer(kind=8), dimension(MSH%nDim) :: total_xNStep
         character(LEN=8) :: dsetname = "samples"
-        logical :: bool !for tests
-        integer :: tmp_val
+
         !integer(HSIZE_T), dimension(:,:), allocatable :: localSlab
-        double precision, dimension(MSH%nDim) :: orig
+
         integer, dimension(MSH%nDim) :: minPos, maxPos
         double precision, dimension(:), allocatable :: randFieldLinear
 
@@ -1034,7 +1022,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     subroutine write_pHDF5_Str_XMF(HDF5nameList, MSH, fileName, &
                                      rang, folderPath, &
-                                     communicator, HDF5relativePath)
+                                     HDF5relativePath)
 
         implicit none
 
@@ -1044,13 +1032,11 @@ contains
         character(len=*)              , intent(in) :: filename;
         integer, intent(in) :: rang
         character(len=*)              , intent(in) :: folderPath
-        integer                       , intent(in) :: communicator
         character(len=*)              , intent(in) :: HDF5relativePath
 
         !LOCAL VARIABLES
-        integer             :: i, j, file, nDim;
+        integer             :: i, file, nDim;
         character (len=110) :: fileXMFName, fullPathXMF, HDF5path, dimText;
-        character (len=35)  :: eventName, meshName;
         integer, dimension(MSH%nDim) :: total_xNStep
 
 
@@ -1258,7 +1244,7 @@ contains
         !LOCAL
         character(len=50) :: attr_name
         integer(HID_T)  :: file_id       !File identifier
-        integer :: error, code
+        integer :: error
         !integer(kind=8) :: sum_xNTotal, sum_kNTotal
         logical :: indep
 

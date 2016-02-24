@@ -1081,7 +1081,7 @@ function ignbin ( n, pp )
   end if
 
   ffm = xnp + p
-  m = ffm
+  m = nint(ffm)
   fm = m
   xnpq = xnp * q
   p1 = int ( 2.195E+00 * sqrt ( xnpq ) - 4.6E+00 * q ) + 0.5E+00
@@ -1107,7 +1107,7 @@ function ignbin ( n, pp )
 !  Triangle
 !
     if ( u < p1 ) then
-      ix = xm - p1 * v + u
+      ix = nint(xm - p1 * v + u)
       if ( 0.5E+00 < pp ) then
         ix = n - ix
       end if
@@ -1126,11 +1126,11 @@ function ignbin ( n, pp )
         cycle
       end if
 
-      ix = x
+      ix = int(x)
 
     else if ( u <= p3 ) then
 
-      ix = xl + log ( v ) / xll
+      ix = int(xl + log ( v ) / xll)
       if ( ix < 0 ) then
         cycle
       end if
@@ -1138,7 +1138,7 @@ function ignbin ( n, pp )
 
     else
 
-      ix = xr - log ( v ) / xlr
+      ix = int(xr - log ( v ) / xlr)
       if ( n < ix ) then
         cycle
       end if
@@ -1381,14 +1381,14 @@ function ignpoi ( mu )
   real ( kind = 4 ) fy
   real ( kind = 4 ) g
   integer ( kind = 4 ) ignpoi
-  integer ( kind = 4 ) j
+  !integer ( kind = 4 ) j
   integer ( kind = 4 ) k
   integer ( kind = 4 ) kflag
   integer ( kind = 4 ) l
   integer ( kind = 4 ) m
   real ( kind = 4 ) mu
-  real ( kind = 4 ) muold
-  real ( kind = 4 ) muprev
+  !real ( kind = 4 ) muold
+  !real ( kind = 4 ) muprev
   real ( kind = 4 ) omega
   real ( kind = 4 ) p
   real ( kind = 4 ) p0
@@ -1409,6 +1409,8 @@ function ignpoi ( mu )
 
   data fact / 1.0E+00, 1.0E+00, 2.0E+00, 6.0E+00, 24.0E+00, &
     120.0E+00, 720.0E+00, 5040.0E+00, 40320.0E+00, 362880.0E+00 /
+
+  e = 0.0
 !
 !  Start new table and calculate P0.
 !
@@ -1541,6 +1543,7 @@ function ignpoi ( mu )
 !
 !  Exponential sample.
 !
+
     do
 
       e = sexpo ( )
@@ -1654,7 +1657,7 @@ function ignuin ( low, high )
 !
   implicit none
 
-  integer ( kind = 4 ) err
+  !integer ( kind = 4 ) err
   integer ( kind = 4 ) high
   integer ( kind = 4 ) i4_uni
   integer ( kind = 4 ) ign

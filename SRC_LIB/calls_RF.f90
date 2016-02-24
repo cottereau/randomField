@@ -79,7 +79,6 @@ contains
         type(RF), intent(inout) :: RDF
         type(MESH), intent(inout) :: MSH
         !LOCAL
-        logical, dimension(:), allocatable :: effectCalc;
 
         if(RDF%rang == 0) write(*,*) "Inside create_RF_Unstruct_Init"
 
@@ -101,11 +100,11 @@ contains
 
         !LOCAL VARIABLES
         integer :: i;
-        integer :: minIndexNeigh, maxIndexNeigh
+
         !logical, dimension(size(MSH%neigh)) :: considerNeighbour
         !integer, dimension(16) :: testVec
         integer :: partitionType = 1
-        integer, dimension(RDF%nDim) :: minPos, maxPos
+
 
         !testVec = [(i, i = 1, 16)]
 

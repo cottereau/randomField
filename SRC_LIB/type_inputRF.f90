@@ -75,7 +75,7 @@ contains
             IPT%xMinGlob = -1.0D0
             IPT%xMaxGlob_in = -1.0D0
             IPT%xMinGlob_in = -1.0D0
-            IPT%pointsPerCorrL = -1.0D0
+            IPT%pointsPerCorrL = -1
             IPT%corrL   = -1.0D0
             IPT%overlap = -1.0D0
 
@@ -215,7 +215,7 @@ contains
                     call read_DataTable(dataTable, "pointsPerCorrL", IPT%pointsPerCorrL)
                     IPT%unv = .true.
                     call readUNV(IPT%unv_path, IPT%nDim_mesh, IPT%coordList, IPT%connectList, IPT%monotype, &
-                                 IPT%rang, IPT%nb_procs, IPT%comm)
+                                 IPT%rang, IPT%nb_procs)
                     !call readUNV_many([IPT%unv_path, IPT%unv_path], IPT%nDim_mesh, IPT%coordList, &
                     !                  IPT%connectList, IPT%monotype, &
                     !                  IPT%rang, IPT%nb_procs, IPT%comm)
@@ -254,7 +254,7 @@ contains
             type(IPT_RF), intent(inout)  :: IPT
             !LOCAL
             character(len=1024) , dimension(:,:), allocatable :: dataTable;
-            integer :: independent
+
 
             call set_DataTable(path, dataTable)
             call read_DataTable(dataTable, "nDim", IPT%nDim_gen)
@@ -336,7 +336,7 @@ contains
             integer, intent(in), optional :: unit_in
             logical, intent(in), optional :: forLog_in
             !LOCAL
-            character(len = 20) :: dblFmt, matDblFmt, intFmt, matIntFmt
+            !character(len = 20) :: dblFmt, matDblFmt, intFmt, matIntFmt
             integer :: unit
             logical :: forLog
             logical :: active

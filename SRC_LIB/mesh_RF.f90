@@ -23,7 +23,6 @@ contains
         double precision, dimension(:, :), allocatable, intent(out), target :: xPoints;
 
         !LOCAL
-        integer :: d
 
         allocate(xPoints(MSH%nDim, MSH%xNTotal))
 

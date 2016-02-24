@@ -27,8 +27,8 @@ module type_STAT
         double precision, dimension(:), allocatable :: overlap;
         integer(kind=8) , dimension(:), allocatable :: xNStep, xNStep_Loc!, kNStep
         integer,          dimension(:), allocatable :: procPerDim, coords
-        integer,          dimension(:,:), allocatable :: localRange
-        integer,          dimension(:,:), allocatable :: Sk_Ind, SkTot_Ind
+        integer(kind=8),  dimension(:,:), allocatable :: localRange
+        integer(kind=8),  dimension(:,:), allocatable :: Sk_Ind, SkTot_Ind
         double precision, dimension(:), allocatable :: Sk_Dir, SkTot_Dir
         !integer(kind=8) :: xNTotal, kNTotal
         !integer(kind=8) :: sum_xNTotal, sum_kNTotal

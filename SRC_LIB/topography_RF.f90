@@ -68,16 +68,9 @@ contains
         double precision, dimension(:), intent(out) :: procExtent, procStart
         double precision, dimension(:), intent(out), optional :: stepProc_out
         !LOCAL
-        double precision, dimension(MSH%nDim) :: delta, half, minVol
+        double precision, dimension(MSH%nDim) :: delta
         double precision, dimension(MSH%nDim) :: ovlp_Tot, Novlp_Tot, ovlp, Novlp
         double precision, dimension(MSH%nDim) :: delta_Proc, stepProc
-        double precision, dimension(MSH%nDim) :: locNO, locO
-        integer, dimension(MSH%nDim) :: nPointsO, nPointsO_Ext, nPointsTot, nPointsLoc
-        integer, dimension(MSH%nDim) :: nPointsNO, nPointsNO_int, nPointsNO_ext
-        integer, dimension(MSH%nDim) :: pointInit, pointEnd, pointNb
-        integer, dimension(MSH%nDim) :: xNStepGlob
-        integer :: sliceSize
-        integer :: i
 
         !Rounding Global Extremes
         call wLog(" ")
@@ -276,10 +269,10 @@ contains
         !OUTPUT
         double precision, dimension(:)  , intent(out) :: xMinInt, xMaxInt, xMinExt, xMaxExt
         double precision, dimension(:,:), intent(out) :: xMaxNeigh, xMinNeigh, xOrNeigh
-        integer(kind=8), intent(out) :: nOvlpPoints, nOvlpMax
+        integer :: nOvlpMax, nOvlpPoints
 
         !LOCAL VARIABLES
-        double precision :: ovlpFraction = 1.0D0
+
         integer :: neighPos
         integer :: nOvlpPoints_Neigh
 
@@ -402,7 +395,7 @@ contains
         logical, intent(out) :: validProc
         !LOCAL
         !integer, dimension(IPT%nDim_gen) :: procPerDim
-        integer :: i, j, procTotal;
+        integer :: procTotal;
         double  precision :: procRootDim, logProc2, diff1, diff2;
         integer :: code, color
 
@@ -910,7 +903,7 @@ contains
         neigh(:) = -1
         op_neigh(:) = -1
 
-        coords = subdivisionCoords(:,MSH%rang+1)
+        coords = nint(subdivisionCoords(:,MSH%rang+1))
 
         call wLog("coords = ")
         call wLog(coords)
@@ -967,137 +960,134 @@ contains
         !end if
 
     end subroutine set_communications_topology
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine set_neighbours (MSH)
-        implicit none
 
-        !INPUT AND OUTPUT
-        type(MESH) :: MSH
-
-        !LOCAL VARIABLES
-        integer :: i, j, code, delta;
-        integer, dimension(MSH%nDim) :: shift
-
-        !write(*,*) "set_neighbour!Opposite directions are neighbours, 1 is opposite to 2, 3 to 4 and so on
-
-        !Defining lateral neighbours
-        if(MSH%nDim == 1) then
-            shift = [-1]
-            call find_rank (MSH, shift, 1)
-            !shift = [1]
-            shift = -shift
-            call find_rank (MSH, shift, 2)
-        else if(MSH%nDim == 2) then
-            shift = [0, -1]
-            call find_rank (MSH, shift, 1)
-            !shift = [0, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 2)
-            shift = [-1, 0]
-            call find_rank (MSH, shift, 3)
-            !shift = [1, 0]
-            shift = -shift
-            call find_rank (MSH, shift, 4)
-        else if(MSH%nDim == 3) then
-            shift = [0, 0, -1]
-            call find_rank (MSH, shift, 1)
-            !shift = [0, 0, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 2)
-            shift = [0, -1, 0]
-            call find_rank (MSH, shift, 3)
-            !shift = [0, 1, 0]
-            shift = -shift
-            call find_rank (MSH, shift, 4)
-            shift = [-1, 0, 0]
-            call find_rank (MSH, shift, 5)
-            !shift = [1, 0, 0]
-            shift = -shift
-            call find_rank (MSH, shift, 6)
-        end if
-!        do i = 0, MSH%nDim - 1
-!            !write(*,*) "i = ", i
-!            call MPI_CART_SHIFT (MSH%topComm,i,1,MSH%neigh(2*i +1),MSH%neigh(2*(i+1)),code)
-!        end do
-
-        !Defining corner neighbours
-        if(MSH%nDim == 2) then
-            shift = [-1, -1]
-            call find_rank (MSH, shift, 5)
-            !shift = [1, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 6)
-            shift = [1, -1]
-            call find_rank (MSH, shift, 7)
-            !shift = [-1, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 8)
-        else if(MSH%nDim == 3) then
-            shift = [-1, -1, -1]
-            call find_rank (MSH, shift, 19)
-            !shift = [1, 1, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 20)
-            shift = [1, -1, -1]
-            call find_rank (MSH, shift, 21)
-            !shift = [-1, 1, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 22)
-            shift = [1, 1, -1]
-            call find_rank (MSH, shift, 23)
-            !shift = [-1, -1, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 24)
-            shift = [-1, 1, -1]
-            call find_rank (MSH, shift, 25)
-            !shift = [1, -1, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 26)
-
-        end if
-
-        !Defining vertex neighbours
-        if(MSH%nDim == 3) then
-            shift = [-1, -1, 0]
-            call find_rank (MSH, shift, 7)
-            !shift = [1, 1, 0]
-            shift = -shift
-            call find_rank (MSH, shift, 8)
-            shift = [-1, 1, 0]
-            call find_rank (MSH, shift, 9)
-            !shift = [1, -1, 0]
-            shift = -shift
-            call find_rank (MSH, shift, 10)
-
-            shift = [-1, 0, -1]
-            call find_rank (MSH, shift, 11)
-            !shift = [1, 0, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 12)
-            shift = [-1, 0, 1]
-            call find_rank (MSH, shift, 13)
-            !shift = [1, 0, -1]
-            shift = -shift
-            call find_rank (MSH, shift, 14)
-
-            shift = [0, -1, -1]
-            call find_rank (MSH, shift, 15)
-            !shift = [0, 1, 1]
-            shift = -shift
-            call find_rank (MSH, shift, 16)
-            shift = [0, -1, 1]
-            call find_rank (MSH, shift, 17)
-            !shift = [0, 1, -1]
-            shift = -shift
-            call find_rank (MSH, shift, 18)
-        end if
-
-        call set_shift(MSH)
-
-    end subroutine set_neighbours
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine set_neighbours (MSH)
+!        implicit none
+!
+!        !INPUT AND OUTPUT
+!        type(MESH) :: MSH
+!
+!        !LOCAL VARIABLES
+!        integer :: code, delta;
+!        integer, dimension(MSH%nDim) :: shift
+!
+!        !write(*,*) "set_neighbour!Opposite directions are neighbours, 1 is opposite to 2, 3 to 4 and so on
+!
+!        !Defining lateral neighbours
+!        if(MSH%nDim == 1) then
+!            shift = [-1]
+!            call find_rank (MSH, shift, 1)
+!            !shift = [1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 2)
+!        else if(MSH%nDim == 2) then
+!            shift = [0, -1]
+!            call find_rank (MSH, shift, 1)
+!            !shift = [0, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 2)
+!            shift = [-1, 0]
+!            call find_rank (MSH, shift, 3)
+!            !shift = [1, 0]
+!            shift = -shift
+!            call find_rank (MSH, shift, 4)
+!        else if(MSH%nDim == 3) then
+!            shift = [0, 0, -1]
+!            call find_rank (MSH, shift, 1)
+!            !shift = [0, 0, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 2)
+!            shift = [0, -1, 0]
+!            call find_rank (MSH, shift, 3)
+!            !shift = [0, 1, 0]
+!            shift = -shift
+!            call find_rank (MSH, shift, 4)
+!            shift = [-1, 0, 0]
+!            call find_rank (MSH, shift, 5)
+!            !shift = [1, 0, 0]
+!            shift = -shift
+!            call find_rank (MSH, shift, 6)
+!        end if
+!
+!        !Defining corner neighbours
+!        if(MSH%nDim == 2) then
+!            shift = [-1, -1]
+!            call find_rank (MSH, shift, 5)
+!            !shift = [1, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 6)
+!            shift = [1, -1]
+!            call find_rank (MSH, shift, 7)
+!            !shift = [-1, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 8)
+!        else if(MSH%nDim == 3) then
+!            shift = [-1, -1, -1]
+!            call find_rank (MSH, shift, 19)
+!            !shift = [1, 1, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 20)
+!            shift = [1, -1, -1]
+!            call find_rank (MSH, shift, 21)
+!            !shift = [-1, 1, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 22)
+!            shift = [1, 1, -1]
+!            call find_rank (MSH, shift, 23)
+!            !shift = [-1, -1, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 24)
+!            shift = [-1, 1, -1]
+!            call find_rank (MSH, shift, 25)
+!            !shift = [1, -1, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 26)
+!
+!        end if
+!
+!        !Defining vertex neighbours
+!        if(MSH%nDim == 3) then
+!            shift = [-1, -1, 0]
+!            call find_rank (MSH, shift, 7)
+!            !shift = [1, 1, 0]
+!            shift = -shift
+!            call find_rank (MSH, shift, 8)
+!            shift = [-1, 1, 0]
+!            call find_rank (MSH, shift, 9)
+!            !shift = [1, -1, 0]
+!            shift = -shift
+!            call find_rank (MSH, shift, 10)
+!
+!            shift = [-1, 0, -1]
+!            call find_rank (MSH, shift, 11)
+!            !shift = [1, 0, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 12)
+!            shift = [-1, 0, 1]
+!            call find_rank (MSH, shift, 13)
+!            !shift = [1, 0, -1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 14)
+!
+!            shift = [0, -1, -1]
+!            call find_rank (MSH, shift, 15)
+!            !shift = [0, 1, 1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 16)
+!            shift = [0, -1, 1]
+!            call find_rank (MSH, shift, 17)
+!            !shift = [0, 1, -1]
+!            shift = -shift
+!            call find_rank (MSH, shift, 18)
+!        end if
+!
+!        call set_shift(MSH)
+!
+!    end subroutine set_neighbours
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -1117,59 +1107,59 @@ contains
 
     end subroutine get_NeighbourCriteria
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine find_rank (MSH, shift, neighPos)
-
-        implicit none
-
-        !INPUT AND OUTPUT
-        type(MESH) :: MSH
-
-        !INPUT
-        integer, dimension(:), intent(in) :: shift
-        integer, intent(in) :: neighPos
-
-        !LOCAL VARIABLES
-        integer :: i, code, neigh;
-        integer, dimension(:), allocatable :: pos
-        logical :: possible
-
-
-        allocate(pos(MSH%nDim))
-        possible = .true.
-        pos = MSH%coords+shift
-
-        !MSH%neighShift(:,neighPos) = shift
-        !MSH%intShift(:,neighPos) = shift
-
-        do i = 1, MSH%nDim
-            if (pos(i) < 0 .or. pos(i) > MSH%procPerDim(i) - 1) then
-                MSH%neigh(neighPos) = -1
-                !MSH%neighShift(:,neighPos) = 0
-                possible = .false.
-                exit
-            end if
-        end do
-
-        if(possible) then
-            call MPI_CART_RANK (MSH%topComm,pos,MSH%neigh(neighPos),code)
-            MSH%mappingFromShift(findLabel(shift)) = MSH%neigh(neighPos)
-            !call wLog(" MSH%neigh(neighPos) = ")
-            !call wLog(MSH%neigh(neighPos))
-            !call wLog(" shift = ")
-            !call wLog(shift)
-            !call wLog(" findLabel(shift) = ")
-            !call wLog(findLabel(shift))
-        else
-            MSH%mappingFromShift(findLabel(shift)) = -1
-        end if
-
-        deallocate(pos)
-
-    end subroutine find_rank
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    subroutine find_rank (MSH, shift, neighPos)
+!
+!        implicit none
+!
+!        !INPUT AND OUTPUT
+!        type(MESH) :: MSH
+!
+!        !INPUT
+!        integer, dimension(:), intent(in) :: shift
+!        integer, intent(in) :: neighPos
+!
+!        !LOCAL VARIABLES
+!        integer :: i, code, neigh;
+!        integer, dimension(:), allocatable :: pos
+!        logical :: possible
+!
+!
+!        allocate(pos(MSH%nDim))
+!        possible = .true.
+!        pos = MSH%coords+shift
+!
+!        !MSH%neighShift(:,neighPos) = shift
+!        !MSH%intShift(:,neighPos) = shift
+!
+!        do i = 1, MSH%nDim
+!            if (pos(i) < 0 .or. pos(i) > MSH%procPerDim(i) - 1) then
+!                MSH%neigh(neighPos) = -1
+!                !MSH%neighShift(:,neighPos) = 0
+!                possible = .false.
+!                exit
+!            end if
+!        end do
+!
+!        if(possible) then
+!            call MPI_CART_RANK (MSH%topComm,pos,MSH%neigh(neighPos),code)
+!            MSH%mappingFromShift(findLabel(shift)) = MSH%neigh(neighPos)
+!            !call wLog(" MSH%neigh(neighPos) = ")
+!            !call wLog(MSH%neigh(neighPos))
+!            !call wLog(" shift = ")
+!            !call wLog(shift)
+!            !call wLog(" findLabel(shift) = ")
+!            !call wLog(findLabel(shift))
+!        else
+!            MSH%mappingFromShift(findLabel(shift)) = -1
+!        end if
+!
+!        deallocate(pos)
+!
+!    end subroutine find_rank
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

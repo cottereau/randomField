@@ -28,8 +28,9 @@ contains
         !LOCAL
         integer(kind=8) :: totalSize
         integer :: nDim
-        integer(kind=8) :: sizePattern, unityMult, patternMult
-        integer :: start, end, i, d
+        integer(kind=8) :: sizePattern, unityMult, patternMult, start, end
+        integer(kind=8) :: i_long
+        integer :: i, d
         logical :: effec_Inverse
 
         totalSize = product(xNStep)
@@ -59,8 +60,8 @@ contains
                 end do
 
                 !Replicating the pattern
-                do i=2, patternMult
-                    start = (i-1)*sizePattern + 1
+                do i_long=2, patternMult
+                    start = (i_long-1)*sizePattern + 1
                     end   = start + sizePattern - 1
                     xPoints(d, start:end) = xPoints(d, 1:sizePattern)
                 end do
@@ -79,8 +80,8 @@ contains
                 end do
 
                 !Replicating the pattern
-                do i=2, patternMult
-                    start = (i-1)*sizePattern + 1
+                do i_long=2, patternMult
+                    start = (i_long-1)*sizePattern + 1
                     end   = start + sizePattern - 1
                     xPoints(d, start:end) = xPoints(d, 1:sizePattern)
                 end do
@@ -94,7 +95,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine get_Permutation(pos, qmax, nStep, pVec, qmin, snapExtremes, verbose)
+    subroutine get_Permutation(pos, qmax, nStep, pVec, qmin, snapExtremes)
 
         implicit none
 
@@ -104,7 +105,7 @@ contains
         double precision, dimension(1:), intent(in), optional :: qmin;
         integer,          dimension(1:), intent(in)           :: nStep;
         logical, optional, intent(in) :: snapExtremes
-        logical, optional, intent(in) :: verbose
+
         !OUTPUT
         double precision, dimension(1:), intent(out) :: pVec;
         !LOCAL VARIABLES

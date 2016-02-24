@@ -37,9 +37,7 @@ contains
 
             !LOCAL
             type(MESH) :: globMSH
-            integer :: code
-            double precision, dimension(IPT%nDim_mesh) :: ratio
-            double precision, dimension(IPT%nDim_mesh) :: Novlp_Now, procExtent, Ovlp_Now
+
             double precision, dimension(IPT%nDim_mesh) :: xRangeTotal, xMaxTotal, xMinTotal, xRangeGlob
             double precision, dimension(IPT%nDim_mesh) :: overlap
             logical :: locLevelOK
@@ -178,7 +176,7 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
 
-        subroutine single_realization(IPT, globMSH, writeFiles, outputStyle, sameFolder, &
+        subroutine single_realization(IPT, globMSH, writeFiles, outputStyle, &
                                       fieldComm, fieldNumber, subdivisionStart, stepProc, h5fullPath)
 
             implicit none
@@ -186,7 +184,6 @@ contains
             type(IPT_RF), intent(in) :: IPT
             type(MESH)  , intent(in) :: globMSH
             logical, intent(in) :: writeFiles
-            logical, intent(in) :: sameFolder
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
             integer, intent(in) :: fieldComm, fieldNumber
             double precision, dimension(:), intent(in) :: subdivisionStart, stepProc
@@ -194,20 +191,21 @@ contains
             !LOCAL
             type(RF)      :: RDF
             type(MESH)    :: MSH
-            double precision, dimension(IPT%nDim_gen) :: procExtent, procStart
-            double precision, dimension(:), allocatable :: seedStartVec
+
+
             double precision, dimension(:,:), allocatable :: UNV_randField
-            double precision :: tLoc1, tLoc2
-            double precision :: t1, t2, t3, t4, t5, t6;
-            double precision :: all_t1, all_t2, all_t3, all_t4, all_t5, all_t6;
+
+            double precision :: t1, t2, t3
+            double precision :: all_t1, all_t2, all_t3
             integer :: code
             integer :: all_xNTotal
             integer :: i
             logical :: validProc
-            integer :: newComm, newNbProcs, newRang
-            character(len=100) :: BBoxPartFileName, BBoxPath
+            integer :: rang
+            integer :: newNbProcs, newRang
+            character(len=200) :: BBoxPartFileName, BBoxPath
             character(len=*)   :: h5fullPath
-            integer(kind=8) :: xNTotal
+
             integer, dimension(IPT%nDim_gen) :: globCoord
 
 
@@ -240,8 +238,8 @@ contains
             call set_local_bounding_box(MSH,&
                                         MSH%xMinBound, MSH%xMaxBound, &
                                         MSH%xNStep, MSH%xNTotal, MSH%origin, validProc)
-
-            call set_validProcs_comm(validProc, fieldComm, MSH%rang, &
+            rang = MSH%rang
+            call set_validProcs_comm(validProc, fieldComm, rang, &
                                      MSH%validProc, RDF%validProc, MSH%comm, RDF%comm, &
                                      MSH%nb_procs, RDF%nb_procs, MSH%rang, RDF%rang)
 
@@ -342,13 +340,13 @@ contains
                         call wLog(minval(RDF%randField,1))
                         call wLog("maxval(RDF%randField,1) =")
                         call wLog(maxval(RDF%randField,1))
-                        call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, BBoxPartFileName, RDF%rang, single_path, &
-                                               MSH%comm, ["_Part"], [fieldNumber], fieldNumber, style=outputStyle, meshMod = msh_AUTO, &
+                        call write_Mono_XMF_h5(RDF, MSH, BBoxPartFileName, RDF%rang, single_path, &
+                                               MSH%comm, ["_Part"], [fieldNumber], fieldNumber, style=outputStyle, &
                                                HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
                     else
                         call wLog("   (Per Proc)");
-                        call write_Mono_XMF_h5(RDF, MSH, IPT%connectList, IPT%monotype, BBoxPartFileName, RDF%rang, single_path, &
-                                               MSH%comm, ["_Part"], [RDF%rang], 0, style=outputStyle, meshMod = msh_AUTO, &
+                        call write_Mono_XMF_h5(RDF, MSH, BBoxPartFileName, RDF%rang, single_path, &
+                                               MSH%comm, ["_Part"], [RDF%rang], 0, style=outputStyle, &
                                                HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
 
                     end if
@@ -377,9 +375,9 @@ contains
 !                if(RDF%rang == 0) write(*,*) "  Source:"
 !                if(RDF%rang == 0) write(*,*) BBoxPath
 !                call interpolateToUNV(BBoxPath, IPT%coordList, UNV_randField, IPT%rang)
-!                call write_UNV_XMF_h5(UNV_randField, IPT%coordList, IPT%connectList, IPT%monotype, &
+!                call write_UNV_XMF_h5(UNV_randField, IPT%coordList, IPT%connectList, &
 !                                      "UNV_", RDF%rang, single_path, &
-!                                      MSH%comm, ["_All_UNV"], [RDF%rang], 0)
+!                                      MSH%comm, 0)
 !            end if
 !
 !            if(IPT%rang == 0) call write_stat_input("./stat_input", BBoxPath)
@@ -394,13 +392,12 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine combine_subdivisions(IPT, writeFiles, outputStyle, sameFolder, &
+        subroutine combine_subdivisions(IPT, writeFiles, outputStyle, &
                                         stepProc, procExtent, overlap, all_t1, delete_intermediate_files)
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
             logical, intent(in) :: writeFiles
-            logical, intent(in) :: sameFolder
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
             double precision, dimension(:), intent(in) :: stepProc, procExtent, overlap
             double precision, intent(in) :: all_t1
@@ -409,11 +406,10 @@ contains
             !LOCAL
             type(MESH) :: globMSH
             type(RF)   :: globRDF
-            integer(HSIZE_T), dimension(IPT%nDim_gen) :: offset, locDims
             integer :: group, fieldNumber, groupComm, groupMax
             integer :: code
             character(len=200) :: randFieldFilePath, XMFFilePath
-            character(len=100) :: BBoxPartFileName
+            character(len=200) :: BBoxPartFileName
             logical :: validProc
             integer :: partitionType =1
             integer :: locLevel, locIter
@@ -421,7 +417,7 @@ contains
             type(IPT_RF) :: newIPT
             double precision, dimension(IPT%nDim_mesh, product(IPT%nFields)) :: subdivisionCoords
             double precision, dimension(:, :), allocatable :: offsetCoords
-            double precision, dimension(IPT%nDim_mesh) :: stepProc_level, procExtent_level
+
             integer, dimension(IPT%nDim_mesh) :: procCoord, locStep
             integer, dimension(IPT%nDim_mesh) :: totalFieldPerDim, nFields_level, nFields_level_before
             integer :: i, validProcGroup, validProcComm, prodNFields
@@ -430,9 +426,9 @@ contains
             integer, dimension(IPT%nDim_mesh) :: minPosProc, maxPosProc
 
             !H5 LOCAL
-            character(len=50) :: attr_Name, dset="samples"
+            character(len=50) :: dset="samples"
             integer :: hdferr
-            integer(HID_T) :: file_id, attr_id, space_id, dset_id, mem_id
+            integer(HID_T) :: file_id, dset_id
             double precision, dimension(IPT%nDim_mesh) :: ones
 
             !Gluing fields together
@@ -701,13 +697,13 @@ contains
                                 call wLog(minval(globRDF%randField,1))
                                 call wLog("maxval(RDF%randField,1) =")
                                 call wLog(maxval(globRDF%randField,1))
-                                call write_Mono_XMF_h5(globRDF, globMSH, IPT%connectList, IPT%monotype, BBoxPartFileName, globRDF%rang, single_path, &
-                                                       globMSH%comm, ["_ALL"], [0], fieldNumber, style=outputStyle, meshMod = msh_AUTO, &
+                                call write_Mono_XMF_h5(globRDF, globMSH, BBoxPartFileName, globRDF%rang, single_path, &
+                                                       globMSH%comm, ["_ALL"], [0], fieldNumber, style=outputStyle, &
                                                        writeDataSet = IPT%writeDataSet)
                             else
                                 call wLog("   (Per Proc)");
-                                call write_Mono_XMF_h5(globRDF, globMSH, IPT%connectList, IPT%monotype, BBoxPartFileName, globRDF%rang, single_path, &
-                                                       globMSH%comm, ["_procOnlyShape"], [IPT%rang], 0, style=outputStyle, meshMod = msh_AUTO, &
+                                call write_Mono_XMF_h5(globRDF, globMSH, BBoxPartFileName, globRDF%rang, single_path, &
+                                                       globMSH%comm, ["_procOnlyShape"], [IPT%rang], 0, style=outputStyle, &
                                                        writeDataSet = IPT%writeDataSet)
 
                             end if
@@ -745,11 +741,11 @@ contains
             !OUTPUT
             double precision, dimension(:,:), intent(out) :: UNV_randField
             !LOCAL
-            integer :: nDim, Nmc, method, corrMod, margiFirst
+            integer :: nDim, Nmc
             logical :: independent
             character(len=50) :: attr_Name, dset="samples"
             integer :: hdferr
-            integer(HID_T) :: file_id, attr_id, space_id, dset_id, mem_id
+            integer(HID_T) :: file_id, space_id, dset_id, mem_id
             integer(HSIZE_T), dimension(size(coordList,1)) :: offset, locDims
             integer, dimension(size(coordList,1)) :: xNStep, coordPosInt
             integer, dimension(size(coordList,1), 2**size(coordList,1)) :: neighCoord
@@ -760,7 +756,7 @@ contains
             double precision, dimension(size(coordList,1)) :: xMin_Loc_UNV, xMax_Loc_UNV
             integer, dimension(size(coordList,1)) :: minPos, maxPos, extent
             integer(HSIZE_T), dimension(2) :: locShape, zero2D
-            integer :: i, j, d
+            integer :: i, j
             double precision, dimension(:,:)    , pointer :: BB_2D
             double precision, dimension(:,:,:)  , pointer :: BB_3D
             double precision :: weight

@@ -19,7 +19,8 @@ module type_MESH
             !nDim independent
         integer :: meshMod, method
         integer :: nDim = -1
-        integer(kind=8) :: xNTotal, nOvlpPoints, nOvlpMax
+        integer(kind=8) :: xNTotal
+        integer :: nOvlpPoints, nOvlpMax
         !integer :: xNTotal
         !integer :: xNTotal = -1, xNInit = -1, xNEnd = -1, xNGlob = -1
         logical :: independent
@@ -152,7 +153,7 @@ module type_MESH
             integer, intent(in), optional :: unit_in
             logical, intent(in), optional :: forLog_in
             !LOCAL
-            character(len = 20) :: dblFmt, matDblFmt, intFmt, matIntFmt
+            character(len = 200) :: dblFmt, matDblFmt, intFmt, matIntFmt
             integer :: unit
             logical :: forLog
             logical :: active
