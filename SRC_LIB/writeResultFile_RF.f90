@@ -1130,8 +1130,8 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_generation_spec(MSH, RDF, folderpath, name, onlyLocalization, &
-                                     nFields, locLevel, timeVec)
+    subroutine write_generation_spec(MSH, RDF, folderpath, name, &
+                                     nFields, locLevel, gen_times, nGenGroups, timeVec)
 
         implicit none
 
@@ -1139,18 +1139,20 @@ contains
         type(RF)   :: RDF
         type(MESH) :: MSH
         character (len=*)             , intent(in) :: folderpath, name;
-        logical, intent(in) :: onlyLocalization
+        !logical, intent(in) :: onlyLocalization
         double precision, dimension(:), intent(in), optional :: timeVec;
         integer, dimension(:), intent(in) :: nFields
         integer, intent(in) :: locLevel
+        double precision, dimension(:), intent(in) :: gen_times
+        integer, intent(in) :: nGenGroups
 
         !LOCAL
         integer :: fileId, code
         character (len=40) :: doubleFmt
-        integer(kind=8) :: sum_xNTotal, sum_kNTotal
+        !integer(kind=8) :: sum_xNTotal, sum_kNTotal
 
-        call MPI_REDUCE (MSH%xNTotal,sum_xNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
-        call MPI_REDUCE (RDF%kNTotal,sum_kNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
+        !call MPI_REDUCE (MSH%xNTotal,sum_xNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
+        !call MPI_REDUCE (RDF%kNTotal,sum_kNTotal,1,MPI_INTEGER8,MPI_SUM,0,RDF%comm,code)
 
         if(RDF%rang == 0) then
             fileId = 15
@@ -1172,26 +1174,15 @@ contains
             write(fileId,fmt = doubleFmt) MSH%xMinGlob
             write(fileId,*) "--xMaxGlob-----------------------"
             write(fileId,fmt = doubleFmt) MSH%xMaxGlob
-            write(fileId,*) "--xMin_Loc-----------------------"
-            write(fileId,fmt = doubleFmt) MSH%xMinExt
-            write(fileId,*) "--xMax_Loc-----------------------"
-            write(fileId,fmt = doubleFmt) MSH%xMaxExt
+            write(fileId,*) "--procExtent-----------------------"
+            write(fileId,fmt = doubleFmt) MSH%procExtent
             write(fileId,*) "--xNTotal_Loc-----------------------"
             write(fileId,fmt = "(I20)") MSH%xNTotal
 
-            if(.not. onlyLocalization) then
-            write(fileId,*) "--kMax_Loc-----------------------"
-            write(fileId,fmt = doubleFmt) RDF%kMax
-            write(fileId,*) "--kNTotal_Loc-----------------------"
-            write(fileId,fmt = "(I20)") RDF%kNTotal
-            write(fileId,*) "--sum_kNTotal-----------------------"
-            write(fileId,fmt = "(I20)") sum_kNTotal
-            end if
-
             write(fileId,*) "--xStep-----------------------"
             write(fileId,fmt = doubleFmt) MSH%xStep
-            write(fileId,*) "--sum_xNTotal-----------------------"
-            write(fileId,fmt = "(I20)") sum_xNTotal
+            !write(fileId,*) "--sum_xNTotal-----------------------"
+            !write(fileId,fmt = "(I20)") sum_xNTotal
             write(fileId,*) "--corrL-----------------------"
             write(fileId,fmt = doubleFmt) RDF%corrL
             write(fileId,*) "--corrMod-----------------------"
@@ -1212,16 +1203,27 @@ contains
             write(fileId,*) nFields
             write(fileId,*) "--overlap-----------------------"
             write(fileId,*) MSH%overlap
-            if(.not. onlyLocalization) then
             write(fileId,*) "--Seed-----------------------"
             write(fileId,fmt = "(I20)") RDF%seed
-            end if
             write(fileId,*) "--SeedStart-----------------------"
             write(fileId,fmt = "(I20)") RDF%seedStart
+            write(fileId,*) "--prep_CPU_Time-----------------------"
+            write(fileId,fmt = "(F30.15)") RDF%prep_CPU_Time
+            write(fileId,*) "--gen_CPU_Time-----------------------"
+            write(fileId,fmt = "(F30.15)") RDF%gen_CPU_Time
+            write(fileId,*) "--loc_CPU_Time-----------------------"
+            write(fileId,fmt = "(F30.15)") RDF%loc_CPU_Time
+            write(fileId,*) "--trans_CPU_Time-----------------------"
+            write(fileId,fmt = "(F30.15)") RDF%trans_CPU_Time
             if(present(timeVec)) then
                 write(fileId,*) "--timeVec-----------------------"
                 write(fileId,fmt = "(F30.15)") timeVec
             end if
+            write(fileId,*) "--nGenGroups-----------------------"
+            write(fileId,fmt = "(I20)") nGenGroups
+            write(fileId,*) "--gen_times-----------------------"
+            write(fileId,fmt = "(F30.15)") gen_times
+
 
             close(fileId)
 

@@ -23,7 +23,7 @@ module type_RF
         integer, dimension(:)  , allocatable :: seed
         integer :: seedStart = -1
         double precision   :: fieldAvg = -1, fieldVar = -1;
-        double precision   :: gen_CPU_Time
+        double precision   :: prep_CPU_Time, gen_CPU_Time, loc_CPU_Time, trans_CPU_Time
         integer :: corrMod = -1 !1 for Gaussian
         integer :: margiFirst = -1 !1 for Gaussian, 2 for Lognormal
         integer :: method = -1 !1 for Isotropic, 2 for Shinozuka, 3 for Randomization, 4 for FFT

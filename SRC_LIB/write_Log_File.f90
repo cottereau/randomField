@@ -27,19 +27,23 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine init_log_file(filename, rang, log_ID)
+    subroutine init_log_file(filename, rang, log_ID, nb_procs)
         implicit none
         !INPUT
         character(len=*), intent(in) :: filename
-        integer         , intent(in) :: rang
+        integer         , intent(in) :: rang, nb_procs
         !OUTPUT
         integer         , intent(out) :: log_ID
         !LOCAL
         integer :: fileId
         integer :: cte = 100001
         character(len=300) :: fullName
+        integer :: nChar
+
+        nChar = len(trim(numb2String(nb_procs-1)))
 
         fullName = stringNumb_join(filename, rang)
+        fullName = string_join_many(filename, numb2String(rang,nChar))
 
         fileId = cte+rang
         log_file_RF_ID = fileId

@@ -27,13 +27,15 @@ program main_RandomField
     logical :: writeDataSet = .true.
     logical :: sameFolder = .true.
     integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
-    logical :: delete_intermediate_files = .false.
+    logical :: delete_intermediate_files = .true.
+    integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
+    logical :: sampleFields = .true.
 
 	!LOCAL VARIABLES
     !logical            :: file_exist
     integer            :: i
     integer            :: rang
-
+    double precision, dimension(:), allocatable :: gen_times, temp_gen_times
     character(len=200) :: path, logFilePath
 
     double precision, dimension(5) :: times, all_times
@@ -49,6 +51,7 @@ program main_RandomField
 
     double precision, dimension(:), allocatable :: stepProc, procExtent, overlap
     double precision, dimension(:,:), allocatable :: subdivisionCoords
+    double precision :: t_bef, t_aft
     type(IPT_RF)  :: IPT
 
     !Initializing MPI
@@ -90,7 +93,7 @@ program main_RandomField
     logFilePath = trim(adjustL(&
                       string_join_many(results_path,"/",log_folder_name,"/",log_filename)))
     if(rang == 0) write(*,*)  " logFilePath = ", trim(adjustL(logFilePath)), "<RANK>"
-    call init_log_file(trim(adjustL(logFilePath)), rang, IPT%log_ID)
+    call init_log_file(trim(adjustL(logFilePath)), rang, IPT%log_ID, IPT%nb_procs)
 #else
     if(rang == 0) write(*,*) "IFDEF MAKELOG NOT DEFINED"
 #endif
@@ -163,51 +166,55 @@ program main_RandomField
     !if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
     if(rang == 0) write(*,*) "Max Coord = ", subdivisionCoords(:, size(subdivisionCoords,2)) + stepProc
 
+    call MPI_BARRIER(IPT%comm, code)
     times(3) = MPI_Wtime() !Organizing Collective Writing
 
     !Making all realizations
-    if(.true.)then
-    if(rang == 0) write(*,*) " "
-    if(rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
-    call wLog("-> SAMPLING----------------------------------------")
-    allocate(HDF5Name(product(IPT%nFields**IPT%localizationLevel)))
-    do i = 1, product(IPT%nFields**IPT%localizationLevel)
+    gen_times(:) = 0.0D0
+    if(sampleFields)then
         if(rang == 0) write(*,*) " "
-        if(rang == 0) write(*,*) " "
-        if(rang == 0) write(*,*)  "-> Making Field ", i
-        call wLog("-> Making Field")
-        fieldNumber = i;
-        if(mod(i, groupMax) == group) then
-            !call wLog("Proc")
-            !call wLog(rang)
-            !call wLog("dealing with field")
-            !call wLog(fieldNumber)
-            !call wLog("     Trying communication")
-            call MPI_BARRIER(groupComm, code)
-            call single_realization(IPT, globMSH, writeFiles, outputStyle, &
-                                    groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
+        if(rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
+        call wLog("-> SAMPLING----------------------------------------")
+        allocate(HDF5Name(product(IPT%nFields**IPT%localizationLevel)))
+        do i = 1, product(IPT%nFields**IPT%localizationLevel)
+            if(mod(i, groupMax) == group) then
+                if(mod(rang,IPT%nProcPerField) == 0) write(*,*)  "-> Group ", group, " making Field ", i
+                call wLog("-> Making Field")
+                call wLog(i)
+                fieldNumber = i;
+                !call wLog("Proc")
+                !call wLog(rang)
+                !call wLog("dealing with field")
+                !call wLog(fieldNumber)
+                !call wLog("     Trying communication")
+                t_bef = MPI_Wtime()
+                call MPI_BARRIER(groupComm, code)
+                call single_realization(IPT, globMSH, writeFiles, outputStyle, &
+                                        groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
+                t_aft = MPI_Wtime()
+                temp_gen_times(i) = t_aft-t_bef
 
-        end if
-    end do
+            end if
+        end do
     end if
 
     call finalize_MESH(globMSH)
 
+    call MPI_BARRIER(IPT%comm, code)
     times(4) = MPI_Wtime() !Generation Time
 
-    delete_intermediate_files = delete_intermediate_files !FOR TESTS
-    all_times = all_times !FOR TESTS
+    call MPI_ALLREDUCE (temp_gen_times, gen_times, size(gen_times), MPI_DOUBLE_PRECISION, MPI_SUM, IPT%comm,code)
+    if(allocated(temp_gen_times)) deallocate(temp_gen_times)
 
     !Combining realizations (localization)
-    !if(product(IPT%nFields) /= 1) then
+    if(.true.) then
         if(rang == 0) write(*,*) " "
         if(rang == 0) write(*,*) "-> COMBINING----------------------------------------"
         call wLog("-> COMBINING----------------------------------------")
         call combine_subdivisions(IPT, writeFiles, outputStyle, stepProc, procExtent, &
-                                  overlap, times(1), delete_intermediate_files)
-    !else
-        !if(rang == 0) write(*,*) "-> NOTHING TO BE COMBINED----------------------------------------"
-    !end if
+                                  overlap, times(1), times(3), times(4), gen_times(:), &
+                                  groupMax, delete_intermediate_files, ignoreTillLocLevel)
+    end if
 
     times(5) = MPI_Wtime() !Localization Time
 
@@ -294,9 +301,9 @@ program main_RandomField
 
             call create_folder(log_folder_name, results_path, rang, comm)
 
-            call wLog("-> Setting folder path")
+            if(rang == 0) write(*,*) "-> Setting folder path"
             single_path = string_join_many(results_path,"/",results_folder_name)
-            call wLog("     single_path = "//trim(single_path))
+            if(rang == 0) write(*,*) "     single_path = "//trim(single_path)
 
             !create xmf and h5 folders
             if(writeFiles) then
@@ -313,6 +320,10 @@ program main_RandomField
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         subroutine allocate_init()
+
+            allocate(gen_times(product(IPT%nFields**IPT%localizationLevel)))
+            allocate(temp_gen_times(product(IPT%nFields**IPT%localizationLevel)))
+
         end subroutine allocate_init
 
 
@@ -340,6 +351,8 @@ program main_RandomField
             !if(allocated(periods)) deallocate(periods)
             if(allocated(overlap)) deallocate(overlap)
             if(allocated(HDF5Name)) deallocate(HDF5Name)
+            if(allocated(gen_times)) deallocate(gen_times)
+            if(allocated(temp_gen_times)) deallocate(temp_gen_times)
             if(allocated(stepProc)) deallocate(stepProc)
             if(allocated(subdivisionCoords)) deallocate(subdivisionCoords)
 

@@ -146,14 +146,12 @@ contains
                     call wLog("shape(RDF%kPoints) = ")
                     call wLog(shape(RDF%kPoints))
                     call wLog("Making kPoints= ")
-                    call setGrid(RDF%kPoints, dble(RDF%kNInit-1)*RDF%kDelta, RDF%kDelta, RDF%kNStep)
-!                    do i_long = RDF%kNInit, RDF%kNEnd
-!                        !if(i>541000) call wLog(i)
-!                        !RDF%kPoints(:, i-RDF%kNInit+1) = 1
-!                        call get_Permutation(int(i_long), RDF%kMax, RDF%kNStep, &
-!                                             RDF%kPoints(:, i_long-RDF%kNInit+1), &
-!                                             snapExtremes = .true.)
-!                    end do
+                    !call setGrid(RDF%kPoints, dble(RDF%kNInit-1)*RDF%kDelta, RDF%kDelta, RDF%kNStep)
+                    do i_long = RDF%kNInit, RDF%kNEnd
+                        call get_Permutation(int(i_long), RDF%kMax, RDF%kNStep, &
+                                             RDF%kPoints(:, i_long-RDF%kNInit+1), &
+                                             snapExtremes = .true.)
+                    end do
                 !end if
 
         end select

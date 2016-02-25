@@ -393,15 +393,20 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         subroutine combine_subdivisions(IPT, writeFiles, outputStyle, &
-                                        stepProc, procExtent, overlap, all_t1, delete_intermediate_files)
+                                        stepProc, procExtent, overlap, &
+                                        t_ref, t_prep, t_gen, gen_times, nGenGroups, &
+                                        delete_intermediate_files, ignoreTillLocLevel)
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
             logical, intent(in) :: writeFiles
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
             double precision, dimension(:), intent(in) :: stepProc, procExtent, overlap
-            double precision, intent(in) :: all_t1
+            double precision, intent(in) :: t_ref, t_prep, t_gen
+            double precision, dimension(:), intent(in) :: gen_times
+            integer, intent(in) :: nGenGroups
             logical, intent(in) :: delete_intermediate_files
+            integer, intent(in) :: ignoreTillLocLevel
 
             !LOCAL
             type(MESH) :: globMSH
@@ -421,7 +426,8 @@ contains
             integer, dimension(IPT%nDim_mesh) :: procCoord, locStep
             integer, dimension(IPT%nDim_mesh) :: totalFieldPerDim, nFields_level, nFields_level_before
             integer :: i, validProcGroup, validProcComm, prodNFields
-            double precision :: t2, all_t2
+            double precision :: t_loc, t_trans
+            double precision :: all_t_loc, all_t_ref, all_t_prep, all_t_gen, all_t_trans
             integer(kind=8) :: xNTotal
             integer, dimension(IPT%nDim_mesh) :: minPosProc, maxPosProc
 
@@ -486,6 +492,12 @@ contains
                     if(IPT%rang == 0) write(*,*)  "  locLevel = ", locLevel, "-------------"
                     call wLog("     locLevel -----------------------------------")
                     call wLog(locLevel)
+
+                    if(locLevel <= ignoreTillLocLevel) then
+                        if(IPT%rang == 0) write(*,*)  "Ignoring This Localization Level"
+                        call wLog("Ignoring This Localization Level")
+                        cycle
+                    end if
 
                     if(IPT%rang == 0) write(*,*)  "  Syncyng Procs  "
                     call wLog("     Syncing Procs")
@@ -652,12 +664,14 @@ contains
                             call addNeighboursFieldsV2(globRDF, globMSH)
                         end if
 
-                        t2 = MPI_Wtime();
-                        call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, globMSH%comm, code)
-                        globRDF%gen_CPU_Time = all_t2 - all_t1
 
 
                         if(size(offsetCoords,2) == 1) then
+                            t_loc = MPI_Wtime(); !Localization Time
+                            !call MPI_ALLREDUCE (t_loc, all_t_loc, 1, MPI_DOUBLE_PRECISION, MPI_SUM, globMSH%comm, code)
+                            all_t_prep = (t_prep - t_ref) * dble(IPT%nb_procs)
+                            all_t_gen  = (t_gen - t_prep) * dble(IPT%nb_procs)
+                            all_t_loc  = (t_loc - t_gen) * dble(IPT%nb_procs)
                             !Things to do only on the final field
                             if(globRDF%rang == 0) write(*,*)"ADJUSTEMENTS ON THE FINAL FIELD"
                             call wLog("-> Adjustement on the Final Field")
@@ -667,8 +681,15 @@ contains
                             xNTotal = product(nint((globMSH%xMaxGlob-globMSH%xMinGlob)/globMSH%xStep) +1)
                             call normalize_randField(globRDF, xNTotal, globRDF%randField, minPosProc, maxPosProc)
                             call multiVariateTransformation (globRDF%margiFirst, globRDF%fieldAvg, globRDF%fieldVar, globRDF%randField)
-                            call write_generation_spec(globMSH, globRDF, single_path, "singleGen", &
-                                                       .true., IPT%nFields, IPT%localizationLevel)
+                            t_trans = MPI_Wtime(); !Transformation Time
+                            all_t_trans = (t_trans - t_loc) * dble(IPT%nb_procs)
+                            globRDF%prep_CPU_Time = all_t_prep
+                            globRDF%gen_CPU_Time = all_t_gen
+                            globRDF%loc_CPU_Time = all_t_loc
+                            globRDF%trans_CPU_Time = all_t_trans
+                            if(globRDF%rang == 0) call write_generation_spec(globMSH, globRDF, single_path, "singleGen", &
+                                                       IPT%nFields, IPT%localizationLevel, &
+                                                       gen_times, nGenGroups)
                         end if
 
                         call wLog("-> Writing XMF and hdf5 files FOR GLOBAL FIELD")
