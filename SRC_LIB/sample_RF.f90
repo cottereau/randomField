@@ -176,14 +176,13 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
 
-        subroutine single_realization(IPT, globMSH, writeFiles, outputStyle, &
+        subroutine single_realization(IPT, globMSH, outputStyle, &
                                       fieldComm, fieldNumber, subdivisionStart, stepProc, h5fullPath)
 
             implicit none
             !INPUT
             type(IPT_RF), intent(in) :: IPT
             type(MESH)  , intent(in) :: globMSH
-            logical, intent(in) :: writeFiles
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
             integer, intent(in) :: fieldComm, fieldNumber
             double precision, dimension(:), intent(in) :: subdivisionStart, stepProc
@@ -191,6 +190,7 @@ contains
             !LOCAL
             type(RF)      :: RDF
             type(MESH)    :: MSH
+            logical :: writeFiles = .true.
 
 
             double precision, dimension(:,:), allocatable :: UNV_randField
@@ -316,7 +316,7 @@ contains
                 t2 = MPI_Wtime();
                 call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,MSH%comm,code)
                 RDF%gen_CPU_Time = all_t2 - all_t1
-                if(RDF%rang == 0) write(*,*) "Generation CPU Time = ", all_t2 - all_t1
+                !if(RDF%rang == 0) write(*,*) "Generation CPU Time = ", all_t2 - all_t1
                 call wLog ("    Generation CPU Time (s)")
                 call wLog (RDF%gen_CPU_Time)
                 all_t3 = -1.0D0
@@ -353,7 +353,7 @@ contains
 
                     t3 = MPI_Wtime();
                     call MPI_ALLREDUCE (t3, all_t3, 1, MPI_DOUBLE_PRECISION, MPI_SUM,MSH%comm,code)
-                    if(RDF%rang == 0) write(*,*) "Writing Files Time = ", all_t3 - all_t2
+                    !if(RDF%rang == 0) write(*,*) "Writing Files Time = ", all_t3 - all_t2
                     call wLog ("    Writing Files CPU Time (s)")
                     call wLog (all_t3 - all_t2)
 
@@ -392,14 +392,13 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine combine_subdivisions(IPT, writeFiles, outputStyle, &
+        subroutine combine_subdivisions(IPT, outputStyle, &
                                         stepProc, procExtent, overlap, &
                                         t_ref, t_prep, t_gen, gen_times, nGenGroups, &
                                         delete_intermediate_files, ignoreTillLocLevel)
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
-            logical, intent(in) :: writeFiles
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
             double precision, dimension(:), intent(in) :: stepProc, procExtent, overlap
             double precision, intent(in) :: t_ref, t_prep, t_gen
@@ -409,6 +408,7 @@ contains
             integer, intent(in) :: ignoreTillLocLevel
 
             !LOCAL
+            logical :: writeFiles = .true.
             type(MESH) :: globMSH
             type(RF)   :: globRDF
             integer :: group, fieldNumber, groupComm, groupMax
@@ -430,6 +430,7 @@ contains
             double precision :: all_t_loc, all_t_ref, all_t_prep, all_t_gen, all_t_trans
             integer(kind=8) :: xNTotal
             integer, dimension(IPT%nDim_mesh) :: minPosProc, maxPosProc
+            logical :: writeDataSet
 
             !H5 LOCAL
             character(len=50) :: dset="samples"
@@ -439,16 +440,16 @@ contains
 
             !Gluing fields together
 
-            call wLog("     Waiting for the other procs")
+            !call wLog("     Waiting for the other procs")
             call MPI_BARRIER(IPT%comm, code)
 
             ones = 1.0D0
             call setGrid(subdivisionCoords, 0*ones, ones, IPT%nFields, inverse=.true.)
-            if (IPT%rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
+            !if (IPT%rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
 
             if(product(IPT%nFields) > IPT%nb_procs) stop("Too little processors for this number of fields")
 
-            if(IPT%rang == 0) write(*,*)  "Dividing comunicator"
+            !if(IPT%rang == 0) write(*,*)  "Dividing comunicator"
             prodNFields = product(IPT%nFields)
             group    = IPT%rang/prodNFields
             groupMax = IPT%nb_procs/prodNFields
@@ -457,6 +458,9 @@ contains
             call wLog(IPT%rang)
             call wLog("     group =")
             call wLog(group)
+            call wLog(" IPT%nb_procs =")
+            call wLog(IPT%nb_procs)
+
 
             validProcGroup = 0
             if(group < groupMax) validProcGroup = 1
@@ -485,7 +489,7 @@ contains
                 call MPI_COMM_RANK(groupComm, newIPT%rang, code)
                 call MPI_COMM_SIZE(groupComm, newIPT%nb_procs, code)
                 totalFieldPerDim = IPT%nFields**(IPT%localizationLevel)
-                if (IPT%rang == 0) write(*,*) "totalFieldPerDim = ", totalFieldPerDim
+                !if (IPT%rang == 0) write(*,*) "totalFieldPerDim = ", totalFieldPerDim
 
                 do locLevel = 1, IPT%localizationLevel
 
@@ -499,23 +503,18 @@ contains
                         cycle
                     end if
 
-                    if(IPT%rang == 0) write(*,*)  "  Syncyng Procs  "
-                    call wLog("     Syncing Procs")
-                    call MPI_BARRIER(validProcComm, code) !We need all the procs to finish before going to next localizationLevel
-
-
                     if(allocated(offsetCoords)) deallocate(offsetCoords)
                     nFields_level = IPT%nFields**(locLevel)
                     nFields_level_before = IPT%nFields**(locLevel-1)
                     locStep = totalFieldPerDim/nFields_level
-                    if (IPT%rang == 0) write(*,*) "locStep = ", locStep
-                    if (IPT%rang == 0) write(*,*) " "
+                    if (IPT%rang == 0) write(*,*) "    locStep = ", locStep
+                    !if (IPT%rang == 0) write(*,*) " "
                     if(allocated(offsetCoords)) deallocate(offsetCoords)
                     allocate(offsetCoords(IPT%nDim_mesh, product(locStep)))
                     call setGrid(offsetCoords, 0*ones, dble(nFields_level)*stepProc, locStep, inverse=.true.)
 
 
-                    if (IPT%rang == 0) call DispCarvalhol(offsetCoords, "offsetCoords")
+                    !if (IPT%rang == 0) call DispCarvalhol(offsetCoords, "offsetCoords")
 
                     do locIter = 1, size(offsetCoords,2)
                     !do locIter = 1, 1 ! FOR TESTS
@@ -527,8 +526,8 @@ contains
 
                         !write(*,*) "          AFTER RANG ", IPT%rang ,"locIter = ", locIter
 
-                        if(IPT%rang == 0) write(*,*)  "     locIter = ", locIter
-                        if(IPT%rang == 0) write(*,*)  "     SETTING COMMUNICATIONS PARAMETERS"
+                        if(IPT%rang == 0) write(*,*)  "         locIter = ", locIter
+                        !if(IPT%rang == 0) write(*,*)  "     SETTING COMMUNICATIONS PARAMETERS"
                         call wLog("     Waiting for the other procs")
                         call wLog("  locIter = ")
                         call wLog(locIter)
@@ -554,8 +553,15 @@ contains
                         call wLog(newIPT%xMinGlob)
                         call wLog("     newIPT%xMaxGlob")
                         call wLog(newIPT%xMaxGlob)
+
                         call init_MESH(globMSH, newIPT, groupComm, newIPT%rang)
                         call init_RF(globRDF, newIPT, groupComm, product(IPT%nFields), newIPT%rang)
+
+                        call wLog("newIPT%nb_procs")
+                        call wLog(newIPT%nb_procs)
+                        call wLog("RDF%nb_procs")
+                        call wLog(globRDF%nb_procs)
+
                         call wLog("-> set_communications_topology")
                         call set_communications_topology(globMSH, globMSH%coords, globMSH%neigh, &
                                                          globMSH%neighShift, globMSH%considerNeighbour, &
@@ -689,7 +695,7 @@ contains
                             globRDF%trans_CPU_Time = all_t_trans
                             if(globRDF%rang == 0) call write_generation_spec(globMSH, globRDF, single_path, "singleGen", &
                                                        IPT%nFields, IPT%localizationLevel, &
-                                                       gen_times, nGenGroups)
+                                                       gen_times, nGenGroups, IPT%nb_procs)
                         end if
 
                         call wLog("-> Writing XMF and hdf5 files FOR GLOBAL FIELD")
@@ -708,8 +714,10 @@ contains
                             call wLog(BBoxPartFileName);
                             randFieldFilePath = string_join_many(single_path,"/h5/",BBoxPartFileName,".h5")
 
+                            writeDataSet = .true.
                             if(size(offsetCoords,2) == 1 .and. IPT%rang == 0) then
                                 call write_stat_input("./stat_input", randFieldFilePath)
+                                writeDataSet = IPT%writeDataSet
                             end if
 
                             if(outputStyle==1) then
@@ -726,7 +734,11 @@ contains
                                 call write_Mono_XMF_h5(globRDF, globMSH, BBoxPartFileName, globRDF%rang, single_path, &
                                                        globMSH%comm, ["_procOnlyShape"], [IPT%rang], 0, style=outputStyle, &
                                                        writeDataSet = IPT%writeDataSet)
+                            end if
 
+                            if(.not. writeDataSet) then
+                                call system("rm -r "//string_join_many(single_path,"/h5"))
+                                call system("rm -r "//string_join_many(single_path,"/xmf"))
                             end if
 
                         end if
@@ -737,6 +749,9 @@ contains
 
                     end do
 
+                    if(IPT%rang == 0) write(*,*)  "  Ending Localization Level ", locLevel
+                    call wLog("     Syncing Procs")
+                    call MPI_BARRIER(validProcComm, code) !We need all the procs to finish before going to next localizationLevel
 
                 end do
 

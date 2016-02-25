@@ -1131,7 +1131,8 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine write_generation_spec(MSH, RDF, folderpath, name, &
-                                     nFields, locLevel, gen_times, nGenGroups, timeVec)
+                                     nFields, locLevel, gen_times, &
+                                     nGenGroups, nb_procs)
 
         implicit none
 
@@ -1140,11 +1141,11 @@ contains
         type(MESH) :: MSH
         character (len=*)             , intent(in) :: folderpath, name;
         !logical, intent(in) :: onlyLocalization
-        double precision, dimension(:), intent(in), optional :: timeVec;
+        !double precision, dimension(:), intent(in), optional :: timeVec;
         integer, dimension(:), intent(in) :: nFields
         integer, intent(in) :: locLevel
         double precision, dimension(:), intent(in) :: gen_times
-        integer, intent(in) :: nGenGroups
+        integer, intent(in) :: nb_procs, nGenGroups
 
         !LOCAL
         integer :: fileId, code
@@ -1163,7 +1164,7 @@ contains
 
             write(fileId,*) "FILE:", name
             write(fileId,*) "--nb_procs-----------------------"
-            write(fileId,fmt = "(I20)") RDF%nb_procs
+            write(fileId,fmt = "(I20)") nb_procs
             write(fileId,*) "--nFields-----------------------"
             write(fileId,*) nFields
             write(fileId,*) "--locLevel-----------------------"
@@ -1197,10 +1198,6 @@ contains
             write(fileId,fmt = "(I20)") RDF%Nmc
             write(fileId,*) "--method-----------------------"
             write(fileId,*) RDF%method
-            write(fileId,*) "--locLevel-----------------------"
-            write(fileId,*) locLevel
-            write(fileId,*) "--nFields-----------------------"
-            write(fileId,*) nFields
             write(fileId,*) "--overlap-----------------------"
             write(fileId,*) MSH%overlap
             write(fileId,*) "--Seed-----------------------"
@@ -1215,10 +1212,10 @@ contains
             write(fileId,fmt = "(F30.15)") RDF%loc_CPU_Time
             write(fileId,*) "--trans_CPU_Time-----------------------"
             write(fileId,fmt = "(F30.15)") RDF%trans_CPU_Time
-            if(present(timeVec)) then
-                write(fileId,*) "--timeVec-----------------------"
-                write(fileId,fmt = "(F30.15)") timeVec
-            end if
+            !if(present(timeVec)) then
+            !    write(fileId,*) "--timeVec-----------------------"
+            !    write(fileId,fmt = "(F30.15)") timeVec
+            !end if
             write(fileId,*) "--nGenGroups-----------------------"
             write(fileId,fmt = "(I20)") nGenGroups
             write(fileId,*) "--gen_times-----------------------"

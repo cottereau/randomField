@@ -23,13 +23,13 @@ program main_RandomField
     !INPUTS
     !integer :: nDim;
     !integer :: compiler = 2 !1 for gfortran and 2 for ifort
-    logical :: writeFiles = .true.
     logical :: writeDataSet = .true.
     logical :: sameFolder = .true.
     integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
     logical :: delete_intermediate_files = .true.
     integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
     logical :: sampleFields = .true.
+    !logical :: writeFiles = .true.
 
 	!LOCAL VARIABLES
     !logical            :: file_exist
@@ -189,7 +189,7 @@ program main_RandomField
                 !call wLog("     Trying communication")
                 t_bef = MPI_Wtime()
                 call MPI_BARRIER(groupComm, code)
-                call single_realization(IPT, globMSH, writeFiles, outputStyle, &
+                call single_realization(IPT, globMSH, outputStyle, &
                                         groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
                 t_aft = MPI_Wtime()
                 temp_gen_times(i) = t_aft-t_bef
@@ -211,7 +211,7 @@ program main_RandomField
         if(rang == 0) write(*,*) " "
         if(rang == 0) write(*,*) "-> COMBINING----------------------------------------"
         call wLog("-> COMBINING----------------------------------------")
-        call combine_subdivisions(IPT, writeFiles, outputStyle, stepProc, procExtent, &
+        call combine_subdivisions(IPT, outputStyle, stepProc, procExtent, &
                                   overlap, times(1), times(3), times(4), gen_times(:), &
                                   groupMax, delete_intermediate_files, ignoreTillLocLevel)
     end if
@@ -301,16 +301,16 @@ program main_RandomField
 
             call create_folder(log_folder_name, results_path, rang, comm)
 
-            if(rang == 0) write(*,*) "-> Setting folder path"
+            if(IPT%rang == 0) write(*,*) "-> Setting folder path"
             single_path = string_join_many(results_path,"/",results_folder_name)
-            if(rang == 0) write(*,*) "     single_path = "//trim(single_path)
+            if(IPT%rang == 0) write(*,*) "     single_path = "//trim(single_path)
 
             !create xmf and h5 folders
-            if(writeFiles) then
-                path = string_vec_join([results_path,"/",results_folder_name])
-                call create_folder("xmf", path, rang, comm)
-                call create_folder("h5", path, rang, comm)
-            end if
+            !if(writeFiles) then
+            path = string_vec_join([results_path,"/",results_folder_name])
+            call create_folder("xmf", path, rang, comm)
+            call create_folder("h5", path, rang, comm)
+            !end if
 
         end subroutine init_basic_folders
 
