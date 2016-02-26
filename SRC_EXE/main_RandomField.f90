@@ -21,18 +21,14 @@ program main_RandomField
     implicit none
 
     !INPUTS
-    !integer :: nDim;
-    !integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeDataSet = .true.
     logical :: sameFolder = .false.
     integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
     logical :: delete_intermediate_files = .true.
     integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
     logical :: sampleFields = .true.
-    !logical :: writeFiles = .true.
 
 	!LOCAL VARIABLES
-    !logical            :: file_exist
     integer            :: i
     integer            :: rang
     double precision, dimension(:), allocatable :: gen_times, temp_gen_times
@@ -41,10 +37,8 @@ program main_RandomField
     double precision, dimension(5) :: times, all_times
 
     !DEVEL
-    !integer, dimension(2) :: nFields = [2,1] !Number of independent fields in each dimension
     integer               :: fieldNumber
     character(len=110), dimension(:)  , allocatable :: HDF5Name
-    !double precision, dimension(:), allocatable :: procStart
     type(MESH)            :: globMSH
     integer               :: group, groupComm, groupMax
     integer               :: code
@@ -345,10 +339,6 @@ program main_RandomField
         !---------------------------------------------------------------------------------
         subroutine deallocate_all()
 
-            !if(allocated(offset)) deallocate(offset)
-            !if(allocated(locDims)) deallocate(locDims)
-            !if(allocated(procStart)) deallocate(procStart)
-            !if(allocated(periods)) deallocate(periods)
             if(allocated(overlap)) deallocate(overlap)
             if(allocated(HDF5Name)) deallocate(HDF5Name)
             if(allocated(gen_times)) deallocate(gen_times)

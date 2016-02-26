@@ -94,12 +94,12 @@ contains
                     call wLog(localizationLevel)
 
                     if(localizationLevel < 0) then
-                        !stop ("ERROR inside redefineIPTlimits, localization level smaller than 0")
                         locLevelOK = .true.
                         write(*,*) "ERROR NEGATIVE LOCALIZATION ON RANK = ", IPT%rang
                         call wLog("ERROR NEGATIVE LOCALIZATION ON RANK = ")
                         call wLog(IPT%rang)
                         call wLog(localizationLevel)
+                        stop ("ERROR inside redefineIPTlimits, localization level smaller than 0")
                     end if
                 else
                     locLevelOK = .true.
@@ -296,22 +296,6 @@ contains
                 call wLog( "      minval(RDF%randField,1) = ")
                 call wLog(minval(RDF%randField,1))
 
-                !call wLog("     Normalizing sample")
-                !xNTotal = product(nint((MSH%xMaxGlob-MSH%xMinGlob)/MSH%xStep) +1)
-                !call normalize_randField(RDF, xNTotal, RDF%randField)
-
-                !i = size(RDF%xPoints,2)
-                !if(i>50) i = 50
-                !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
-
-
-                !i = size(RDF%xPoints,2)
-                !if(i>50) i = 50
-                !call dispCarvalhol(RDF%xPoints(1:i,:), "xPoints", "(F20.5)",unit_in = RDF%log_ID)
-
-                !call show_RF(RDF, forLog_in = .true.)
-
-                !call multiVariateTransformation (RDF%margiFirst, RDF%fieldAvg, RDF%fieldVar, RDF%randField)
 
                 t2 = MPI_Wtime();
                 call MPI_ALLREDUCE (t2, all_t2, 1, MPI_DOUBLE_PRECISION, MPI_SUM,MSH%comm,code)
@@ -353,21 +337,13 @@ contains
 
                     t3 = MPI_Wtime();
                     call MPI_ALLREDUCE (t3, all_t3, 1, MPI_DOUBLE_PRECISION, MPI_SUM,MSH%comm,code)
-                    !if(RDF%rang == 0) write(*,*) "Writing Files Time = ", all_t3 - all_t2
                     call wLog ("    Writing Files CPU Time (s)")
                     call wLog (all_t3 - all_t2)
 
                     h5fullPath = BBoxPath
                 end if
             end if
-!
-!                    call write_generation_spec(MSH, RDF, single_path, "singleGen", &
-!                                               [all_t1,all_t2,all_t3])
-!
-!            call MPI_BARRIER(IPT%comm, code) !Waiting for the generation to finish
-!
-!
-!
+
 !            if(IPT%unv .and. writeFiles .and. outputStyle == 1) then
 !                if(IPT%rang == 0) write(*,*) "-> Writing 'UNV' XMF and hdf5 files for"
 !                if(IPT%rang == 0) write(*,*) IPT%unv_path
@@ -440,16 +416,13 @@ contains
 
             !Gluing fields together
 
-            !call wLog("     Waiting for the other procs")
             call MPI_BARRIER(IPT%comm, code)
 
             ones = 1.0D0
             call setGrid(subdivisionCoords, 0*ones, ones, IPT%nFields, inverse=.true.)
-            !if (IPT%rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
 
             if(product(IPT%nFields) > IPT%nb_procs) stop("Too little processors for this number of fields")
 
-            !if(IPT%rang == 0) write(*,*)  "Dividing comunicator"
             prodNFields = product(IPT%nFields)
             group    = IPT%rang/prodNFields
             groupMax = IPT%nb_procs/prodNFields
@@ -517,17 +490,10 @@ contains
                     !if (IPT%rang == 0) call DispCarvalhol(offsetCoords, "offsetCoords")
 
                     do locIter = 1, size(offsetCoords,2)
-                    !do locIter = 1, 1 ! FOR TESTS
-
-                        !write(*,*) "BEFORE RANG ", IPT%rang ,"locIter = ", locIter, "group =", group
-                        !write(*,*) "mod(locIter-1, groupMax)  ", mod(locIter-1, groupMax)
 
                         if(mod(locIter-1, groupMax) /= group) cycle
 
-                        !write(*,*) "          AFTER RANG ", IPT%rang ,"locIter = ", locIter
-
                         if(IPT%rang == 0) write(*,*)  "         locIter = ", locIter
-                        !if(IPT%rang == 0) write(*,*)  "     SETTING COMMUNICATIONS PARAMETERS"
                         call wLog("     Waiting for the other procs")
                         call wLog("  locIter = ")
                         call wLog(locIter)
