@@ -24,7 +24,7 @@ program main_RandomField
     !integer :: nDim;
     !integer :: compiler = 2 !1 for gfortran and 2 for ifort
     logical :: writeDataSet = .true.
-    logical :: sameFolder = .true.
+    logical :: sameFolder = .false.
     integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
     logical :: delete_intermediate_files = .true.
     integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)

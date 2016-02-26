@@ -82,7 +82,7 @@ program main_Stat
         if(STA%rang == 0) write(*,*) "-> Writing Statistics on File"
         if(STA%rang == 0) call write_StatisticsOnH5(STA, resPath)
 
-        call show_STAT(STA, "Calculated Statistics", 6)
+        if(STA%rang == 0) call show_STAT(STA, "Calculated Statistics", 6)
 
         call finalize_STAT(STA)
 

@@ -1329,7 +1329,7 @@ contains
         open (unit = fileId , file = filePath, action = 'write')
 
         write(fileId,"(A)") '1'
-        write(fileId,"(A)") '"', h5_path, '"'
+        write(fileId,"(A)") '"'//trim(adjustL(h5_path))//'"'
 
         close(fileId)
 

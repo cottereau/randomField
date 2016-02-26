@@ -69,6 +69,14 @@ contains
             MPI_SUM,comm,code)
         call MPI_ALLREDUCE (xNTotal,sum_xNTotal,1,MPI_INTEGER, &
             MPI_SUM,comm,code)
+
+        if(STA%rang == 0) write(*,*) "xNTotal          = ", xNTotal
+        if(STA%rang == 0) write(*,*) "sumRF            = ", sumRF
+        if(STA%rang == 0) write(*,*) "sumRFsquare      = ", sumRFsquare
+        if(STA%rang == 0) write(*,*) "sum_xNTotal      = ", sum_xNTotal
+        if(STA%rang == 0) write(*,*) "totalSumRF       = ", totalSumRF
+        if(STA%rang == 0) write(*,*) "totalSumRFsquare = ", totalSumRFsquare
+
         STA%evntAvg      = totalSumRF/dble(sum_xNTotal);
         STA%evntStdDev   = sqrt(totalSumRFsquare/dble(sum_xNTotal) &
             - (STA%evntAvg)**2)
@@ -78,8 +86,8 @@ contains
         STA%globalStdDev = sqrt(sum(totalSumRFsquare)/dble(sum_xNTotal*Nmc) &
                             - (STA%globalAvg)**2)
 
-        !write(*,*) "STA%globalAvg    = ", STA%globalAvg
-        !write(*,*) "STA%globalStdDev = ", STA%globalStdDev
+        if(STA%rang == 0) write(*,*) "STA%globalAvg    = ", STA%globalAvg
+        if(STA%rang == 0) write(*,*) "STA%globalStdDev = ", STA%globalStdDev
 
         !        !By Point
         !        sumRF_point(:)       = sum( STA%randField    , dim = 2)
