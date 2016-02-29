@@ -29,7 +29,7 @@ module type_RF
         integer :: method = -1 !1 for Isotropic, 2 for Shinozuka, 3 for Randomization, 4 for FFT
         integer :: Nmc = -1
         logical :: init = .false.
-        logical :: independent
+        !logical :: independent
             !nDim dependent
         double precision, dimension(:)   , allocatable :: corrL, kMax, kDelta;
         double precision, dimension(:, :), allocatable :: kPoints;
@@ -99,7 +99,7 @@ module type_RF
             RF_a%method      = IPT%method
             RF_a%seedStart   = IPT%seedStart
             RF_a%corrL       = IPT%corrL
-            RF_a%independent = IPT%independent
+            !RF_a%independent = IPT%independent
             RF_a%seedStart   = IPT%seedStart
 
 
@@ -172,7 +172,7 @@ module type_RF
                     write(unit,*) "|"
                     write(unit,*) "|  Generation---"
                     write(unit,*) "|  |nDim       = ", RF_a%nDim
-                    write(unit,*) "|  |independent= ", RF_a%independent
+                    !write(unit,*) "|  |independent= ", RF_a%independent
                     write(unit,*) "|  |corrMod    = ", RF_a%corrMod
                     write(unit,*) "|  |margiFirst = ", RF_a%margiFirst
                     write(unit,*) "|  |method     = ", RF_a%method

@@ -141,7 +141,7 @@ contains
             call init_MESH(globMSH, IPT, IPT%comm, IPT%rang)
 
             call wLog("->  set_procPerDim")
-            globMSH%independent = .true.
+            !globMSH%independent = .true.
             call wLog("     globMSH%procPerDim")
             call wLog(globMSH%procPerDim)
             call wLog("-> round_basic_inputs")
@@ -223,8 +223,8 @@ contains
             MSH%xMaxGlob = MSH%xMinGlob + globMSH%procExtent
             MSH%procExtent = globMSH%procExtent
 
-            MSH%independent = .false.
-            RDF%independent = .false.
+            !MSH%independent = .false.
+            !RDF%independent = .false.
             MSH%procPerDim(:) = 1
             MSH%procPerDim(MSH%nDim) = newNbProcs
             MSH%coords = 0
@@ -237,7 +237,8 @@ contains
 
             call set_local_bounding_box(MSH,&
                                         MSH%xMinBound, MSH%xMaxBound, &
-                                        MSH%xNStep, MSH%xNTotal, MSH%origin, validProc)
+                                        MSH%xNStep, MSH%xNTotal, MSH%origin, validProc, &
+                                        localization = .false.)
             rang = MSH%rang
             call set_validProcs_comm(validProc, fieldComm, rang, &
                                      MSH%validProc, RDF%validProc, MSH%comm, RDF%comm, &
@@ -326,12 +327,12 @@ contains
                         call wLog(maxval(RDF%randField,1))
                         call write_Mono_XMF_h5(RDF, MSH, BBoxPartFileName, RDF%rang, single_path, &
                                                MSH%comm, ["_Part"], [fieldNumber], fieldNumber, style=outputStyle, &
-                                               HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
+                                               HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet, localization=.false.)
                     else
                         call wLog("   (Per Proc)");
                         call write_Mono_XMF_h5(RDF, MSH, BBoxPartFileName, RDF%rang, single_path, &
                                                MSH%comm, ["_Part"], [RDF%rang], 0, style=outputStyle, &
-                                               HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet)
+                                               HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet, localization=.false.)
 
                     end if
 
@@ -457,7 +458,7 @@ contains
                 call copy_IPT_RF(newIPT, IPT)
 
                 newIPT%overlap = overlap
-                newIPT%independent = .true.
+                !newIPT%independent = .true.
                 newIPT%comm = groupComm
                 call MPI_COMM_RANK(groupComm, newIPT%rang, code)
                 call MPI_COMM_SIZE(groupComm, newIPT%nb_procs, code)
@@ -551,7 +552,7 @@ contains
                         call wLog("-> set_local_bounding_box")
                         call set_local_bounding_box(globMSH,&
                                                     globMSH%xMinBound, globMSH%xMaxBound, &
-                                                    globMSH%xNStep, globMSH%xNTotal, globMSH%origin, validProc)
+                                                    globMSH%xNStep, globMSH%xNTotal, globMSH%origin, validProc, localization = .true.)
                         !call wLog("     globMSH%xMinBound = ")
                         !call wLog(globMSH%xMinBound)
                         !call wLog("     globMSH%xMaxBound = ")
@@ -694,12 +695,12 @@ contains
                                 call wLog(maxval(globRDF%randField,1))
                                 call write_Mono_XMF_h5(globRDF, globMSH, BBoxPartFileName, globRDF%rang, single_path, &
                                                        globMSH%comm, ["_ALL"], [0], fieldNumber, style=outputStyle, &
-                                                       writeDataSet = IPT%writeDataSet)
+                                                       writeDataSet = IPT%writeDataSet, localization=.true.)
                             else
                                 call wLog("   (Per Proc)");
                                 call write_Mono_XMF_h5(globRDF, globMSH, BBoxPartFileName, globRDF%rang, single_path, &
                                                        globMSH%comm, ["_procOnlyShape"], [IPT%rang], 0, style=outputStyle, &
-                                                       writeDataSet = IPT%writeDataSet)
+                                                       writeDataSet = IPT%writeDataSet, localization=.true.)
                             end if
 
                             if(.not. writeDataSet) then

@@ -79,12 +79,12 @@ contains
             RDF%xRange(i)      = RDF%xRange(i)/RDF%corrL(i)
         end do
 
-        if(RDF%independent) then
+        !if(RDF%independent) then
             !RDF%xRange = MSH%xMaxExt - MSH%xMinExt !Delta max in between two wave numbers to avoid periodicity
-            RDF%xRange = MSH%xMaxBound - MSH%xMinBound !Delta max in between two wave numbers to avoid periodicity
-        else
+            !RDF%xRange = MSH%xMaxBound - MSH%xMinBound !Delta max in between two wave numbers to avoid periodicity
+        !else
             RDF%xRange = MSH%xMaxGlob - MSH%xMinGlob !Delta max in between two wave numbers to avoid periodicity
-        end if
+        !end if
 
         !Generating Standard Gaussian Field
         call wLog("")

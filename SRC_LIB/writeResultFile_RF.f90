@@ -19,7 +19,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     subroutine write_Mono_XMF_h5(RDF, MSH, fileName, rang, folderPath, &
                                  communicator, labelsH5, indexesH5, indexXMF, style, &
-                                 HDF5FullPath, writeDataSet)
+                                 HDF5FullPath, writeDataSet, localization)
 
         implicit none
 
@@ -32,6 +32,7 @@ contains
         integer                           , intent(in) :: communicator, indexXMF
         character(len=*), dimension(1:)   , intent(in) :: labelsH5
         integer         , dimension(1:)   , intent(in) :: indexesH5
+        logical, intent(in) :: localization
         logical, intent(in) :: writeDataSet
         integer, intent(in) :: style !1 for parallel h5 writing
                                      !2 for sequential per processor h5 writing
@@ -57,7 +58,8 @@ contains
                                        fileName=fileName, &
                                        folderPath=trim(adjustL(folderPath))//"/h5", &
                                        communicator=communicator, &
-                                       HDF5Name=HDF5Name, HDF5FullPath = HDF5FullPath, writeDataSet = writeDataSet)
+                                       HDF5Name=HDF5Name, HDF5FullPath = HDF5FullPath, &
+                                       writeDataSet = writeDataSet, localization=localization)
             case(2)
                 call write_HDF5_Unstr_per_proc(RDF%xPoints, RDF%randField, fileName, rang, trim(adjustL(folderPath))//"/h5", &
                                    communicator, labelsH5, indexesH5, HDF5Name=HDF5Name, HDF5FullPath=HDF5FullPath)
@@ -734,7 +736,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine write_pHDF5_Str(MSH, RDF, fileName, folderPath, &
-                                 communicator, HDF5Name, HDF5FullPath, writeDataSet)
+                                 communicator, HDF5Name, HDF5FullPath, writeDataSet, localization)
         implicit none
 
         !INPUTS
@@ -745,6 +747,7 @@ contains
         character(len=*)                  , intent(in) :: folderPath
         integer                           , intent(in) :: communicator
         logical                           , intent(in) :: writeDataSet
+        logical                           , intent(in) :: localization
 
         !OUTPUTS
         character(len=110) , optional  , intent(out) ::HDF5Name, HDF5FullPath
@@ -835,9 +838,9 @@ contains
             call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, dset_id, error) !NEW dset_id
             call h5sclose_f(filespace, error) !CLOSE filespace
 
-            if(RDF%independent) then
+            if(localization) then
 
-                call wLog("INDEPENDENT")
+                call wLog("LOCALIZATION")
                 minPos = find_xNStep(MSH%xMinGlob, MSH%xMinInt , MSH%xStep) - MSH%origin + 1
                 maxPos = find_xNStep(MSH%xMinGlob, MSH%xMaxBound , MSH%xStep) - MSH%origin + 1
                 countND = maxPos - minPos + 1
@@ -893,7 +896,7 @@ contains
             call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error) !NEW plist_id (for dataset)
             call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error) !SET plist to MPI (for dataset)
 
-            if(RDF%independent) then
+            if(localization) then
 
                 allocate(randFieldLinear(product(countND)))
 
@@ -1245,16 +1248,16 @@ contains
         integer(HID_T)  :: file_id       !File identifier
         integer :: error
         !integer(kind=8) :: sum_xNTotal, sum_kNTotal
-        logical :: indep
+        !logical :: indep
 
         call h5open_f(error) ! Initialize FORTRAN interface.
         call h5fopen_f(trim(HDF5Path), H5F_ACC_RDWR_F, file_id, error) !Open File
 
         !BOOL
-        indep = RDF%independent
-        if(MSH%overlap(1) == -2.0D0) indep = .true. !Exception for monoproc cases
-        attr_name = "independent"
-        call write_h5attr_bool(file_id, trim(adjustL(attr_name)), indep)
+        !indep = RDF%independent
+        !if(MSH%overlap(1) == -2.0D0) indep = .true. !Exception for monoproc cases
+        !attr_name = "independent"
+        !call write_h5attr_bool(file_id, trim(adjustL(attr_name)), indep)
 
         !INTEGERS
         attr_name = "nb_procs"

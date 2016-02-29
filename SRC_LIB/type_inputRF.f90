@@ -35,7 +35,7 @@ module type_inputRF
         integer :: margiFirst = -1 !1 for Gaussian, 2 for Lognormal
         integer :: method = -1 !1 for Isotropic, 2 for Shinozuka, 3 for Randomization, 4 for FFT
         integer :: Nmc = -1, seedStart
-        logical :: independent
+        !logical :: independent
         integer :: nProcPerField
         integer, dimension(:), allocatable :: nFields
         integer :: localizationLevel
@@ -173,7 +173,7 @@ contains
             IPT%method = IPT_orig%method
             IPT%Nmc = IPT_orig%Nmc
             IPT%seedStart = IPT_orig%seedStart
-            IPT%independent = IPT_orig%independent
+            !IPT%independent = IPT_orig%independent
             IPT%nProcPerField = IPT_orig%nProcPerField
             IPT%nFields = IPT_orig%nFields
             IPT%localizationLevel = IPT_orig%localizationLevel
@@ -282,7 +282,7 @@ contains
             call read_DataTable(dataTable, "localizationLevel", IPT%localizationLevel)
             call read_DataTable(dataTable, "overlap", IPT%overlap)
 
-            IPT%independent = .true.
+            !IPT%independent = .true.
 
 !            if(independent == 1) then
 !                IPT%independent = .true.
@@ -398,7 +398,7 @@ contains
                 write(unit,*) " margiFirst = ", IPT%margiFirst
                 write(unit,*) " method = ", IPT%method
                 write(unit,*) " Nmc = ", IPT%Nmc
-                write(unit,*) " independent = ", IPT%independent
+                !write(unit,*) " independent = ", IPT%independent
                 write(unit,*) " seedStart = ", IPT%seedStart
                 write(unit,*) " nProcPerField = ", IPT%nProcPerField
                 write(unit,*) " nFields = ", IPT%nFields

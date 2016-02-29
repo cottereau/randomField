@@ -44,8 +44,8 @@ contains
         call wLog(MSH%overlap)
         call wLog("     IN   MSH%xStep =  ")
         call wLog(MSH%xStep)
-        call wLog("     IN   MSH%independent =  ")
-        call wLog(MSH%independent)
+        !call wLog("     IN   MSH%independent =  ")
+        !call wLog(MSH%independent)
 
         where(MSH%procPerDim == 1)  overlap = 0.0D0
         overlap = dble(nint(overlap*MSH%corrL/(MSH%xStep))) * MSH%xStep/MSH%corrL
@@ -148,7 +148,7 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine set_local_bounding_box (MSH, xMinBound, xMaxBound, &
-                                       xNStep, xNTotal, origin, validProc)
+                                       xNStep, xNTotal, origin, validProc, localization)
 
         implicit none
 
@@ -158,8 +158,8 @@ contains
         integer         , dimension(:), intent(out) :: xNStep, origin
         integer(kind=8) , intent(out) :: xNTotal
         logical, intent(inout) :: validProc
-        double precision :: deltaLD
-        integer :: LD
+        logical, intent(in) :: localization
+
 
         !FFTW
         integer(C_INTPTR_T) :: L, M, N
@@ -167,6 +167,8 @@ contains
         integer(C_INTPTR_T) :: local_LD_offset
         integer(C_INTPTR_T) :: alloc_local
         integer, dimension(MSH%nDim) :: xNStepGlob
+        double precision :: deltaLD
+        integer :: LD
 
         xMinBound = MSH%procStart
         xMaxBound = MSH%procStart + MSH%procExtent
@@ -175,7 +177,7 @@ contains
 
         validProc = .true.
 
-        if(.not. MSH%independent) then
+        if(.not. localization) then
             xMinBound = 0.0
             xMaxBound = MSH%procExtent
             !Slicing Last Dimension (LD)
@@ -1213,7 +1215,7 @@ contains
             stop(" ")
         end if
 
-        if(MSH%method == FFT .and. (.not. MSH%independent)) then
+        if(MSH%method == FFT) then
 
             procPerDim(:) = 1
             procPerDim(MSH%nDim) = MSH%nb_procs !1D Data Division
@@ -1238,12 +1240,10 @@ contains
                         procPerDim(i) = procPerDim(i)*2
                     end do
                 end if
-            else if(.not. MSH%independent) then
+            else
                 call wLog("    1D Division")
                 procPerDim(:) = 1
                 procPerDim(MSH%nDim) = MSH%nb_procs
-            else
-                stop ("ERROR, no mesh division algorithm for this number of procs")
             end if
 
         end if

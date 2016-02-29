@@ -23,7 +23,7 @@ module type_MESH
         integer :: nOvlpPoints, nOvlpMax
         !integer :: xNTotal
         !integer :: xNTotal = -1, xNInit = -1, xNEnd = -1, xNGlob = -1
-        logical :: independent
+        !logical :: independent
             !nDim dependent
         integer         , dimension(:), allocatable :: xNStep, procPerDim;
         integer         , dimension(:), allocatable :: neigh, coords, op_neigh;
@@ -117,7 +117,7 @@ module type_MESH
             MESH_a%method   = IPT%method
             MESH_a%pointsPerCorrL = IPT%pointsPerCorrL
             MESH_a%overlap(:)     = IPT%overlap
-            MESH_a%independent    = IPT%independent
+            !MESH_a%independent    = IPT%independent
 
             MESH_a%xMaxBound     = -1
             MESH_a%xMinBound     = -1
@@ -200,7 +200,7 @@ module type_MESH
                     write(unit,*) "|"
                     write(unit,*) "|  Input---"
                     write(unit,*) "|  |nDim     = ", MESH_a%nDim
-                    write(unit,*) "|  |independent = ", MESH_a%independent
+                    !write(unit,*) "|  |independent = ", MESH_a%independent
                     write(unit,*) "|  |meshMod  = ", MESH_a%meshMod
                     write(unit,"(A,("//dblFmt//"))") " |  |xMinGlob = ", MESH_a%xMinGlob
                     write(unit,"(A,("//dblFmt//"))") " |  |xMaxGlob = ", MESH_a%xMaxGlob
