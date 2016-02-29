@@ -14,7 +14,7 @@ module sample_RF
     use randomFieldND
     use mesh_RF
     use topography_RF
-    use calls_RF
+    !use calls_RF
 
     implicit none
 
@@ -403,7 +403,7 @@ contains
             integer, dimension(IPT%nDim_mesh) :: totalFieldPerDim, nFields_level, nFields_level_before
             integer :: i, validProcGroup, validProcComm, prodNFields
             double precision :: t_loc, t_trans
-            double precision :: all_t_loc, all_t_ref, all_t_prep, all_t_gen, all_t_trans
+            double precision :: all_t_loc, all_t_prep, all_t_gen, all_t_trans
             integer(kind=8) :: xNTotal
             integer, dimension(IPT%nDim_mesh) :: minPosProc, maxPosProc
             logical :: writeDataSet
@@ -961,5 +961,6 @@ contains
             if (allocated(BB_randField))   deallocate(BB_randField)
 
         end subroutine interpolateToUNV
+
 
 end module sample_RF

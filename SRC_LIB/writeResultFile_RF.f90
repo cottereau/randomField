@@ -1148,7 +1148,7 @@ contains
         integer, intent(in) :: nb_procs, nGenGroups
 
         !LOCAL
-        integer :: fileId, code
+        integer :: fileId
         character (len=40) :: doubleFmt
         !integer(kind=8) :: sum_xNTotal, sum_kNTotal
 

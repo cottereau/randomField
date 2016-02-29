@@ -12,6 +12,8 @@ module calls_RF
     use common_variables_RF
     use randomFieldND
     use mesh_RF
+    use type_inputRF
+    use sample_RF
 
     implicit none
 
@@ -21,6 +23,93 @@ module calls_RF
 
 contains
 
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine make_random_field (IPT, times, nTotalFields)
+        !INPUT
+        type(IPT_RF)  :: IPT
+        double precision, dimension(:), intent(inout) :: times
+        integer, intent(in)               :: nTotalFields
+        !LOCAL
+        type(MESH)            :: globMSH
+        integer               :: group, groupComm, groupMax
+        integer               :: code
+        double precision, dimension(IPT%nDim_mesh) :: stepProc, procExtent, overlap
+        double precision, dimension(IPT%nDim_mesh, nTotalFields) :: subdivisionCoords
+        double precision      :: t_bef, t_aft
+        integer               :: fieldNumber
+        character(len=110), dimension(nTotalFields) :: HDF5Name
+        double precision, dimension(nTotalFields) :: gen_times, temp_gen_times
+        integer :: i
+
+
+        !Building Subdivisions
+        if(IPT%rang == 0) write(*,*) " "
+        if(IPT%rang == 0) write(*,*) "-> DIVIDING----------------------------------------"
+        call wLog("-> DIVIDING----------------------------------------")
+        !allocate(subdivisionCoords(IPT%nDim_mesh, product(IPT%nFields**IPT%localizationLevel)))
+        call build_subdivisions(IPT, globMSH, groupMax, &
+                                group, groupComm, stepProc, procExtent, overlap)
+        call setGrid(subdivisionCoords, globMSH%xMinGlob, stepProc, IPT%nFields**IPT%localizationLevel, inverse=.true.)
+        !if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
+        if(IPT%rang == 0) write(*,*) "Max Coord = ", subdivisionCoords(:, size(subdivisionCoords,2)) + stepProc
+
+        call MPI_BARRIER(IPT%comm, code)
+        times(3) = MPI_Wtime() !Organizing Collective Writing
+
+        !Making all realizations
+        gen_times(:) = 0.0D0
+        if(IPT%sampleFields)then
+            if(IPT%rang == 0) write(*,*) " "
+            if(IPT%rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
+            call wLog("-> SAMPLING----------------------------------------")
+            do i = 1, product(IPT%nFields**IPT%localizationLevel)
+                if(mod(i, groupMax) == group) then
+                    if(mod(IPT%rang,IPT%nProcPerField) == 0) write(*,*)  "-> Group ", group, " making Field ", i
+                    call wLog("-> Making Field")
+                    call wLog(i)
+                    fieldNumber = i;
+                    !call wLog("Proc")
+                    !call wLog(rang)
+                    !call wLog("dealing with field")
+                    !call wLog(fieldNumber)
+                    !call wLog("     Trying communication")
+                    t_bef = MPI_Wtime()
+                    call MPI_BARRIER(groupComm, code)
+                    call single_realization(IPT, globMSH, IPT%outputStyle, &
+                                            groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
+                    t_aft = MPI_Wtime()
+                    temp_gen_times(i) = t_aft-t_bef
+
+                end if
+            end do
+        end if
+
+        call finalize_MESH(globMSH)
+
+        call MPI_BARRIER(IPT%comm, code)
+        times(4) = MPI_Wtime() !Generation Time
+
+        call MPI_ALLREDUCE (temp_gen_times, gen_times, size(gen_times), MPI_DOUBLE_PRECISION, MPI_SUM, IPT%comm,code)
+        !if(allocated(temp_gen_times)) deallocate(temp_gen_times)
+
+        !Combining realizations (localization)
+        if(.true.) then
+            if(IPT%rang == 0) write(*,*) " "
+            if(IPT%rang == 0) write(*,*) "-> COMBINING----------------------------------------"
+            call wLog("-> COMBINING----------------------------------------")
+            call combine_subdivisions(IPT, IPT%outputStyle, stepProc, procExtent, &
+                                      overlap, times(1), times(3), times(4), gen_times(:), &
+                                      groupMax, IPT%delete_intermediate_files, IPT%ignoreTillLocLevel)
+        end if
+
+        times(5) = MPI_Wtime() !Localization Time
+
+        call finalize_MESH(globMSH)
+
+    end subroutine make_random_field
 !    !-----------------------------------------------------------------------------------------------
 !    !-----------------------------------------------------------------------------------------------
 !    !-----------------------------------------------------------------------------------------------
@@ -69,162 +158,5 @@ contains
 !        call create_RF_Unstruct_Init(RDF, MSH)
 !
 !    end subroutine create_RF_Unstruct_noInit
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine create_RF_Unstruct_Init (RDF, MSH)
-        !INPUT OUTPUT
-        type(RF), intent(inout) :: RDF
-        type(MESH), intent(inout) :: MSH
-        !LOCAL
-
-        if(RDF%rang == 0) write(*,*) "Inside create_RF_Unstruct_Init"
-
-        !Generating standard Gaussian Field
-        call gen_Std_Gauss(RDF, MSH)
-
-    end subroutine create_RF_Unstruct_Init
-
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    subroutine gen_Std_Gauss (RDF, MSH)
-        implicit none
-
-        !INPUT OUTPUT
-        type(RF), intent(inout) :: RDF
-        type(MESH), intent(inout) :: MSH
-
-        !LOCAL VARIABLES
-        integer :: i;
-
-        !logical, dimension(size(MSH%neigh)) :: considerNeighbour
-        !integer, dimension(16) :: testVec
-        integer :: partitionType = 1
-
-
-        !testVec = [(i, i = 1, 16)]
-
-        !Normalization
-        call wLog(" ")
-        call wLog("->Normalizing Coordinates")
-        call wLog(" ")
-        do i = 1, RDF%nDim
-            RDF%xPoints(i,:)   = RDF%xPoints(i,:)/RDF%corrL(i)
-            MSH%xStep(i)       = MSH%xStep(i) /RDF%corrL(i)
-            MSH%xMinInt(i)     = MSH%xMinInt(i)/RDF%corrL(i)
-            MSH%xMaxInt(i)     = MSH%xMaxInt(i)/RDF%corrL(i)
-            MSH%xMinExt(i)     = MSH%xMinExt(i)/RDF%corrL(i)
-            MSH%xMaxExt(i)     = MSH%xMaxExt(i)/RDF%corrL(i)
-            MSH%xMinGlob(i)    = MSH%xMinGlob(i)/RDF%corrL(i)
-            MSH%xMaxGlob(i)    = MSH%xMaxGlob(i)/RDF%corrL(i)
-            MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)/RDF%corrL(i)
-            MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)/RDF%corrL(i)
-            MSH%xMaxBound(i)   = MSH%xMaxBound(i)/RDF%corrL(i)
-            MSH%xMinBound(i)   = MSH%xMinBound(i)/RDF%corrL(i)
-            MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)/RDF%corrL(i)
-            RDF%xRange(i)      = RDF%xRange(i)/RDF%corrL(i)
-        end do
-
-        if(RDF%independent) then
-            !RDF%xRange = MSH%xMaxExt - MSH%xMinExt !Delta max in between two wave numbers to avoid periodicity
-            RDF%xRange = MSH%xMaxBound - MSH%xMinBound !Delta max in between two wave numbers to avoid periodicity
-        else
-            RDF%xRange = MSH%xMaxGlob - MSH%xMinGlob !Delta max in between two wave numbers to avoid periodicity
-        end if
-
-        !Generating Standard Gaussian Field
-        call wLog("")
-        call wLog("GENERATING RANDOM FIELDS")
-        call wLog("-------------------------------")
-        if(RDF%rang == 0) write(*,*)"GENERATING RANDOM FIELDS"
-        if(RDF%rang == 0) write(*,*) "-------------------------------"
-        call wLog("")
-
-        select case (RDF%method)
-            case(ISOTROPIC)
-                call wLog(" ISOTROPIC")
-                if(RDF%rang == 0) write(*,*)"ISOTROPIC"
-                call gen_Std_Gauss_Isotropic(RDF, MSH)
-            case(SHINOZUKA)
-                call wLog(" SHINOZUKA")
-                if(RDF%rang == 0) write(*,*)"SHINOZUKA"
-                call gen_Std_Gauss_Shinozuka(RDF, MSH)
-            case(RANDOMIZATION)
-                call wLog(" RANDOMIZATION")
-                if(RDF%rang == 0) write(*,*)"RANDOMIZATION"
-                call gen_Std_Gauss_Randomization(RDF, MSH)
-            case(FFT)
-                call wLog(" FFT")
-                if(RDF%rang == 0) write(*,*)"FFT"
-                call gen_Std_Gauss_FFT(RDF, MSH)
-        end select
-
-        !RDF%randField = 1.0 ! For Tests
-
-        call wLog("minval(RDF%randField,1) =")
-        call wLog(minval(RDF%randField,1))
-        call wLog("maxval(RDF%randField,1) =")
-        call wLog(maxval(RDF%randField,1))
-
-        if(RDF%independent .and. RDF%nb_procs > 1) then
-            call wLog("")
-            call wLog("GENERATING OVERLAP")
-            call wLog("-------------------------------")
-            if(RDF%rang == 0) write(*,*)"GENERATING OVERLAP"
-            if(RDF%rang == 0) write(*,*) "-------------------------------"
-            call wLog("")
-
-            !RDF%randField = 1.0 ! For Tests
-            if(RDF%rang == 0) write(*,*) "    ->Applying Weighting Functions"
-            call wLog("    ->Applying Weighting Functions on Field")
-            call applyWeightingFunctions_OnMatrix(RDF, MSH, partitionType)
-            if(RDF%rang == 0) write(*,*) "    ->addNeighboursFields"
-            call wLog("    ->addNeighboursFields")
-            call addNeighboursFields(RDF, MSH)
-
-!            ! START For Tests
-!            minPos = nint((MSH%xMinInt-MSH%xMinExt)/MSH%xStep) + 1
-!            maxPos = nint((MSH%xMaxInt-MSH%xMinExt)/MSH%xStep)
-!            call wLog("minPos = ")
-!            call wLog(minPos)
-!            call wLog("maxPos = ")
-!            call wLog(maxPos)
-!            if(RDF%nDim == 2) RDF%RF_2D(minPos(1):maxPos(1), &
-!                                        minPos(2):maxPos(2)) = 0
-!            if(RDF%nDim == 3) RDF%RF_3D(minPos(1):maxPos(1), &
-!                                        minPos(2):maxPos(2), &
-!                                        minPos(3):maxPos(3)) = 0
-!            ! END For Tests
-
-        end if
-
-        !Reverting Normalization
-        call wLog(" ")
-        call wLog("->Reverting Normalization")
-        do i = 1, RDF%nDim
-            RDF%xPoints(i,:)   = RDF%xPoints(i,:)*RDF%corrL(i)
-            RDF%xRange(i)      = RDF%xRange(i)*RDF%corrL(i)
-            MSH%xStep(i)       = MSH%xStep(i)*RDF%corrL(i)
-            MSH%xMinInt(i)     = MSH%xMinInt(i)*RDF%corrL(i)
-            MSH%xMaxInt(i)     = MSH%xMaxInt(i)*RDF%corrL(i)
-            MSH%xMinExt(i)     = MSH%xMinExt(i)*RDF%corrL(i)
-            MSH%xMaxExt(i)     = MSH%xMaxExt(i)*RDF%corrL(i)
-            MSH%xMinGlob(i)    = MSH%xMinGlob(i)*RDF%corrL(i)
-            MSH%xMaxGlob(i)    = MSH%xMaxGlob(i)*RDF%corrL(i)
-            MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)*RDF%corrL(i)
-            MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
-            MSH%xMaxBound(i)   = MSH%xMaxBound(i)*RDF%corrL(i)
-            MSH%xMinBound(i)   = MSH%xMinBound(i)*RDF%corrL(i)
-            MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)*RDF%corrL(i)
-            RDF%xRange(i)      = RDF%xRange(i)*RDF%corrL(i)
-        end do
-
-        !RDF%randField = RDF%rang ! For Tests
-
-    end subroutine gen_Std_Gauss
 
 end module calls_RF

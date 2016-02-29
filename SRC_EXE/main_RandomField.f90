@@ -21,37 +21,37 @@ program main_RandomField
     implicit none
 
     !INPUTS
-    logical :: writeDataSet = .true.
-    logical :: sameFolder = .false.
-    integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
-    logical :: delete_intermediate_files = .true.
-    integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
-    logical :: sampleFields = .true.
+
 
 	!LOCAL VARIABLES
-    integer            :: i
-    integer            :: rang
-    double precision, dimension(:), allocatable :: gen_times, temp_gen_times
+    !integer            :: i
+    !integer            :: rang
+    !double precision, dimension(:), allocatable :: gen_times, temp_gen_times
     character(len=200) :: path, logFilePath
 
     double precision, dimension(5) :: times, all_times
 
     !DEVEL
-    integer               :: fieldNumber
-    character(len=110), dimension(:)  , allocatable :: HDF5Name
-    type(MESH)            :: globMSH
-    integer               :: group, groupComm, groupMax
+    !integer               :: fieldNumber
+    !character(len=110), dimension(:)  , allocatable :: HDF5Name
+    !type(MESH)            :: globMSH
+    !integer               :: group, groupComm, groupMax
     integer               :: code
 
-    double precision, dimension(:), allocatable :: stepProc, procExtent, overlap
-    double precision, dimension(:,:), allocatable :: subdivisionCoords
-    double precision :: t_bef, t_aft
+    !double precision, dimension(:), allocatable :: stepProc, procExtent, overlap
+    !double precision, dimension(:,:), allocatable :: subdivisionCoords
+    !double precision :: t_bef, t_aft
     type(IPT_RF)  :: IPT
 
     !Initializing MPI
     call init_communication(MPI_COMM_WORLD, IPT%comm, IPT%rang, IPT%nb_procs)
-    rang = IPT%rang
-    IPT%writeDataSet = writeDataSet
+    !rang = IPT%rang
+    IPT%writeDataSet = .true.
+    IPT%sameFolder = .false.
+    IPT%outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
+    IPT%delete_intermediate_files = .true.
+    IPT%ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
+    IPT%sampleFields = .true.
 
     times(1) = MPI_Wtime() !Initial Time
 
@@ -69,42 +69,42 @@ program main_RandomField
         write(*,*)
     end if
 
-    if(rang == 0) write(*,*) "-> MPI_communications started"
-    if(rang == 0) write(*,*) "         running on: "
-    if(rang == 0) call system("pwd")
-    if(rang == 0) write(*,*) "         nb_procs    = ", IPT%nb_procs
-    if(rang == 0) write(*,*) "         outputStyle = ", outputStyle
+    if(IPT%rang == 0) write(*,*) "-> MPI_communications started"
+    if(IPT%rang == 0) write(*,*) "         running on: "
+    if(IPT%rang == 0) call system("pwd")
+    if(IPT%rang == 0) write(*,*) "         nb_procs    = ", IPT%nb_procs
+    if(IPT%rang == 0) write(*,*) "         outputStyle = ", IPT%outputStyle
 
     !Initializing folders
-    if(rang == 0) write(*,*)  "-> Initialize Folders"
+    if(IPT%rang == 0) write(*,*)  "-> Initialize Folders"
     call init_basic_folders(IPT%comm)
 
 #ifdef MAKELOG
-    if(rang == 0) write(*,*) "IFDEF MAKELOG DEFINED"
+    if(IPT%rang == 0) write(*,*) "IFDEF MAKELOG DEFINED"
 
     !Initializing logFiles
-    if(rang == 0) write(*,*)  "-> Initialize logFiles"
+    if(IPT%rang == 0) write(*,*)  "-> Initialize logFiles"
     logFilePath = trim(adjustL(&
                       string_join_many(results_path,"/",log_folder_name,"/",log_filename)))
-    if(rang == 0) write(*,*)  " logFilePath = ", trim(adjustL(logFilePath)), "<RANK>"
-    call init_log_file(trim(adjustL(logFilePath)), rang, IPT%log_ID, IPT%nb_procs)
+    if(IPT%rang == 0) write(*,*)  " logFilePath = ", trim(adjustL(logFilePath)), "<RANK>"
+    call init_log_file(trim(adjustL(logFilePath)), IPT%rang, IPT%log_ID, IPT%nb_procs)
 #else
-    if(rang == 0) write(*,*) "IFDEF MAKELOG NOT DEFINED"
+    if(IPT%rang == 0) write(*,*) "IFDEF MAKELOG NOT DEFINED"
 #endif
 
     !READING INPUTS--------------------------------------------------
     !----------------------------------------------------------------
-    if(rang == 0) write(*,*)  "-> Reading inputs"
+    if(IPT%rang == 0) write(*,*)  "-> Reading inputs"
     call wLog("-> Reading inputs")
     !Reading Mesh---------------------------------------------------
-    if(rang == 0) write(*,*)  "     -> Reading Mesh Input"
+    if(IPT%rang == 0) write(*,*)  "     -> Reading Mesh Input"
     call wLog("     -> Reading Mesh Input")
     path = mesh_input
     path = adjustL(path)
     !call wLog("        file: "//trim(path))
     call read_mesh_input(path, IPT)
     !Reading Generation Input---------------------------------------
-    if(rang == 0) write(*,*)  "     -> Reading Generation Input"
+    if(IPT%rang == 0) write(*,*)  "     -> Reading Generation Input"
     call wLog("     -> Reading Generation Input")
     path = gen_input
     path = adjustL(path)
@@ -113,7 +113,7 @@ program main_RandomField
     !Validating Inputs----------------------------------------------
     call wLog("    Validating Inputs")
     call validate_input(IPT)
-    if(rang == 0) call show_IPT_RF(IPT)
+    if(IPT%rang == 0) call show_IPT_RF(IPT)
 #ifdef MAKELOG
     call show_IPT_RF(IPT, forLog_in=.true.)
 #endif
@@ -130,15 +130,15 @@ program main_RandomField
     end if
 
     !Changing xMaxGlob and xMinGlob according to localization level
-    if(rang == 0) write(*,*) "-> REDEFINE xMaxGlob and xMinGlob----------------------------------------"
+    if(IPT%rang == 0) write(*,*) "-> REDEFINE xMaxGlob and xMinGlob----------------------------------------"
     call wLog("-> REDEFINE xMaxGlob and xMinGlob----------------------------------------")
     call redefineIPTlimits(IPT, IPT%xMinGlob, IPT%xMaxGlob, IPT%localizationLevel)
-    if(rang == 0) write(*,*) "IPT%xMinGlob"
-    if(rang == 0) write(*,*) IPT%xMinGlob
-    if(rang == 0) write(*,*) "IPT%xMaxGlob"
-    if(rang == 0) write(*,*) IPT%xMaxGlob
-    if(rang == 0) write(*,*) "IPT%localizationLevel"
-    if(rang == 0) write(*,*) IPT%localizationLevel
+    if(IPT%rang == 0) write(*,*) "IPT%xMinGlob"
+    if(IPT%rang == 0) write(*,*) IPT%xMinGlob
+    if(IPT%rang == 0) write(*,*) "IPT%xMaxGlob"
+    if(IPT%rang == 0) write(*,*) IPT%xMaxGlob
+    if(IPT%rang == 0) write(*,*) "IPT%localizationLevel"
+    if(IPT%rang == 0) write(*,*) IPT%localizationLevel
     call wLog("IPT%xMinGlob")
     call wLog(IPT%xMinGlob)
     call wLog("IPT%xMaxGlob")
@@ -146,87 +146,24 @@ program main_RandomField
     call wLog("IPT%localizationLevel")
     call wLog(IPT%localizationLevel)
 
-    !Building Subdivisions
-    if(rang == 0) write(*,*) " "
-    if(rang == 0) write(*,*) "-> DIVIDING----------------------------------------"
-    call wLog("-> DIVIDING----------------------------------------")
-    allocate(stepProc(IPT%nDim_mesh))
-    allocate(procExtent(IPT%nDim_mesh))
-    allocate(overlap(IPT%nDim_mesh))
-    allocate(subdivisionCoords(IPT%nDim_mesh, product(IPT%nFields**IPT%localizationLevel)))
-    call build_subdivisions(IPT, globMSH, groupMax, &
-                            group, groupComm, stepProc, procExtent, overlap)
-    call setGrid(subdivisionCoords, globMSH%xMinGlob, stepProc, IPT%nFields**IPT%localizationLevel, inverse=.true.)
-    !if(rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
-    if(rang == 0) write(*,*) "Max Coord = ", subdivisionCoords(:, size(subdivisionCoords,2)) + stepProc
-
-    call MPI_BARRIER(IPT%comm, code)
-    times(3) = MPI_Wtime() !Organizing Collective Writing
-
-    !Making all realizations
-    gen_times(:) = 0.0D0
-    if(sampleFields)then
-        if(rang == 0) write(*,*) " "
-        if(rang == 0) write(*,*) "-> SAMPLING----------------------------------------"
-        call wLog("-> SAMPLING----------------------------------------")
-        allocate(HDF5Name(product(IPT%nFields**IPT%localizationLevel)))
-        do i = 1, product(IPT%nFields**IPT%localizationLevel)
-            if(mod(i, groupMax) == group) then
-                if(mod(rang,IPT%nProcPerField) == 0) write(*,*)  "-> Group ", group, " making Field ", i
-                call wLog("-> Making Field")
-                call wLog(i)
-                fieldNumber = i;
-                !call wLog("Proc")
-                !call wLog(rang)
-                !call wLog("dealing with field")
-                !call wLog(fieldNumber)
-                !call wLog("     Trying communication")
-                t_bef = MPI_Wtime()
-                call MPI_BARRIER(groupComm, code)
-                call single_realization(IPT, globMSH, outputStyle, &
-                                        groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
-                t_aft = MPI_Wtime()
-                temp_gen_times(i) = t_aft-t_bef
-
-            end if
-        end do
-    end if
-
-    call finalize_MESH(globMSH)
-
-    call MPI_BARRIER(IPT%comm, code)
-    times(4) = MPI_Wtime() !Generation Time
-
-    call MPI_ALLREDUCE (temp_gen_times, gen_times, size(gen_times), MPI_DOUBLE_PRECISION, MPI_SUM, IPT%comm,code)
-    if(allocated(temp_gen_times)) deallocate(temp_gen_times)
-
-    !Combining realizations (localization)
-    if(.true.) then
-        if(rang == 0) write(*,*) " "
-        if(rang == 0) write(*,*) "-> COMBINING----------------------------------------"
-        call wLog("-> COMBINING----------------------------------------")
-        call combine_subdivisions(IPT, outputStyle, stepProc, procExtent, &
-                                  overlap, times(1), times(3), times(4), gen_times(:), &
-                                  groupMax, delete_intermediate_files, ignoreTillLocLevel)
-    end if
-
-    times(5) = MPI_Wtime() !Localization Time
+    !Generating random fields
+    call make_random_field(IPT, times, product(IPT%nFields**IPT%localizationLevel))
 
     call MPI_ALLREDUCE (times, all_times, size(times), MPI_DOUBLE_PRECISION, MPI_SUM, IPT%comm,code)
 
-    if(rang == 0) write(*,*) ""
-    if(rang == 0) write(*,*) ""
-    if(rang == 0) write(*,*) "AVERAGE TIMES (WALL)------------------------ "
-    if(rang == 0) write(*,*) "Reading Inputs   = ", (all_times(2) - all_times(1))/dble(IPT%nb_procs)
-    if(rang == 0) write(*,*) "Pre Organization = ", (all_times(3) - all_times(2))/dble(IPT%nb_procs)
-    if(rang == 0) write(*,*) "Generation       = ", (all_times(4) - all_times(3))/dble(IPT%nb_procs)
-    if(rang == 0) write(*,*) "Localization     = ", (all_times(5) - all_times(4))/dble(IPT%nb_procs)
-    if(rang == 0) write(*,*) ""
+    if(IPT%rang == 0) write(*,*) ""
+    if(IPT%rang == 0) write(*,*) ""
+    if(IPT%rang == 0) write(*,*) "AVERAGE TIMES (WALL)------------------------ "
+    if(IPT%rang == 0) write(*,*) "Reading Inputs   = ", (all_times(2) - all_times(1))/dble(IPT%nb_procs)
+    if(IPT%rang == 0) write(*,*) "Pre Organization = ", (all_times(3) - all_times(2))/dble(IPT%nb_procs)
+    if(IPT%rang == 0) write(*,*) "Generation       = ", (all_times(4) - all_times(3))/dble(IPT%nb_procs)
+    if(IPT%rang == 0) write(*,*) "Localization     = ", (all_times(5) - all_times(4))/dble(IPT%nb_procs)
+    if(IPT%rang == 0) write(*,*) ""
 
 	!Deallocating
     call deallocate_all()
 
-    if(rang == 0) then
+    if(IPT%rang == 0) then
         write(*,*) ""
         write(*,*) "---------------------------------------------------------------------";
         write(*,*) "-----------------END RANDOM FIELD LIBRARY TEST-----------------------";
@@ -285,15 +222,15 @@ program main_RandomField
             call date_and_time(strings(1), strings(2), strings(3), date_time)
             results_folder_name = strings(1)(3:8)//"_"//strings(2)(1:6)//"_res"
 
-            if(sameFolder) results_folder_name = "res"
+            if(IPT%sameFolder) results_folder_name = "res"
 
             call MPI_BARRIER (comm ,code) !Necessary because each proc can have a different time
             call MPI_BCAST (results_folder_name, 100, MPI_CHARACTER, 0, comm, code)
 
             log_folder_name     = trim(adjustL(results_folder_name))//"/log"
-            if(sameFolder) log_folder_name     = ".."
+            if(IPT%sameFolder) log_folder_name     = ".."
 
-            call create_folder(log_folder_name, results_path, rang, comm)
+            call create_folder(log_folder_name, results_path, IPT%rang, comm)
 
             if(IPT%rang == 0) write(*,*) "-> Setting folder path"
             single_path = string_join_many(results_path,"/",results_folder_name)
@@ -302,8 +239,8 @@ program main_RandomField
             !create xmf and h5 folders
             !if(writeFiles) then
             path = string_vec_join([results_path,"/",results_folder_name])
-            call create_folder("xmf", path, rang, comm)
-            call create_folder("h5", path, rang, comm)
+            call create_folder("xmf", path, IPT%rang, comm)
+            call create_folder("h5", path, IPT%rang, comm)
             !end if
 
         end subroutine init_basic_folders
@@ -314,9 +251,6 @@ program main_RandomField
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         subroutine allocate_init()
-
-            allocate(gen_times(product(IPT%nFields**IPT%localizationLevel)))
-            allocate(temp_gen_times(product(IPT%nFields**IPT%localizationLevel)))
 
         end subroutine allocate_init
 
@@ -339,15 +273,7 @@ program main_RandomField
         !---------------------------------------------------------------------------------
         subroutine deallocate_all()
 
-            if(allocated(overlap)) deallocate(overlap)
-            if(allocated(HDF5Name)) deallocate(HDF5Name)
-            if(allocated(gen_times)) deallocate(gen_times)
-            if(allocated(temp_gen_times)) deallocate(temp_gen_times)
-            if(allocated(stepProc)) deallocate(stepProc)
-            if(allocated(subdivisionCoords)) deallocate(subdivisionCoords)
-
             call finalize_IPT_RF(IPT)
-            call finalize_MESH(globMSH)
             !call finalize_RF(globRDF)
 
         end subroutine deallocate_all

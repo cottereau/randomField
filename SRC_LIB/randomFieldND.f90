@@ -19,6 +19,133 @@ module randomFieldND
 
 
 contains
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine create_RF_Unstruct_Init (RDF, MSH)
+        !INPUT OUTPUT
+        type(RF), intent(inout) :: RDF
+        type(MESH), intent(inout) :: MSH
+        !LOCAL
+
+        if(RDF%rang == 0) write(*,*) "Inside create_RF_Unstruct_Init"
+
+        !Generating standard Gaussian Field
+        call gen_Std_Gauss(RDF, MSH)
+
+    end subroutine create_RF_Unstruct_Init
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine gen_Std_Gauss (RDF, MSH)
+        implicit none
+
+        !INPUT OUTPUT
+        type(RF), intent(inout) :: RDF
+        type(MESH), intent(inout) :: MSH
+
+        !LOCAL VARIABLES
+        integer :: i;
+
+        !logical, dimension(size(MSH%neigh)) :: considerNeighbour
+        !integer, dimension(16) :: testVec
+        !integer :: partitionType = 1
+
+
+        !testVec = [(i, i = 1, 16)]
+
+        !Normalization
+        call wLog(" ")
+        call wLog("->Normalizing Coordinates")
+        call wLog(" ")
+        do i = 1, RDF%nDim
+            RDF%xPoints(i,:)   = RDF%xPoints(i,:)/RDF%corrL(i)
+            MSH%xStep(i)       = MSH%xStep(i) /RDF%corrL(i)
+            MSH%xMinInt(i)     = MSH%xMinInt(i)/RDF%corrL(i)
+            MSH%xMaxInt(i)     = MSH%xMaxInt(i)/RDF%corrL(i)
+            MSH%xMinExt(i)     = MSH%xMinExt(i)/RDF%corrL(i)
+            MSH%xMaxExt(i)     = MSH%xMaxExt(i)/RDF%corrL(i)
+            MSH%xMinGlob(i)    = MSH%xMinGlob(i)/RDF%corrL(i)
+            MSH%xMaxGlob(i)    = MSH%xMaxGlob(i)/RDF%corrL(i)
+            MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)/RDF%corrL(i)
+            MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)/RDF%corrL(i)
+            MSH%xMaxBound(i)   = MSH%xMaxBound(i)/RDF%corrL(i)
+            MSH%xMinBound(i)   = MSH%xMinBound(i)/RDF%corrL(i)
+            MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)/RDF%corrL(i)
+            RDF%xRange(i)      = RDF%xRange(i)/RDF%corrL(i)
+        end do
+
+        if(RDF%independent) then
+            !RDF%xRange = MSH%xMaxExt - MSH%xMinExt !Delta max in between two wave numbers to avoid periodicity
+            RDF%xRange = MSH%xMaxBound - MSH%xMinBound !Delta max in between two wave numbers to avoid periodicity
+        else
+            RDF%xRange = MSH%xMaxGlob - MSH%xMinGlob !Delta max in between two wave numbers to avoid periodicity
+        end if
+
+        !Generating Standard Gaussian Field
+        call wLog("")
+        call wLog("GENERATING RANDOM FIELDS")
+        call wLog("-------------------------------")
+        if(RDF%rang == 0) write(*,*)"GENERATING RANDOM FIELDS"
+        if(RDF%rang == 0) write(*,*) "-------------------------------"
+        call wLog("")
+
+        select case (RDF%method)
+            case(ISOTROPIC)
+                call wLog(" ISOTROPIC")
+                if(RDF%rang == 0) write(*,*)"ISOTROPIC"
+                call gen_Std_Gauss_Isotropic(RDF, MSH)
+            case(SHINOZUKA)
+                call wLog(" SHINOZUKA")
+                if(RDF%rang == 0) write(*,*)"SHINOZUKA"
+                call gen_Std_Gauss_Shinozuka(RDF, MSH)
+            case(RANDOMIZATION)
+                call wLog(" RANDOMIZATION")
+                if(RDF%rang == 0) write(*,*)"RANDOMIZATION"
+                call gen_Std_Gauss_Randomization(RDF, MSH)
+            case(FFT)
+                call wLog(" FFT")
+                if(RDF%rang == 0) write(*,*)"FFT"
+                call gen_Std_Gauss_FFT(RDF, MSH)
+        end select
+
+        !RDF%randField = 1.0 ! For Tests
+
+        call wLog("minval(RDF%randField,1) =")
+        call wLog(minval(RDF%randField,1))
+        call wLog("maxval(RDF%randField,1) =")
+        call wLog(maxval(RDF%randField,1))
+
+        !Reverting Normalization
+        call wLog(" ")
+        call wLog("->Reverting Normalization")
+        do i = 1, RDF%nDim
+            RDF%xPoints(i,:)   = RDF%xPoints(i,:)*RDF%corrL(i)
+            RDF%xRange(i)      = RDF%xRange(i)*RDF%corrL(i)
+            MSH%xStep(i)       = MSH%xStep(i)*RDF%corrL(i)
+            MSH%xMinInt(i)     = MSH%xMinInt(i)*RDF%corrL(i)
+            MSH%xMaxInt(i)     = MSH%xMaxInt(i)*RDF%corrL(i)
+            MSH%xMinExt(i)     = MSH%xMinExt(i)*RDF%corrL(i)
+            MSH%xMaxExt(i)     = MSH%xMaxExt(i)*RDF%corrL(i)
+            MSH%xMinGlob(i)    = MSH%xMinGlob(i)*RDF%corrL(i)
+            MSH%xMaxGlob(i)    = MSH%xMaxGlob(i)*RDF%corrL(i)
+            MSH%xMaxNeigh(i,:) = MSH%xMaxNeigh(i,:)*RDF%corrL(i)
+            MSH%xMinNeigh(i,:) = MSH%xMinNeigh(i,:)*RDF%corrL(i)
+            MSH%xMaxBound(i)   = MSH%xMaxBound(i)*RDF%corrL(i)
+            MSH%xMinBound(i)   = MSH%xMinBound(i)*RDF%corrL(i)
+            MSH%xOrNeigh(i,:)  = MSH%xOrNeigh(i,:)*RDF%corrL(i)
+            RDF%xRange(i)      = RDF%xRange(i)*RDF%corrL(i)
+        end do
+
+        !RDF%randField = RDF%rang ! For Tests
+
+    end subroutine gen_Std_Gauss
+
+
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

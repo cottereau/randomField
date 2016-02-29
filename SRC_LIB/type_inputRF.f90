@@ -13,7 +13,6 @@ module type_inputRF
         integer :: rang = -1
         integer :: nb_procs = -1
         logical :: init=.false.
-        logical :: writeDataSet=.true.
         !MESH
         integer :: nDim_mesh
         integer :: meshMod
@@ -40,6 +39,14 @@ module type_inputRF
         integer :: nProcPerField
         integer, dimension(:), allocatable :: nFields
         integer :: localizationLevel
+
+        !FILE MANAGER
+        logical :: writeDataSet = .true.
+        logical :: sameFolder = .false.
+        integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
+        logical :: delete_intermediate_files = .true.
+        integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
+        logical :: sampleFields = .true.
 
     end type IPT_RF
 
