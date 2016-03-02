@@ -232,6 +232,7 @@ contains
                                         MSH%xMinBound, MSH%xMaxBound, &
                                         MSH%xNStep, MSH%xNTotal, MSH%origin, validProc, &
                                         localization = .false.)
+            !write(*,*) "After set_local_bounding_box"
             rang = MSH%rang
             call set_validProcs_comm(validProc, fieldComm, rang, &
                                      MSH%validProc, RDF%validProc, MSH%comm, RDF%comm, &
@@ -262,6 +263,7 @@ contains
                 call wLog(" ")
 
                 call wLog("-> Setting xPoints")
+                !write(*,*) "Setting xPoints"
                 call set_xPoints(MSH, RDF, RDF%xPoints_Local)
                 call wLog("      maxval(RDF%xPoints,2) = ")
                 call wLog(maxval(RDF%xPoints,2))
@@ -271,7 +273,7 @@ contains
                 !i = size(RDF%xPoints,2)
                 !if(i>50) i = 50
                 !call dispCarvalhol(transpose(RDF%xPoints(:,1:i)), "transpose(RDF%xPoints)", "(F20.5)",unit_in = RDF%log_ID)
-
+                !write(*,*) "AFTER Setting xPoints"
                 !Discovering the total number of points in all procs
                 call MPI_ALLREDUCE (MSH%xNTotal, all_xNTotal,1,MPI_INTEGER, &
                                     MPI_SUM,MSH%comm,code)
@@ -282,11 +284,14 @@ contains
 
                 call wLog("-> Generating Random Field")
                 call wLog("     Allocating random field")
+                !write(*,*) "Generating Random Field"
                 call allocate_randField(RDF, MSH%xNStep, RDF%randField_Local)
                 call wLog("     shape(RDF%randField)")
                 call wLog(shape(RDF%randField))
                 call wLog("     Calculating sample")
                 call create_RF_Unstruct_Init (RDF, MSH)
+
+                !write(*,*) "After Calculation"
 
                 call wLog("      maxval(RDF%randField,1) = ")
                 call wLog(maxval(RDF%randField,1))
@@ -307,6 +312,7 @@ contains
                 call wLog("-> Writing XMF and hdf5 files");
 
                 if(.true.) then
+                    write(*,*) "Writing Files"
                     call wLog("IPT%outputStyle");
                     call wLog(IPT%outputStyle);
                     if(RDF%rang == 0) write(*,*) "-> Writing 'Bounding Box' XMF and hdf5 files"
@@ -441,8 +447,15 @@ contains
 
             if(validProcGroup == 1) then
 
-                call init_IPT_RF(newIPT, IPT%nDim_mesh, IPT%log_ID, IPT%rang)
+                !write(*,*) "New Input allocating"
+
+                call allocate_IPT_RF(newIPT, IPT%nDim_mesh, IPT%log_ID, IPT%rang, IPT%comm, IPT%nb_procs)
+
+                !write(*,*) "New Input allocated"
+                !write(*,*) "New Input copying"
                 call copy_IPT_RF(newIPT, IPT)
+
+                !write(*,*) "New Input copy done"
 
                 newIPT%overlap = overlap
                 !newIPT%independent = .true.

@@ -24,6 +24,7 @@ contains
 
         !LOCAL
 
+        !write(*,*) "Allocating xPoints"
         allocate(xPoints(MSH%nDim, MSH%xNTotal))
 
         call wLog("MSH%xMinBound = ")
@@ -35,8 +36,15 @@ contains
         call wLog("MSH%xNTotal = ")
         call wLog(MSH%xNTotal)
 
+        !write(*,*) "Setting Grid"
+        !write(*,*) "shape(xPoints) = ", shape(xPoints)
+        !write(*,*) "MSH%xStep      = ", MSH%xStep
+        !write(*,*) "MSH%xMinBound  = ", MSH%xMinBound
+        !write(*,*) "MSH%xNStep = ", MSH%xNStep
         call setGrid(xPoints, MSH%xMinBound, MSH%xStep, MSH%xNStep)
+        !write(*,*) "AFTER Setting Grid"
 
+        !write(*,*) "Pointing xPoints"
         RDF%xPoints => xPoints
 
         if(RDF%nDim == 2) then
@@ -48,6 +56,8 @@ contains
             !call wLog("Point in minimal position = ")
             !call wLog(RDF%xPoints_3D(:,22,1,1))
         end if
+
+        !write(*,*) "AFTER Pointing xPoints"
 
         !call DispCarvalhol(transpose(RDF%xPoints), "transpose(RDF%xPoints)", unit_in=RDF%log_ID)
 

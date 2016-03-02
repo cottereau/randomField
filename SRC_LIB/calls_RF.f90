@@ -79,12 +79,14 @@ contains
                     !call wLog(fieldNumber)
                     !call wLog("     Trying communication")
                     t_bef = MPI_Wtime()
+                    !write(*,*) "Before communicator"
                     call MPI_BARRIER(groupComm, code)
+                    !write(*,*) "After communicator"
                     call single_realization(IPT, globMSH, &
                                             groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
                     t_aft = MPI_Wtime()
                     temp_gen_times(i) = t_aft-t_bef
-
+                    !write(*,*) "After single"
                 end if
             end do
         end if
@@ -114,7 +116,7 @@ contains
         call MPI_BARRIER(IPT%comm, code)
         if(IPT%unv .and. IPT%writeUNVinterpolation .and. IPT%outputStyle == 1) then
             if(IPT%rang == 0) write(*,*) "-> Writing 'UNV' XMF and hdf5 files for"
-            if(IPT%rang == 0) write(*,*) IPT%unv_path
+            if(IPT%rang == 0) write(*,*) trim(adjustL(IPT%unv_path))
             allocate(UNV_randField(size(IPT%coordList,2),1))
             if(IPT%rang == 0) write(*,*) "  Source:"
             if(IPT%rang == 0) write(*,*) BBoxPath

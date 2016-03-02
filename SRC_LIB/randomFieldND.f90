@@ -30,7 +30,7 @@ contains
         type(MESH), intent(inout) :: MSH
         !LOCAL
 
-        if(RDF%rang == 0) write(*,*) "Inside create_RF_Unstruct_Init"
+        !if(RDF%rang == 0) write(*,*) "Inside create_RF_Unstruct_Init"
 
         !Generating standard Gaussian Field
         call gen_Std_Gauss(RDF, MSH)

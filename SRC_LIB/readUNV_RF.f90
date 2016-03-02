@@ -11,15 +11,17 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine readUNV(path, nDim, coordList, connectList, monotype, rang, nb_procs)
+    subroutine readUNV(path, nDim, coordList, connectList, monotype, rang, nb_procs, coordList_pointer, connectList_pointer)
         !INPUT
         character (len=*), intent(in) :: path
         integer, intent(in)           :: nDim, rang, nb_procs
 
         !OUTPUT
-        double precision, dimension(:,:), allocatable, intent(out), optional :: coordList
-        integer         , dimension(:,:), allocatable, intent(out), optional :: connectList
-        logical, optional, intent(out) :: monoType
+        double precision, dimension(:,:), allocatable, intent(out), target :: coordList
+        integer         , dimension(:,:), allocatable, intent(out), target :: connectList
+        double precision, dimension(:,:), pointer :: coordList_pointer
+        integer         , dimension(:,:), pointer :: connectList_pointer
+        logical, intent(out) :: monoType
 
         !LOCAL
         integer :: fileID = 18
@@ -87,8 +89,7 @@ contains
             end do
 
             !Sharing nodes between processors
-            if((nNodes < nb_procs .and. present(coordList)) .or. &
-                nElem < nb_procs .and. present(connectList)) then
+            if(nNodes < nb_procs .or. nElem < nb_procs) then
                 call wLog("ERROR!!! Too little Nodes/Elements for this number of processors")
                 call wLog(" nNodes   = ")
                 call wLog(nNodes)
@@ -119,19 +120,18 @@ contains
             call wLog(elemEnd)
 
             !Allocation
-            if(present(coordList)) then
-                allocate(coordList(nDim, nNodesLoc))
-                coordList(:,:)   = -1
-                call wLog("shape(coordList) = ")
-                call wLog(shape(coordList))
-            end if
-            if(present(connectList)) then
-                allocate(connectList(1:maxConnect, nElemLoc))
-                allocate(sizeList(nElemLoc))
-                connectList(:,:) = -1
-                call wLog("shape(connectList) = ")
-                call wLog(shape(connectList))
-            end if
+
+            allocate(coordList(nDim, nNodesLoc))
+            coordList(:,:)   = -1
+            call wLog("shape(coordList) = ")
+            call wLog(shape(coordList))
+
+            allocate(connectList(1:maxConnect, nElemLoc))
+            allocate(sizeList(nElemLoc))
+            connectList(:,:) = -1
+            call wLog("shape(connectList) = ")
+            call wLog(shape(connectList))
+
 
 
             !end if
@@ -153,8 +153,7 @@ contains
                     call wLog("Line ")
                     call wLog(lineNb)
                     call wLog("is -1")
-                else if((trim(adjustL(line)) == "2411" .or. trim(adjustL(line)) == "781") &
-                        .and. present(coordList) )then
+                else if((trim(adjustL(line)) == "2411" .or. trim(adjustL(line)) == "781"))then
                     call wLog(" ")
                     call wLog("Reading Coordinates")
                     call wLog("TAG Line = ")
@@ -162,8 +161,7 @@ contains
                     call readCoordinates(fileID, coordList, nodeStart, nodeEnd)
                     call wLog("End Line = ")
                     call wLog(lineNb)
-                else if((trim(adjustL(line)) == "2412" .or. trim(adjustL(line)) == "780") &
-                        .and. present(connectList))then
+                else if((trim(adjustL(line)) == "2412" .or. trim(adjustL(line)) == "780"))then
                     call wLog(" ")
                     call wLog("Reading Connectivity")
                     call wLog("TAG Line = ")
@@ -186,14 +184,29 @@ contains
 
             end do
 
+        if(rang == 0) write(*,*) "shape(coordList) = "
+        if(rang == 0) write(*,*) shape(coordList)
+        if(rang == 0) write(*,*) "shape(connectList) = "
+        if(rang == 0) write(*,*) shape(connectList)
+        if(rang == 0) write(*,*) "monoType = "
+        if(rang == 0) write(*,*) monoType
+
         close(fileID)
+
+        coordList_pointer   => coordList
+        connectList_pointer => connectList
 
         if(allocated(sizeList)) deallocate(sizeList)
 
-        !!write(get_fileId(),*) "--------------------------------------------------"
-        !!write(get_fileId(),*) "END OF UNV LECTURE------------------------------"
-        !!write(get_fileId(),*) "--------------------------------------------------"
-        !!write(get_fileId(),*) ""
+        if(rang == 0) write(*,*)"--------------------------------------------------"
+        if(rang == 0) write(*,*)"END OF UNV LECTURE--------------------------------"
+        if(rang == 0) write(*,*)"--------------------------------------------------"
+        if(rang == 0) write(*,*)""
+
+        call wLog("--------------------------------------------------")
+        call wLog("END OF UNV LECTURE--------------------------------")
+        call wLog("--------------------------------------------------")
+        call wLog("")
 
         !if(present(coordList)) call dispCarvalhol(transpose(coordList(:, :10)), "coord List", "(F15.5)")
         !if(present(connectList)) call dispCarvalhol(transpose(connectList(:, :10)), "connect List", "(I8)", 8)
@@ -564,7 +577,7 @@ contains
         !OUTPUT
         integer, intent(out) :: nElem
         integer, intent(inout) :: maxConnect
-        logical, intent(inout) :: monoType
+        logical, intent(out) :: monoType
         !LOCAL
         integer, dimension(50) :: nElemByType
         character (len=20) :: line
@@ -575,6 +588,7 @@ contains
         inside = .true.
         nElem = 0
         nElemByType(:) = 0
+        monoType = .true.
 
         !Jump initials -1
         read(fileID, fmt=*) line
