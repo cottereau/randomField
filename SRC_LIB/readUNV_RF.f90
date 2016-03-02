@@ -22,7 +22,7 @@ contains
         logical, optional, intent(out) :: monoType
 
         !LOCAL
-        integer :: fileID = 600
+        integer :: fileID = 18
         character (len=200) :: line
         integer :: stat
         logical :: inside
@@ -55,21 +55,30 @@ contains
             do while (stat == 0)
 
                 if(trim(adjustL(line)) == "-1") then
-                    !!!write(get_fileId(),*) "Line ", lineNb, "is -1"
+                    call wLog("Line ")
+                    call wLog(lineNb)
+                    call wLog("is -1")
                 else if((trim(adjustL(line)) == "2411" .or. trim(adjustL(line)) == "781"))then
-                    !!!write(get_fileId(),*) " "
-                    !!!write(get_fileId(),*) "Dimensioning Coordinates"
-                    !!!write(get_fileId(),*) "Start Line = ", lineNb
+                    call wLog(" ")
+                    call wLog("Dimensioning Coordinates")
+                    call wLog("TAG Line = ")
+                    call wLog(lineNb)
                     call prepareCoordinates(fileID, nNodes)
+                    call wLog("End Line = ")
+                    call wLog(lineNb)
                 else if((trim(adjustL(line)) == "2412" .or. trim(adjustL(line)) == "780")) then
-                    !!!write(get_fileId(),*) " "
-                    !!!write(get_fileId(),*) "Dimensioning Connectivity"
-                    !!!write(get_fileId(),*) "Start Line = ", lineNb
+                    call wLog(" ")
+                    call wLog("Dimensioning Connectivity")
+                    call wLog("TAG Line = ")
+                    call wLog(lineNb)
                     call prepareConnectivity(fileID, nElem, maxConnect, monoType)
+                    call wLog("End Line = ")
+                    call wLog(lineNb)
                 !else if(trim(adjustL(line)) == "2477") then
-                    !write(*,*) " "
-                    !write(*,*) "Dimensioning Physical Volumes (NOT YET)"
-                    !write(*,*) "Start Line = ", lineNb
+                    !call wLog(" ")
+                    !call wLog("Dimensioning Physical Volumes (NOT YET)")
+                    !call wLog("Start Line = ")
+                    !call wLog(lineNb)
                 end if
 
                 read(fileID, fmt=*, IOSTAT = stat) line
@@ -80,10 +89,13 @@ contains
             !Sharing nodes between processors
             if((nNodes < nb_procs .and. present(coordList)) .or. &
                 nElem < nb_procs .and. present(connectList)) then
-                !!write(get_fileId(),*) "ERROR!!! Too little Nodes/Elements for this number of processors"
-                !!write(get_fileId(),*) " nNodes   = ", nNodes
-                !!write(get_fileId(),*) " nb_procs = ", nb_procs
-                !!write(get_fileId(),*) " nElem    = ", nElem
+                call wLog("ERROR!!! Too little Nodes/Elements for this number of processors")
+                call wLog(" nNodes   = ")
+                call wLog(nNodes)
+                call wLog(" nb_procs = ")
+                call wLog(nb_procs)
+                call wLog(" nElem    = ")
+                call wLog(nElem)
                 stop
             end if
 
@@ -97,32 +109,38 @@ contains
             if((rang+1) == nb_procs) elemEnd = nElem
             nElemLoc = elemEnd - elemStart + 1
 
-            !!write(get_fileId(),*) "nodeStart = ", nodeStart
-            !!write(get_fileId(),*) "nodeEnd   = ", nodeEnd
-            !!write(get_fileId(),*) "elemStart = ", elemStart
-            !!write(get_fileId(),*) "elemEnd   = ", elemEnd
+            call wLog("nodeStart = ")
+            call wLog(nodeStart)
+            call wLog("nodeEnd   = ")
+            call wLog(nodeEnd)
+            call wLog("elemStart = ")
+            call wLog(elemStart)
+            call wLog("elemEnd   = ")
+            call wLog(elemEnd)
 
             !Allocation
             if(present(coordList)) then
                 allocate(coordList(nDim, nNodesLoc))
                 coordList(:,:)   = -1
-                !!write(get_fileId(),*) "shape(coordList) = ", shape(coordList)
+                call wLog("shape(coordList) = ")
+                call wLog(shape(coordList))
             end if
             if(present(connectList)) then
                 allocate(connectList(1:maxConnect, nElemLoc))
                 allocate(sizeList(nElemLoc))
                 connectList(:,:) = -1
-                !!write(get_fileId(),*) "shape(connectList) = ", shape(connectList)
+                call wLog("shape(connectList) = ")
+                call wLog(shape(connectList))
             end if
 
-!
-!            end if
+
+            !end if
 
             !Real Lecture
-            !!write(get_fileId(),*) "--------------------------------------------------"
-            !!write(get_fileId(),*) "EFFECTIVE LECTURE------------------------------"
-            !!write(get_fileId(),*) "--------------------------------------------------"
-            !!write(get_fileId(),*) ""
+            call wLog("--------------------------------------------------")
+            call wLog("EFFECTIVE LECTURE------------------------------")
+            call wLog("--------------------------------------------------")
+            call wLog("")
             rewind(fileID)
             lineNb = 0
 
@@ -132,19 +150,29 @@ contains
             do while (stat == 0)
 
                 if(trim(adjustL(line)) == "-1") then
-                    !!!write(get_fileId(),*) "Line ", lineNb, "is -1"
+                    call wLog("Line ")
+                    call wLog(lineNb)
+                    call wLog("is -1")
                 else if((trim(adjustL(line)) == "2411" .or. trim(adjustL(line)) == "781") &
                         .and. present(coordList) )then
-                    !!!write(get_fileId(),*) " "
-                    !!!write(get_fileId(),*) "Line = ", lineNb
-                    !!write(get_fileId(),*) "Reading Coordinates"
+                    call wLog(" ")
+                    call wLog("Reading Coordinates")
+                    call wLog("TAG Line = ")
+                    call wLog(lineNb)
                     call readCoordinates(fileID, coordList, nodeStart, nodeEnd)
+                    call wLog("End Line = ")
+                    call wLog(lineNb)
                 else if((trim(adjustL(line)) == "2412" .or. trim(adjustL(line)) == "780") &
                         .and. present(connectList))then
-                    !!!write(get_fileId(),*) " "
-                    !!!write(get_fileId(),*) "Line = ", lineNb
-                    !!write(get_fileId(),*) "Reading Connectivity"
+                    call wLog(" ")
+                    call wLog("Reading Connectivity")
+                    call wLog("TAG Line = ")
+                    call wLog(lineNb)
+                    call wLog("shape(connectList) = ")
+                    call wLog(shape(connectList))
                     call readConnectivity(fileID, connectList, sizeList, elemStart, elemEnd, monoType)
+                    call wLog("End Line = ")
+                    call wLog(lineNb)
 
                 !else if(trim(adjustL(line)) == "2477") then
                     !write(*,*) " "
@@ -489,7 +517,11 @@ contains
 
         !Jump initials -1
         read(fileID, fmt=*) line
+        lineNb = lineNb + 1
         do while(trim(adjustL(line)) == "-1")
+            call wLog("Line ")
+            call wLog(lineNb)
+            call wLog("is -1")
             read(fileID, fmt=*) line
             lineNb = lineNb + 1
         end do
@@ -504,7 +536,9 @@ contains
             lineNb = lineNb + 1
 
             if(trim(adjustL(line)) == "-1") then
-                !!!write(get_fileId(),*) "Line ", lineNb, "is -1 (inside coord)"
+                call wLog("Line ")
+                call wLog(lineNb)
+                call wLog("is -1 (Exiting Coordinates)")
                 inside = .false.
             else
                 !Counting number of nodes
@@ -544,7 +578,11 @@ contains
 
         !Jump initials -1
         read(fileID, fmt=*) line
+        lineNb = lineNb + 1
         do while(trim(adjustL(line)) == "-1")
+            call wLog("Line ")
+            call wLog(lineNb)
+            call wLog("is -1")
             read(fileID, fmt=*) line
             lineNb = lineNb + 1
         end do
@@ -558,7 +596,9 @@ contains
 
             !Read the connectivity header information
             if(trim(adjustL(line)) == "-1") then
-                !!!write(get_fileId(),*) "Line ", lineNb, "is -1 (inside connect)"
+                call wLog("Line ")
+                call wLog(lineNb)
+                call wLog("is -1 (exiting prepare Connectivity)")
                 inside = .false.
                 cycle
             else
@@ -666,8 +706,6 @@ contains
         backspace(fileID)
         lineNb = lineNb - 1
 
-        call wLog("lineNb = ")
-        call wLog(lineNb)
         call wLog("shape(coordList) = ")
         call wLog(shape(coordList))
         call wLog("offset = ")
@@ -681,7 +719,9 @@ contains
             lineNb = lineNb + 1
 
             if(trim(adjustL(line)) == "-1") then
-                !!!write(get_fileId(),*) "Line ", lineNb, "is -1 (inside coord)"
+                call wLog("Line ")
+                call wLog(lineNb)
+                call wLog("is -1 (exiting read Coordinates)")
                 inside = .false.
             else
                 !Reading coordinates values
@@ -728,7 +768,7 @@ contains
         integer, dimension(6) :: connectInfo
         integer :: i, n, start, end
         logical :: inside
-        integer :: nS, nE, offset
+        integer :: nS, n_E, offset
         integer :: connectStart
 
         !Optional Arguments
@@ -739,9 +779,9 @@ contains
         end if
 
         if(.not.present(nE_in)) then
-            nE = size(connectList, 2)
+            n_E = size(connectList, 2)
         else
-            nE = nE_in
+            n_E = nE_in
         end if
 
         if(.not.present(offset_in)) then
@@ -756,12 +796,9 @@ contains
             connectStart = connectStart_in
         end if
 
-        connectStart = connectStart_in
-
         !Init
         inside = .true.
         n = 0
-
         !Jump initials -1
         read(fileID, fmt=*) line
         lineNb = lineNb + 1
@@ -775,9 +812,9 @@ contains
         !write(*,*) "READ CONNECT"
         if((monoType) .and. present(sizeList)) then
             sizeList(:) = size(connectList, 1)
-            !!write(get_fileId(),*) "Is monotype"
+            call wLog("Is monotype")
         end if
-
+       !inside = .false. !For Tests
         do while(inside)
 
             read(fileID, fmt=*) line
@@ -791,7 +828,9 @@ contains
 
             !Read the connectivity header information
             if((trim(adjustL(line)) == "-1")) then
-                !!!write(get_fileId(),*) "Line ", lineNb, "is the exit line"
+                call wLog("Line ")
+                call wLog(lineNb)
+                call wLog("is -1 (exiting read Connectivity)")
                 inside = .false.
                 cycle
             else
@@ -802,7 +841,7 @@ contains
                     lineNb = lineNb + 1
                     cycle
                 end if
-                if(n > nE) then
+                if(n > n_E) then
                     !!!write(get_fileId(),*) "Line ", lineNb, "is an ignored element (Exit line)"
                     inside = .false.
                     cycle
@@ -843,8 +882,8 @@ contains
         !!!write(get_fileId(),*) "n            = ", n
         !!!write(get_fileId(),*) "exit Line = ", lineNb
 
-        !call dispCarvalhol(sizeList, "sizeList",unit_in = get_fileId())
-        !call dispCarvalhol(connectList, "connectList",unit_in = get_fileId())
+        !call dispCarvalhol(sizeList, "sizeList")
+        !call dispCarvalhol(connectList, "connectList")
 
     end subroutine readConnectivity
 

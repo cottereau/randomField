@@ -687,14 +687,21 @@ contains
 
         !Shape Function Generation
         call generateUnityPartition_OnMatrix(RDF, MSH%xNStep, originCorner, MSH%overlap, &
-            MSH%neighShift(:, direction), partitionType, &
+            MSH%corrL, MSH%neighShift(:, direction), partitionType, &
             unityPartition, minPos, maxPos)
 
     end do !Direction
 
+    !if(RDF%rang == 0) call DispCarvalhol(unityPartition, "unityPartition")
+
+    !if(RDF%rang == 0) write(*,*) "Showing Unity Partition -------------------------------"
+
     do i = 1, size(RDF%randField(:,1),1)
         RDF%randField(i,1) = RDF%randField(i,1) * sqrt(unityPartition(i))
+        !if(RDF%rang == 0 .and. (unityPartition(i) /= 1.0D0))  write(*,*) unityPartition(i)
     end do
+
+    !if(RDF%rang == 0) write(*,*) "That's ALL -------------------------------"
     !RDF%randField(:,1) = RDF%randField(:,1) * sqrt(unityPartition(:)) !This syntax demands too much memory for Occygen
 
     !RDF%randField(:,1) = unityPartition(:) !TEST
@@ -706,7 +713,7 @@ end subroutine applyWeightingFunctions_OnMatrix
 !-----------------------------------------------------------------------------------------------
 !-----------------------------------------------------------------------------------------------
 !-----------------------------------------------------------------------------------------------
-subroutine generateUnityPartition_OnMatrix(RDF, xNStep, originCorner, overlap, neighShift, &
+subroutine generateUnityPartition_OnMatrix(RDF, xNStep, originCorner, overlap, corrL, neighShift, &
     partitionType, unityPartition, minPos, maxPos)
 
     implicit none
@@ -714,7 +721,7 @@ subroutine generateUnityPartition_OnMatrix(RDF, xNStep, originCorner, overlap, n
     !INPUT
     type(RF), intent(in) ::  RDF
     integer, dimension(:), intent(in) ::  xNStep
-    double precision, dimension(:)  , intent(in) :: originCorner, overlap
+    double precision, dimension(:)  , intent(in) :: originCorner, overlap, corrL
     integer, dimension(:)  , intent(in) :: neighShift
     integer, intent(in) :: partitionType
     integer, dimension(:), intent(in) :: minPos, maxPos
@@ -765,7 +772,7 @@ subroutine generateUnityPartition_OnMatrix(RDF, xNStep, originCorner, overlap, n
                 UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = &
                     ((1.0D0 + cos(PI*(RDF%xPoints_2D(&
                     i,minPos(1):maxPos(1),minPos(2):maxPos(2)) &
-                    - originCorner(i))/overlap(i)))&
+                    - originCorner(i))/(overlap(i)*corrL(i))))&
                     / 2.0D0) &
                     * UP_2D(minPos(1):maxPos(1),minPos(2):maxPos(2))
             else if (RDF%nDim == 3) then
@@ -778,7 +785,7 @@ subroutine generateUnityPartition_OnMatrix(RDF, xNStep, originCorner, overlap, n
                 UP_3D(minPos(1):maxPos(1),minPos(2):maxPos(2), minPos(3):maxPos(3)) = &
                     ((1.0D0 + cos(PI*(RDF%xPoints_3D(&
                     i,minPos(1):maxPos(1),minPos(2):maxPos(2), minPos(3):maxPos(3)) &
-                    - originCorner(i))/overlap(i)))&
+                    - originCorner(i))/(overlap(i)*corrL(i))))&
                     / 2.0D0) &
                     * UP_3D(minPos(1):maxPos(1),minPos(2):maxPos(2), minPos(3):maxPos(3))
             else

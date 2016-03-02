@@ -47,9 +47,10 @@ program main_RandomField
     call init_communication(MPI_COMM_WORLD, IPT%comm, IPT%rang, IPT%nb_procs)
     !rang = IPT%rang
     IPT%writeDataSet = .true.
-    IPT%sameFolder = .false.
+    IPT%writeUNVinterpolation = .true.
+    IPT%sameFolder = .true.
     IPT%outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
-    IPT%delete_intermediate_files = .true.
+    IPT%delete_intermediate_files = .false.
     IPT%ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
     IPT%sampleFields = .true.
 

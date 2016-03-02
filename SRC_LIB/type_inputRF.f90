@@ -47,6 +47,7 @@ module type_inputRF
         logical :: delete_intermediate_files = .true.
         integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
         logical :: sampleFields = .true.
+        logical :: writeUNVinterpolation
 
     end type IPT_RF
 
@@ -213,7 +214,7 @@ contains
                     IPT%xMinGlob = IPT%xMinGlob_in
                     IPT%xMaxGlob = IPT%xMaxGlob_in
                 case(2)
-                    stop("Inside read_mesh_input UNV not updated")
+                    !stop("Inside read_mesh_input UNV not updated")
                     if(IPT%rang==0) write(*,*) "   Mesh UNV"
                     call wLog("    Mesh UNV")
                     call wLog("        file: ")

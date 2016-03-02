@@ -82,7 +82,7 @@ contains
             case(SHINOZUKA)
                 RDF%kNStep(:)   = 1 + int(kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:)))); !Number of points in k
                 RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1); !Redefining kDelta after ceiling and adjust
-                RDF%kNTotal = product(RDF%kNStep);
+                RDF%kNTotal = product(int(RDF%kNStep,8));
 
                 !!write(get_fileId(),*) "RDF%kNStep = ", RDF%kNStep
                 !!write(get_fileId(),*) "RDF%kNTotal = ", RDF%kNTotal
@@ -96,7 +96,7 @@ contains
             case(RANDOMIZATION)
                 RDF%kNStep(:)   = 1 + int(kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:)))); !Number of points in k
                 RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1); !Redefining kDelta after ceiling and adjust
-                RDF%kNTotal = product(RDF%kNStep);
+                RDF%kNTotal = product(int(RDF%kNStep,8));
 
                 allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
                 call random_number(RDF%kPoints(:,:))
@@ -114,7 +114,7 @@ contains
                 !RDF%kDelta(:) = RDF%kDelta(:)
                 !RDF%kDelta(:) = RDF%kMax(:)/dble(RDF%kNStep(:))
                 !RDF%kNStep(:) = RDF%xNStep(:);
-                RDF%kNTotal   = product(RDF%kNStep);
+                RDF%kNTotal   = product(int(RDF%kNStep,8));
                 !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
                 !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(1.0D0)) * RDF%kDelta(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
 

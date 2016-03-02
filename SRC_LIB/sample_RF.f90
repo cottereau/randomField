@@ -176,24 +176,19 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
 
-        subroutine single_realization(IPT, globMSH, outputStyle, &
+        subroutine single_realization(IPT, globMSH, &
                                       fieldComm, fieldNumber, subdivisionStart, stepProc, h5fullPath)
 
             implicit none
             !INPUT
             type(IPT_RF), intent(in) :: IPT
             type(MESH)  , intent(in) :: globMSH
-            integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
             integer, intent(in) :: fieldComm, fieldNumber
             double precision, dimension(:), intent(in) :: subdivisionStart, stepProc
 
             !LOCAL
             type(RF)      :: RDF
             type(MESH)    :: MSH
-            logical :: writeFiles = .true.
-
-
-            double precision, dimension(:,:), allocatable :: UNV_randField
 
             double precision :: t1, t2, t3
             double precision :: all_t1, all_t2, all_t3
@@ -223,8 +218,6 @@ contains
             MSH%xMaxGlob = MSH%xMinGlob + globMSH%procExtent
             MSH%procExtent = globMSH%procExtent
 
-            !MSH%independent = .false.
-            !RDF%independent = .false.
             MSH%procPerDim(:) = 1
             MSH%procPerDim(MSH%nDim) = newNbProcs
             MSH%coords = 0
@@ -243,6 +236,9 @@ contains
             call set_validProcs_comm(validProc, fieldComm, rang, &
                                      MSH%validProc, RDF%validProc, MSH%comm, RDF%comm, &
                                      MSH%nb_procs, RDF%nb_procs, MSH%rang, RDF%rang)
+
+            call wLog("MSH%xNTotal = ")
+            call wLog(MSH%xNTotal)
 
             if(validProc) then
 
@@ -310,28 +306,28 @@ contains
 
                 call wLog("-> Writing XMF and hdf5 files");
 
-                if(writeFiles) then
-                    call wLog("outputStyle");
-                    call wLog(outputStyle);
+                if(.true.) then
+                    call wLog("IPT%outputStyle");
+                    call wLog(IPT%outputStyle);
                     if(RDF%rang == 0) write(*,*) "-> Writing 'Bounding Box' XMF and hdf5 files"
                     BBoxPartFileName = string_join_many(BBoxFileName,"_L00")
                     do i = 1, size(globCoord)
                         BBoxPartFileName = string_join_many(BBoxPartFileName,"_",numb2String(globCoord(i)+1,3))
                     end do
 
-                    if(outputStyle==1) then
+                    if(IPT%outputStyle==1) then
                         call wLog("   (Parallel)");
                         call wLog("minval(RDF%randField,1) =")
                         call wLog(minval(RDF%randField,1))
                         call wLog("maxval(RDF%randField,1) =")
                         call wLog(maxval(RDF%randField,1))
                         call write_Mono_XMF_h5(RDF, MSH, BBoxPartFileName, RDF%rang, single_path, &
-                                               MSH%comm, ["_Part"], [fieldNumber], fieldNumber, style=outputStyle, &
+                                               MSH%comm, ["_Part"], [fieldNumber], fieldNumber, style=IPT%outputStyle, &
                                                HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet, localization=.false.)
                     else
                         call wLog("   (Per Proc)");
                         call write_Mono_XMF_h5(RDF, MSH, BBoxPartFileName, RDF%rang, single_path, &
-                                               MSH%comm, ["_Part"], [RDF%rang], 0, style=outputStyle, &
+                                               MSH%comm, ["_Part"], [RDF%rang], 0, style=IPT%outputStyle, &
                                                HDF5FullPath = BBoxPath, writeDataSet = IPT%writeDataSet, localization=.false.)
 
                     end if
@@ -345,23 +341,10 @@ contains
                 end if
             end if
 
-!            if(IPT%unv .and. writeFiles .and. outputStyle == 1) then
-!                if(IPT%rang == 0) write(*,*) "-> Writing 'UNV' XMF and hdf5 files for"
-!                if(IPT%rang == 0) write(*,*) IPT%unv_path
-!                allocate(UNV_randField(size(IPT%coordList,2),1))
-!                if(RDF%rang == 0) write(*,*) "  Source:"
-!                if(RDF%rang == 0) write(*,*) BBoxPath
-!                call interpolateToUNV(BBoxPath, IPT%coordList, UNV_randField, IPT%rang)
-!                call write_UNV_XMF_h5(UNV_randField, IPT%coordList, IPT%connectList, &
-!                                      "UNV_", RDF%rang, single_path, &
-!                                      MSH%comm, 0)
-!            end if
-!
-!            if(IPT%rang == 0) call write_stat_input("./stat_input", BBoxPath)
+            if(IPT%rang == 0) call write_stat_input("./stat_input", BBoxPath)
 
             call finalize_MESH(MSH)
             call finalize_RF(RDF)
-            if(allocated(UNV_randField)) deallocate(UNV_randField)
 
         end subroutine single_realization
 
@@ -372,7 +355,8 @@ contains
         subroutine combine_subdivisions(IPT, outputStyle, &
                                         stepProc, procExtent, overlap, &
                                         t_ref, t_prep, t_gen, gen_times, nGenGroups, &
-                                        delete_intermediate_files, ignoreTillLocLevel)
+                                        delete_intermediate_files, ignoreTillLocLevel, &
+                                        finalFieldPath)
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
@@ -384,6 +368,9 @@ contains
             logical, intent(in) :: delete_intermediate_files
             integer, intent(in) :: ignoreTillLocLevel
 
+            !OUTPUT
+            character(len=200) :: finalFieldPath
+
             !LOCAL
             logical :: writeFiles = .true.
             type(MESH) :: globMSH
@@ -393,13 +380,13 @@ contains
             character(len=200) :: randFieldFilePath, XMFFilePath
             character(len=200) :: BBoxPartFileName
             logical :: validProc
-            integer :: partitionType =1
+            integer :: partitionType=1
             integer :: locLevel, locIter
             integer(HSIZE_T), dimension(2) :: locShape
             type(IPT_RF) :: newIPT
             double precision, dimension(IPT%nDim_mesh, product(IPT%nFields)) :: subdivisionCoords
             double precision, dimension(:, :), allocatable :: offsetCoords
-
+            logical :: last_round
             integer, dimension(IPT%nDim_mesh) :: procCoord, locStep
             integer, dimension(IPT%nDim_mesh) :: totalFieldPerDim, nFields_level, nFields_level_before
             integer :: i, validProcGroup, validProcComm, prodNFields
@@ -640,6 +627,7 @@ contains
 
 
                         if(size(offsetCoords,2) == 1) then
+                            last_round = .true.
                             t_loc = MPI_Wtime(); !Localization Time
                             !call MPI_ALLREDUCE (t_loc, all_t_loc, 1, MPI_DOUBLE_PRECISION, MPI_SUM, globMSH%comm, code)
                             all_t_prep = (t_prep - t_ref) * dble(IPT%nb_procs)
@@ -651,7 +639,7 @@ contains
                             minPosProc = find_xNStep(globMSH%xMinGlob, globMSH%xMinInt , globMSH%xStep) - globMSH%origin + 1
                             maxPosProc = find_xNStep(globMSH%xMinGlob, globMSH%xMaxBound , globMSH%xStep) - globMSH%origin + 1
                             call wLog("     Normalizing sample")
-                            xNTotal = product(nint((globMSH%xMaxGlob-globMSH%xMinGlob)/globMSH%xStep) +1)
+                            xNTotal = product(nint((globMSH%xMaxGlob-globMSH%xMinGlob)/globMSH%xStep,8) +1)
                             call normalize_randField(globRDF, xNTotal, globRDF%randField, minPosProc, maxPosProc)
                             call multiVariateTransformation (globRDF%margiFirst, globRDF%fieldAvg, globRDF%fieldVar, globRDF%randField)
                             t_trans = MPI_Wtime(); !Transformation Time
@@ -682,9 +670,12 @@ contains
                             randFieldFilePath = string_join_many(single_path,"/h5/",BBoxPartFileName,".h5")
 
                             writeDataSet = .true.
-                            if(size(offsetCoords,2) == 1 .and. IPT%rang == 0) then
-                                call write_stat_input("./stat_input", randFieldFilePath)
-                                writeDataSet = IPT%writeDataSet
+                            if(last_round) then
+                                finalFieldPath = randFieldFilePath
+                                if(IPT%rang == 0) then
+                                    call write_stat_input("./stat_input", randFieldFilePath)
+                                    writeDataSet = IPT%writeDataSet
+                                end if
                             end if
 
                             if(outputStyle==1) then
@@ -734,7 +725,7 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine interpolateToUNV(BBoxFileName, coordList, UNV_randField, rang)
+        subroutine interpolateToMesh(BBoxFileName, coordList, UNV_randField, rang)
             implicit none
 
             !INPUT
@@ -745,7 +736,7 @@ contains
             double precision, dimension(:,:), intent(out) :: UNV_randField
             !LOCAL
             integer :: nDim, Nmc
-            logical :: independent
+            !logical :: independent
             character(len=50) :: attr_Name, dset="samples"
             integer :: hdferr
             integer(HID_T) :: file_id, space_id, dset_id, mem_id
@@ -772,8 +763,8 @@ contains
 
             !READING SCALARS----------------------------
             !BOOL
-            attr_name = "independent"
-            call read_h5attr_bool(file_id, trim(adjustL(attr_name)), independent)
+            !attr_name = "independent"
+            !call read_h5attr_bool(file_id, trim(adjustL(attr_name)), independent)
 
             !INTEGERS
             attr_name = "nDim"
@@ -961,7 +952,7 @@ contains
 
             if (allocated(BB_randField))   deallocate(BB_randField)
 
-        end subroutine interpolateToUNV
+        end subroutine interpolateToMesh
 
 
 end module sample_RF

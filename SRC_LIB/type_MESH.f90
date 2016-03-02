@@ -246,9 +246,11 @@ module type_MESH
             !LOCAL
             character(len = 3) :: nDim, space
             character(len = 50) :: fmtNum, fmtChar
+            character(len = 1) :: nbChar
             integer :: i
             integer :: unit
             logical :: active
+            integer :: numb_space = 9
 
             active = .true.
             unit = 6 !Screen
@@ -270,17 +272,18 @@ module type_MESH
                     stop("")
                 end if
 
-                nDim = trim(numb2String(MESH_a%nDim))
-                space = trim(numb2String(MESH_a%nDim*6 + 1))
+                nDim   = trim(numb2String(MESH_a%nDim))
+                space  = trim(numb2String(MESH_a%nDim*numb_space + 1))
+                nbChar = trim(numb2String(numb_space))
 
                 if(present(name)) write(unit,*) "|  ", name
 
-                fmtChar = "(A14, A"//space//", A"//space//", A"//space//")"
-                fmtNum = "(I6, A3, I5, A1, "//nDim//"I6, A1, "//nDim//"F6.2, A1, "//nDim//"F6.2)"
+                fmtChar = "(A15, A"//space//", A"//space//", A"//space//")"
+                fmtNum = "(I6, A3, I5, A1, "//nDim//"I"//nbChar//", A1, "//nDim//"F"//nbChar//".2, A1, "//nDim//"F"//nbChar//".2)"
 
                 if(MESH_a%init) then
 
-                    write(unit,fmtChar) "Neighbour/ op","|Shift                 ", "|xMin                    ", "|xMax                  "
+                    write(unit,fmtChar) "Neighbour/ op|","Shift|", "xMin|", "xMax|"
 
                     do i = 1, size(MESH_a%neigh)
                         if(onlyExisting .and. MESH_a%neigh(i)<0) cycle

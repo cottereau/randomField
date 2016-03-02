@@ -244,7 +244,7 @@ contains
 
             xNStep = find_xNStep(xMinBound, xMaxBound, MSH%xStep)
             origin = find_xNStep(MSH%xMinGlob, xMinBound , MSH%xStep)
-            xNTotal = product(xNStep)
+            xNTotal = product(int(xNStep,8))
 
             call wLog("        OUT xNStep = ")
             call wLog(xNStep)

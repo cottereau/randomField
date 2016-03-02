@@ -34,12 +34,14 @@ contains
         integer, intent(in)               :: nTotalFields
         !LOCAL
         type(MESH)            :: globMSH
+        double precision, dimension(:,:), allocatable :: UNV_randField
         integer               :: group, groupComm, groupMax
         integer               :: code
         double precision, dimension(IPT%nDim_mesh) :: stepProc, procExtent, overlap
         double precision, dimension(IPT%nDim_mesh, nTotalFields) :: subdivisionCoords
         double precision      :: t_bef, t_aft
         integer               :: fieldNumber
+        character(len=200) :: BBoxPath
         character(len=110), dimension(nTotalFields) :: HDF5Name
         double precision, dimension(nTotalFields) :: gen_times, temp_gen_times
         integer :: i
@@ -78,7 +80,7 @@ contains
                     !call wLog("     Trying communication")
                     t_bef = MPI_Wtime()
                     call MPI_BARRIER(groupComm, code)
-                    call single_realization(IPT, globMSH, IPT%outputStyle, &
+                    call single_realization(IPT, globMSH, &
                                             groupComm, fieldNumber, subdivisionCoords(:,i), stepProc, HDF5Name(i))
                     t_aft = MPI_Wtime()
                     temp_gen_times(i) = t_aft-t_bef
@@ -93,7 +95,6 @@ contains
         times(4) = MPI_Wtime() !Generation Time
 
         call MPI_ALLREDUCE (temp_gen_times, gen_times, size(gen_times), MPI_DOUBLE_PRECISION, MPI_SUM, IPT%comm,code)
-        !if(allocated(temp_gen_times)) deallocate(temp_gen_times)
 
         !Combining realizations (localization)
         if(.true.) then
@@ -102,10 +103,29 @@ contains
             call wLog("-> COMBINING----------------------------------------")
             call combine_subdivisions(IPT, IPT%outputStyle, stepProc, procExtent, &
                                       overlap, times(1), times(3), times(4), gen_times(:), &
-                                      groupMax, IPT%delete_intermediate_files, IPT%ignoreTillLocLevel)
+                                      groupMax, IPT%delete_intermediate_files, IPT%ignoreTillLocLevel, &
+                                      BBoxPath)
         end if
 
         times(5) = MPI_Wtime() !Localization Time
+
+
+        !Writing Interpolation File
+        call MPI_BARRIER(IPT%comm, code)
+        if(IPT%unv .and. IPT%writeUNVinterpolation .and. IPT%outputStyle == 1) then
+            if(IPT%rang == 0) write(*,*) "-> Writing 'UNV' XMF and hdf5 files for"
+            if(IPT%rang == 0) write(*,*) IPT%unv_path
+            allocate(UNV_randField(size(IPT%coordList,2),1))
+            if(IPT%rang == 0) write(*,*) "  Source:"
+            if(IPT%rang == 0) write(*,*) BBoxPath
+            if(IPT%rang == 0) write(*,*) "-> INTERPOLATING TO GIVEN MESH----------------------------------------"
+            call wLog("-> INTERPOLATING TO GIVEN MESH----------------------------------------")
+            call interpolateToMesh(BBoxPath, IPT%coordList, UNV_randField, IPT%rang)
+            call write_UNV_XMF_h5(UNV_randField, IPT%coordList, IPT%connectList, &
+                                  "UNV_", IPT%rang, single_path, &
+                                  IPT%comm, 0)
+            if(allocated(UNV_randField)) deallocate(UNV_randField)
+        end if
 
         call finalize_MESH(globMSH)
 
