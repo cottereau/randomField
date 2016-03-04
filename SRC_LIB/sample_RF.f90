@@ -123,20 +123,27 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
 
-        subroutine build_subdivisions(IPT, globMSH, groupMax, group, groupComm, stepProc, procExtent, overlap)
+        subroutine build_subdivisions(IPT, globMSH, &
+                                      stepProc, procExtent, overlap, &
+                                      gen_groupMax, gen_group, gen_Comm, gen_nbProcs, &
+                                      gen_rang, &
+                                      loc_groupMax, loc_group, loc_Comm, loc_nbProcs, &
+                                      loc_rang)
 
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
             !OUTPUT
             type(MESH), intent(out)  :: globMSH
-            integer, intent(out) :: group, groupMax, groupComm
+            integer, intent(out) :: gen_groupMax, gen_group, gen_Comm, gen_nbProcs, gen_rang
             double precision, dimension(:), intent(out) :: stepProc
             double precision, dimension(:), intent(out) :: procExtent
             double precision, dimension(:), intent(out) :: overlap
+            integer, intent(out) :: loc_groupMax, loc_group, loc_Comm, loc_nbProcs, loc_rang
 
             !LOCAL
             integer :: code
+            integer :: prodNFields
 
             call init_MESH(globMSH, IPT, IPT%comm, IPT%rang)
 
@@ -155,19 +162,39 @@ contains
             call wLog(globMSH%procExtent)
 
             procExtent = globMSH%procExtent
+            prodNFields  = product(IPT%nFields)
 
-            !DEFINING GROUPS AND COMMUNICATORS
-            group    = IPT%rang/IPT%nProcPerField
-            groupMax = IPT%nb_procs/IPT%nProcPerField
+            !DEFINING GROUPS AND COMMUNICATORS FOR GENERATION
+            gen_group    = mod(IPT%rang,prodNFields)
+            gen_groupMax = prodNFields
+            call MPI_COMM_SPLIT(IPT%comm, gen_group, IPT%rang, gen_Comm, code)
+            call MPI_COMM_SIZE(gen_Comm, gen_nbProcs, code)
+            call MPI_COMM_RANK(gen_Comm, gen_rang, code)
 
-            call MPI_COMM_SPLIT(IPT%comm, group, IPT%rang, groupComm, code)
+            call wLog("     gen_group = ")
+            call wLog(gen_group)
+            call wLog("     gen_groupMax = ")
+            call wLog(gen_groupMax)
+            call wLog("     gen_Comm = ")
+            call wLog(gen_Comm)
+            call wLog("     gen_nbProcs = ")
+            call wLog(gen_nbProcs)
 
-            call wLog("     group = ")
-            call wLog(group)
-            call wLog("     groupMax = ")
-            call wLog(groupMax)
-            call wLog("     groupComm = ")
-            call wLog(groupComm)
+            !DEFINING GROUPS AND COMMUNICATORS FOR LOCALIZATION
+            loc_group    = IPT%rang/prodNFields
+            loc_groupMax = 1 !IPT%nb_procs/prodNFields
+            loc_nbProcs  = prodNFields !loc_groupMax * prodNFields
+            call MPI_COMM_SPLIT(IPT%comm, loc_group, IPT%rang, loc_Comm, code)
+            call MPI_COMM_RANK(loc_Comm, loc_rang, code)
+
+            call wLog("     loc_group = ")
+            call wLog(loc_group)
+            call wLog("     loc_groupMax = ")
+            call wLog(loc_groupMax)
+            call wLog("     loc_Comm = ")
+            call wLog(loc_Comm)
+            call wLog("     loc_nbProcs = ")
+            call wLog(loc_nbProcs)
 
         end subroutine build_subdivisions
 
@@ -177,7 +204,8 @@ contains
         !---------------------------------------------------------------------------------
 
         subroutine single_realization(IPT, globMSH, &
-                                      fieldComm, fieldNumber, subdivisionStart, stepProc, h5fullPath)
+                                      fieldComm, fieldNumber, subdivisionStart, stepProc, &
+                                      randField_Local, h5fullPath)
 
             implicit none
             !INPUT
@@ -185,6 +213,9 @@ contains
             type(MESH)  , intent(in) :: globMSH
             integer, intent(in) :: fieldComm, fieldNumber
             double precision, dimension(:), intent(in) :: subdivisionStart, stepProc
+
+            !OUTPUT
+            double precision, dimension(:,:), allocatable, intent(out) :: randField_Local
 
             !LOCAL
             type(RF)      :: RDF
@@ -285,7 +316,7 @@ contains
                 call wLog("-> Generating Random Field")
                 call wLog("     Allocating random field")
                 !write(*,*) "Generating Random Field"
-                call allocate_randField(RDF, MSH%xNStep, RDF%randField_Local)
+                call allocate_randField(RDF, MSH%xNStep, randField_Local)
                 call wLog("     shape(RDF%randField)")
                 call wLog(shape(RDF%randField))
                 call wLog("     Calculating sample")
@@ -309,9 +340,9 @@ contains
 
                 !RDF%randField = 1.0D0 ! For Tests
 
-                call wLog("-> Writing XMF and hdf5 files");
 
-                if(.true.) then
+                if(.false.) then
+                    call wLog("-> Writing XMF and hdf5 files");
                     write(*,*) "Writing Files"
                     call wLog("IPT%outputStyle");
                     call wLog(IPT%outputStyle);
@@ -358,11 +389,69 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
+        subroutine gather_sample(randField_Local, randField_inProc, &
+                                 gen_rang, gen_nbProcs, gen_comm)
+            implicit none
+            !INPUT
+            double precision, dimension(:,:), intent(in) :: randField_Local
+            integer, intent(in) :: gen_rang, gen_nbProcs, gen_comm
+            !OUTPUT
+            double precision, dimension(:,:), intent(out) :: randField_inProc
+            !LOCAL
+            integer(kind=8), dimension(gen_nbProcs) :: offset, rf_sizes
+            integer(kind=8) :: xNLocal
+            integer :: code, i
+            double precision, dimension(:,:), allocatable:: randField_Test
+
+
+            xNLocal = size(randField_Local, 1)
+
+            call MPI_ALLGATHER(xNLocal, 1, MPI_INTEGER8, rf_sizes, 1, MPI_INTEGER8, &
+                               gen_comm, code)
+
+            offset(1) = 0
+            do i = 2, gen_nbProcs
+                offset(i) = sum(rf_sizes(1:i-1))
+            end do
+
+            if(gen_rang == 0) allocate(randField_Test(sum(rf_sizes), 1))
+            if(gen_rang == 0) randField_Test = -1
+
+            !write(*,*) "gen_rang = ", gen_rang
+            !write(*,*) "gen_comm = ", gen_comm
+            !write(*,*) "randField_Local = ", randField_Local
+            !write(*,*) "shape(randField_Local) = ", shape(randField_Local)
+
+!            call MPI_GATHERV(randField_Local,int(xNLocal),MPI_DOUBLE_PRECISION, &
+!                             randField_Test, int(rf_sizes), int(offset), MPI_DOUBLE_PRECISION, &
+!                             0, gen_comm, code)
+            call MPI_GATHERV(randField_Local,int(xNLocal),MPI_DOUBLE_PRECISION, &
+                             randField_inProc, int(rf_sizes), int(offset), MPI_DOUBLE_PRECISION, &
+                             0, gen_comm, code)
+
+            !call DispCarvalhol(randField_Local, "randField_Local ")
+
+            write(*,*) "AFTER Gathering Sample"
+            if(gen_rang == 0) write(*,*) "shape(randField_Local) = ", shape(randField_Local)
+            !if(gen_rang == 0) write(*,*) "shape(randField_Test) = ", shape(randField_Test)
+            if(gen_rang == 0) write(*,*) "rf_sizes = ", rf_sizes
+            if(gen_rang == 0) write(*,*) "offset = ", offset
+            !if(gen_rang == 0) call DispCarvalhol(randField_inProc, "randField_inProc ")
+            !if(gen_rang == 0) write(*,*) "randField_Test = ", randField_Test
+
+            if(allocated(randField_Test)) deallocate(randField_Test)
+
+        end subroutine gather_sample
+
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
         subroutine combine_subdivisions(IPT, outputStyle, &
                                         stepProc, procExtent, overlap, &
-                                        t_ref, t_prep, t_gen, gen_times, nGenGroups, &
+                                        t_ref, t_prep, t_gen, gen_times, &
                                         delete_intermediate_files, ignoreTillLocLevel, &
-                                        finalFieldPath)
+                                        loc_group, loc_Comm, loc_groupMax, finalFieldPath)
             implicit none
             !INPUT
             type(IPT_RF), intent(in)  :: IPT
@@ -370,9 +459,10 @@ contains
             double precision, dimension(:), intent(in) :: stepProc, procExtent, overlap
             double precision, intent(in) :: t_ref, t_prep, t_gen
             double precision, dimension(:), intent(in) :: gen_times
-            integer, intent(in) :: nGenGroups
+            !integer, intent(in) :: nGenGroups
             logical, intent(in) :: delete_intermediate_files
             integer, intent(in) :: ignoreTillLocLevel
+            integer, intent(in) :: loc_group, loc_Comm, loc_groupMax
 
             !OUTPUT
             character(len=200) :: finalFieldPath
@@ -381,7 +471,7 @@ contains
             logical :: writeFiles = .true.
             type(MESH) :: globMSH
             type(RF)   :: globRDF
-            integer :: group, fieldNumber, groupComm, groupMax
+            integer :: fieldNumber
             integer :: code
             character(len=200) :: randFieldFilePath, XMFFilePath
             character(len=200) :: BBoxPartFileName
@@ -417,33 +507,30 @@ contains
 
             if(product(IPT%nFields) > IPT%nb_procs) stop("Too little processors for this number of fields")
 
-            prodNFields = product(IPT%nFields)
-            group    = IPT%rang/prodNFields
-            groupMax = IPT%nb_procs/prodNFields
+
 
             call wLog("     IPT%rang =")
             call wLog(IPT%rang)
             call wLog("     group =")
-            call wLog(group)
+            call wLog(loc_group)
             call wLog(" IPT%nb_procs =")
             call wLog(IPT%nb_procs)
 
 
             validProcGroup = 0
-            if(group < groupMax) validProcGroup = 1
+            if(loc_group < loc_groupMax) validProcGroup = 1
 
             call MPI_COMM_SPLIT(IPT%comm, validProcGroup, IPT%rang, validProcComm, code)
-            call MPI_COMM_SPLIT(IPT%comm, group, IPT%rang, groupComm, code)
 
             call wLog("TESTING---------------")
             call wLog("IPT%comm")
             call wLog(IPT%comm)
-            call wLog("group")
-            call wLog(group)
+            call wLog("loc_group")
+            call wLog(loc_group)
             call wLog("IPT%rang")
             call wLog(IPT%rang)
-            call wLog("groupComm")
-            call wLog(groupComm)
+            call wLog("loc_Comm")
+            call wLog(loc_Comm)
 
             if(validProcGroup == 1) then
 
@@ -459,9 +546,9 @@ contains
 
                 newIPT%overlap = overlap
                 !newIPT%independent = .true.
-                newIPT%comm = groupComm
-                call MPI_COMM_RANK(groupComm, newIPT%rang, code)
-                call MPI_COMM_SIZE(groupComm, newIPT%nb_procs, code)
+                newIPT%comm = loc_Comm
+                call MPI_COMM_RANK(loc_Comm, newIPT%rang, code)
+                call MPI_COMM_SIZE(loc_Comm, newIPT%nb_procs, code)
                 totalFieldPerDim = IPT%nFields**(IPT%localizationLevel)
                 !if (IPT%rang == 0) write(*,*) "totalFieldPerDim = ", totalFieldPerDim
 
@@ -492,13 +579,13 @@ contains
 
                     do locIter = 1, size(offsetCoords,2)
 
-                        if(mod(locIter-1, groupMax) /= group) cycle
+                        if(mod(locIter-1, loc_groupMax) /= loc_group) cycle
 
                         if(IPT%rang == 0) write(*,*)  "         locIter = ", locIter
                         call wLog("     Waiting for the other procs")
                         call wLog("  locIter = ")
                         call wLog(locIter)
-                        call MPI_BARRIER(groupComm, code)
+                        call MPI_BARRIER(loc_Comm, code)
 
 
                         call wLog(" subdivisionCoords(:,IPT%rang+1)")
@@ -521,8 +608,8 @@ contains
                         call wLog("     newIPT%xMaxGlob")
                         call wLog(newIPT%xMaxGlob)
 
-                        call init_MESH(globMSH, newIPT, groupComm, newIPT%rang)
-                        call init_RF(globRDF, newIPT, groupComm, product(IPT%nFields), newIPT%rang)
+                        call init_MESH(globMSH, newIPT, newIPT%comm, newIPT%rang)
+                        call init_RF(globRDF, newIPT, newIPT%comm, product(IPT%nFields), newIPT%rang)
 
                         call wLog("newIPT%nb_procs")
                         call wLog(newIPT%nb_procs)
@@ -663,7 +750,7 @@ contains
                             globRDF%trans_CPU_Time = all_t_trans
                             if(globRDF%rang == 0) call write_generation_spec(globMSH, globRDF, single_path, "singleGen", &
                                                        IPT%nFields, IPT%localizationLevel, &
-                                                       gen_times, nGenGroups, IPT%nb_procs)
+                                                       gen_times, loc_groupMax, IPT%nb_procs)
                         end if
 
                         call wLog("-> Writing XMF and hdf5 files FOR GLOBAL FIELD")
@@ -966,6 +1053,5 @@ contains
             if (allocated(BB_randField))   deallocate(BB_randField)
 
         end subroutine interpolateToMesh
-
 
 end module sample_RF

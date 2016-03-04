@@ -805,6 +805,145 @@ end subroutine generateUnityPartition_OnMatrix
 !-----------------------------------------------------------------------------------------------
 !-----------------------------------------------------------------------------------------------
 !-----------------------------------------------------------------------------------------------
+subroutine generateUnityPartition_Matrix(xNStep, overlap, corrL, xStep,&
+                                         partitionType, unityPartition, nDim)
+
+    implicit none
+
+    !INPUT
+    integer, dimension(:), intent(in) ::  xNStep
+    double precision, dimension(:)  , intent(in) :: overlap, corrL, xStep
+    integer, intent(in) :: partitionType
+    integer, intent(in) :: nDim
+
+    !OUTPUT
+    double precision, dimension(:), intent(out), target :: unityPartition
+
+    !LOCAL
+    integer :: i, j, k, s
+    double precision, dimension(:, :), pointer :: UP_2D
+    double precision, dimension(:, :, :), pointer :: UP_3D
+    integer, dimension(nDim) :: overlapNPoints, overlapSizeInt
+    double precision, dimension(nDim) :: originCorner
+    double precision, dimension(:), allocatable :: pattern
+    integer :: dim1, dim2, sizeDim1, sizeDim2
+    !integer, dimension(nDim) :: minPos, maxPos
+    integer, dimension(nDim) :: U_Lim, D_Lim
+
+    if(nDim == 2) UP_2D(1:xNStep(1),1:xNStep(2)) => unityPartition
+    if(nDim == 3) UP_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => unityPartition
+
+    !call wLog("shape(unityPartition) = ")
+    !call wLog(shape(unityPartition))
+    !call wLog("shape(UP_2D) = ")
+    !call wLog(shape(UP_2D))
+    !call wLog("shape(RDF%xPoints_2D) = ")
+    !call wLog(shape(RDF%xPoints_2D))
+    !call wLog("shape(UP_3D) = ")
+    !call wLog(shape(UP_3D))
+    !call wLog("shape(RDF%xPoints_3D) = ")
+    !call wLog(shape(RDF%xPoints_3D))
+
+    overlapNPoints = nint((overlap*corrL - 2*xStep)/xStep) + 1
+    overlapSizeInt = overlapNPoints + 2
+    unityPartition = 1.0D0
+
+    call wLog("xNStep =")
+    call wLog(xNStep)
+    call wLog("size(unityPartition) =")
+    call wLog(size(unityPartition))
+
+    do j = 1, 2
+
+        call wLog("j =================")
+        call wLog(j)
+
+        if(j == 1) then
+            D_Lim = 1
+            U_Lim = overlapNPoints
+            originCorner = dble(D_Lim - 1)
+        else
+            U_Lim = xNStep
+            D_Lim = xNStep - overlapNPoints + 1
+            originCorner = dble(U_Lim + 1)
+        end if
+
+        call wLog("D_Lim = ")
+        call wLog(D_Lim)
+        call wLog("U_Lim = ")
+        call wLog(U_Lim)
+        call wLog("originCorner = ")
+        call wLog(originCorner)
+
+        do i = 1, nDim
+
+            if(allocated(pattern)) deallocate(pattern)
+            allocate(pattern(overlapNPoints(i)))
+            call wLog("size(pattern) = ")
+            call wLog(size(pattern))
+            pattern = [(dble(k), k=1, size(pattern))]
+            !call wLog("Pattern Before 1")
+            !call wLog(pattern)
+            pattern = abs((pattern)/dble(overlapSizeInt(i)))
+            !call wLog("Pattern Before 1.5")
+            !call wLog(pattern)
+            if(j == 1) pattern = pattern(size(pattern):1:-1) !Pattern inversion
+
+            !call wLog("Pattern Before 2 =")
+            !call wLog(pattern)
+
+            if(partitionType == 1) then
+                pattern = ((1.0D0 + cos(PI*(pattern)))&
+                            / 2.0D0)
+            end if
+
+            call wLog("Pattern Developed =")
+            call wLog(pattern)
+
+            if(nDim == 2) then
+
+                if(i==1) then
+                    do s = 1, size(pattern)
+                        UP_2D(D_Lim(i)+s-1,:) = UP_2D(D_Lim(i)+s-1,:) * pattern(s)
+                    end do
+                else if(i==2) then
+                    do s = 1, size(pattern)
+                        UP_2D(:,D_Lim(i)+s-1) = UP_2D(:,D_Lim(i)+s-1) * pattern(s)
+                    end do
+                end if
+
+
+
+            else if(nDim == 3) then
+
+                if(i==1) then
+                    do s = 1, size(pattern)
+                        UP_3D(D_Lim(i)+s-1,:,:) = UP_3D(D_Lim(i)+s-1,:,:) * pattern(s)
+                    end do
+                else if(i==2) then
+                    do s = 1, size(pattern)
+                        UP_3D(:,D_Lim(i)+s-1,:) = UP_3D(:,D_Lim(i)+s-1,:) * pattern(s)
+                    end do
+                else if(i==3) then
+                    do s = 1, size(pattern)
+                        UP_3D(:,:,D_Lim(i)+s-1) = UP_3D(:,:,D_Lim(i)+s-1) * pattern(s)
+                    end do
+                end if
+
+            end if
+        end do
+    end do
+
+    if(associated(UP_2D)) nullify(UP_2D)
+    if(associated(UP_3D)) nullify(UP_3D)
+    if(allocated(pattern)) deallocate(pattern)
+
+end subroutine generateUnityPartition_Matrix
+
+!-----------------------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------------------------
 subroutine generateUnityPartition(xPoints, originCorner, overlap, neighShift, partitionType, unityPartition)
 
     implicit none

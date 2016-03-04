@@ -871,12 +871,13 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine set_communications_topology(MSH, coords, neigh, neighShift, considerNeighbour, &
-                                           mappingFromShift, op_neigh)
+                                           mappingFromShift, op_neigh, procId_in)
 
         implicit none
 
         !INPUT
         type(MESH), intent(in) :: MSH
+        integer, intent(in), optional :: procId_in
         !OUTPUT
         integer, dimension(:), intent(out) :: coords
         integer, dimension(:), intent(out) :: neigh
@@ -890,6 +891,10 @@ contains
         double precision, dimension(MSH%nDim) :: ones
         integer, dimension(MSH%nDim) :: deltaShift
         integer :: neighRank, coordComp, coordCompPos
+        integer :: procId
+
+        procId = MSH%rang
+        if(present(procId_in)) procId = procId_in
 
         !Creating grids
         ones = 1.0D0
@@ -905,14 +910,14 @@ contains
         neigh(:) = -1
         op_neigh(:) = -1
 
-        coords = nint(subdivisionCoords(:,MSH%rang+1))
+        coords = nint(subdivisionCoords(:,procId+1))
 
         call wLog("coords = ")
         call wLog(coords)
 
         do neighRank = 1, size(subdivisionCoords, 2)
 
-            if(neighRank == MSH%rang+1) cycle
+            if(neighRank == procId+1) cycle
 
             deltaShift = nint(subdivisionCoords(:,neighRank) - coords)
 
