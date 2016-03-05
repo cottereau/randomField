@@ -806,7 +806,8 @@ end subroutine generateUnityPartition_OnMatrix
 !-----------------------------------------------------------------------------------------------
 !-----------------------------------------------------------------------------------------------
 subroutine generateUnityPartition_Matrix(xNStep, overlap, corrL, xStep,&
-                                         partitionType, unityPartition, nDim)
+                                         partitionType, unityPartition, nDim, &
+                                         neigh, neighShift, reverse)
 
     implicit none
 
@@ -815,7 +816,9 @@ subroutine generateUnityPartition_Matrix(xNStep, overlap, corrL, xStep,&
     double precision, dimension(:)  , intent(in) :: overlap, corrL, xStep
     integer, intent(in) :: partitionType
     integer, intent(in) :: nDim
-
+    integer, dimension(:), intent(in), optional :: neigh
+    integer, dimension(:,:), intent(in), optional :: neighShift
+    logical, intent(in), optional :: reverse
     !OUTPUT
     double precision, dimension(:), intent(out), target :: unityPartition
 
@@ -829,6 +832,7 @@ subroutine generateUnityPartition_Matrix(xNStep, overlap, corrL, xStep,&
     integer :: dim1, dim2, sizeDim1, sizeDim2
     !integer, dimension(nDim) :: minPos, maxPos
     integer, dimension(nDim) :: U_Lim, D_Lim
+    logical :: considerNeighbour
 
     if(nDim == 2) UP_2D(1:xNStep(1),1:xNStep(2)) => unityPartition
     if(nDim == 3) UP_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => unityPartition
@@ -876,6 +880,21 @@ subroutine generateUnityPartition_Matrix(xNStep, overlap, corrL, xStep,&
         call wLog(originCorner)
 
         do i = 1, nDim
+
+            considerNeighbour = .true.
+
+            if(present(neigh)) then
+                considerNeighbour = .false.
+                if(j==1 .and. any(neighShift(i,:) == -1 .and. neigh >=0)) then
+                    considerNeighbour = .true.
+                else if(j==2 .and. any(neighShift(i,:) == 1 .and. neigh >=0)) then
+                    considerNeighbour = .true.
+                end if
+
+                if(reverse) considerNeighbour = .not.considerNeighbour
+            end if
+
+            if(.not. considerneighbour) cycle
 
             if(allocated(pattern)) deallocate(pattern)
             allocate(pattern(overlapNPoints(i)))

@@ -57,7 +57,7 @@ contains
         double precision, dimension(:), allocatable ::unityPartition
         integer(kind=8) :: xNTotal_Proc, xNTotal_Group
         double precision, dimension(:,:), allocatable :: xMinFiles, xMaxFiles
-        double precision, dimension(IPT%nDim_gen) :: ones, xMin_Group
+        double precision, dimension(IPT%nDim_gen) :: ones, xMin_Group, xMax_Group
         integer, dimension(IPT%nDim_gen) :: xNStep_Proc, xNStep_Group
         integer, dimension(IPT%nDim_gen) :: locStep, minP, maxP
         double precision, dimension(:, :), pointer :: RF_2D_Proc, RF_2D_Group
@@ -205,6 +205,7 @@ contains
         xNTotal_Group = product(int(xNStep_Group,8))
         xMin_Group    = globMSH%xMinGlob + &
                         ((dble(IPT%nFields)**(dble(IPT%localizationLevel-1)))*stepProc)*globMSH%coords
+        xMax_Group     = xMin_Group + gen_GroupRange
         call wLog("gen_GroupRange = ")
         call wLog(gen_GroupRange)
         call wLog("xNStep_Group = ")
@@ -227,6 +228,7 @@ contains
             call write_MONO_proc_result(globMSH%procExtent*0, globMSH%procExtent, &
                                         globMSH%xStep, globMSH%nDim, &
                                         unityPartition, "UnityPartition", single_path)
+
 
             do i = 1, nSamplesInProc
                 !Multiplication
@@ -261,28 +263,56 @@ contains
 
             end do
 
+            if(allocated(unityPartition)) deallocate(unityPartition)
+
+            MONO_FileName = string_join_many("GROUP_BEF",numb2String(gen_group))
+            if(gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
+                                                          globMSH%xStep, globMSH%nDim, &
+                                                          randField_Group(:,1), MONO_FileName, &
+                                                          single_path)
+
+            !Correcting Borders
+            allocate(unityPartition(xNTotal_Group))
+            call generateUnityPartition_Matrix(xNStep_Group, globMSH%overlap, globMSH%corrL, globMSH%xStep,&
+                                               1, unityPartition, globMSH%nDim, &
+                                               globMSH%neigh, globMSH%neighShift, reverse = .true.)
+
+            MONO_FileName = string_join_many("LOC_GROUP_",numb2String(gen_group))
+            if(gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
+                                                          globMSH%xStep, globMSH%nDim, &
+                                                          unityPartition, MONO_FileName, &
+                                                          single_path)
+
+            randField_Group(:,1) = randField_Group(:,1)/unityPartition
+
+            MONO_FileName = string_join_many("GROUP_AFT",numb2String(gen_group))
+            if(gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
+                                                          globMSH%xStep, globMSH%nDim, &
+                                                          randField_Group(:,1), MONO_FileName, &
+                                                          single_path)
+
+
+
+
+            if(allocated(unityPartition)) deallocate(unityPartition)
 
         end if
 
+        call MPI_BARRIER(IPT%comm, code)
+        times(4) = MPI_Wtime() !Generation Time
 
+        call MPI_ALLREDUCE (temp_gen_times, gen_times, size(gen_times), MPI_DOUBLE_PRECISION, MPI_SUM, IPT%comm,code)
 
-
-!
-!        call MPI_BARRIER(IPT%comm, code)
-!        times(4) = MPI_Wtime() !Generation Time
-!
-!        call MPI_ALLREDUCE (temp_gen_times, gen_times, size(gen_times), MPI_DOUBLE_PRECISION, MPI_SUM, IPT%comm,code)
-
-!        !Combining realizations (localization)
-!        if(.true.) then
-!            if(IPT%rang == 0) write(*,*) " "
-!            if(IPT%rang == 0) write(*,*) "-> COMBINING----------------------------------------"
-!            call wLog("-> COMBINING----------------------------------------")
-!            call combine_subdivisions(IPT, IPT%outputStyle, stepProc, procExtent, &
-!                                      overlap, times(1), times(3), times(4), gen_times(:), &
-!                                      IPT%delete_intermediate_files, IPT%ignoreTillLocLevel, &
-!                                      loc_group, loc_Comm, loc_groupMax, BBoxPath)
-!        end if
+        !Combining realizations (localization)
+        if(.true.) then
+            if(IPT%rang == 0) write(*,*) " "
+            if(IPT%rang == 0) write(*,*) "-> COMBINING----------------------------------------"
+            call wLog("-> COMBINING----------------------------------------")
+            call combine_subdivisions(IPT, IPT%outputStyle, stepProc, procExtent, &
+                                      overlap, times(1), times(3), times(4), gen_times(:), &
+                                      IPT%delete_intermediate_files, IPT%ignoreTillLocLevel, &
+                                      loc_group, loc_Comm, loc_groupMax, BBoxPath)
+        end if
 !
 !        times(5) = MPI_Wtime() !Localization Time
 !
