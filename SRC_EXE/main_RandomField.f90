@@ -25,7 +25,7 @@ program main_RandomField
 
 	!LOCAL VARIABLES
     character(len=200) :: path, logFilePath
-    double precision, dimension(5) :: times, all_times
+    double precision, dimension(7) :: times, all_times
     integer               :: code
 
     !INPUT VARIABLES
@@ -41,8 +41,8 @@ program main_RandomField
     IPT_Temp%sameFolder = .true.
     IPT_Temp%outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
     IPT_Temp%delete_intermediate_files = .false.
-    IPT_Temp%ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
     IPT_Temp%sampleFields = .true.
+    !Ps: IPT_Temp%ignoreTillLocLevel Defined after Reading Inputs
 
     times(1) = MPI_Wtime() !Initial Time
 
@@ -101,8 +101,12 @@ program main_RandomField
     path = adjustL(path)
     !call wLog("        file: "//trim(path))
     call read_generation_input(path, IPT_Temp)
+
+    IPT_Temp%ignoreTillLocLevel = IPT_Temp%localizationLevel - 1 !<1 doesn't affetct the behaviour of the program (for restarts)
+
     !Validating Inputs----------------------------------------------
-    call wLog("    Validating Inputs")
+    if(IPT_Temp%rang == 0) write(*,*)  "     -> Validating Input (IPT_Temp)"
+    call wLog("    Validating Inputs (IPT_Temp)")
     call validate_input(IPT_Temp)
     if(IPT_Temp%rang == 0) call show_IPT_RF(IPT_Temp, "IPT_Temp")
 #ifdef MAKELOG
@@ -121,6 +125,9 @@ program main_RandomField
     end if
 
     !Initialize Inputs
+    if(IPT_Temp%rang == 0) write(*,*)  " "
+    if(IPT_Temp%rang == 0) write(*,*)  " "
+    if(IPT_Temp%rang == 0) write(*,*)  "-> Initializing Input (IPT)"
     call init_IPT_RF(&
         IPT, &
         log_ID = IPT_Temp%log_ID, &
@@ -140,8 +147,8 @@ program main_RandomField
         unv_path = IPT_Temp%unv_path, &
         fieldAvg = IPT_Temp%fieldAvg, &
         fieldVar = IPT_Temp%fieldVar, &
-        corrL = IPT_Temp%corrL, &
-        overlap = IPT_Temp%overlap, &
+        corrL_in = IPT_Temp%corrL_in, &
+        overlap_in = IPT_Temp%overlap_in, &
         corrMod = IPT_Temp%corrMod, &
         margiFirst = IPT_Temp%margiFirst, &
         method = IPT_Temp%method, &
@@ -158,28 +165,8 @@ program main_RandomField
         sampleFields = IPT_Temp%sampleFields, &
         writeUNVinterpolation = IPT_Temp%writeUNVinterpolation)
 
-    if(IPT%rang == 0) call show_IPT_RF(IPT, "IPT")
-
-
-    !Changing xMaxGlob and xMinGlob according to localization level
-    if(IPT_Temp%rang == 0) write(*,*) "-> REDEFINE xMaxGlob and xMinGlob----------------------------------------"
-    call wLog("-> REDEFINE xMaxGlob and xMinGlob----------------------------------------")
-    call redefineIPTlimits(IPT, IPT%xMinGlob, IPT%xMaxGlob, IPT%localizationLevel)
-    if(IPT_Temp%rang == 0) write(*,*) "IPT%xMinGlob"
-    if(IPT_Temp%rang == 0) write(*,*) IPT%xMinGlob
-    if(IPT_Temp%rang == 0) write(*,*) "IPT%xMaxGlob"
-    if(IPT_Temp%rang == 0) write(*,*) IPT%xMaxGlob
-    if(IPT_Temp%rang == 0) write(*,*) "IPT%localizationLevel"
-    if(IPT_Temp%rang == 0) write(*,*) IPT%localizationLevel
-    call wLog("IPT%xMinGlob")
-    call wLog(IPT%xMinGlob)
-    call wLog("IPT_Temp%xMaxGlob")
-    call wLog(IPT%xMaxGlob)
-    call wLog("IPT%localizationLevel")
-    call wLog(IPT%localizationLevel)
-
     !Generating random fields
-    call make_random_field(IPT, times, product(IPT%nFields**IPT%localizationLevel))
+    call make_random_field(IPT, times)
 
     call MPI_ALLREDUCE (times, all_times, size(times), MPI_DOUBLE_PRECISION, MPI_SUM, IPT%comm,code)
 
@@ -189,7 +176,9 @@ program main_RandomField
     if(IPT_Temp%rang == 0) write(*,*) "Reading Inputs   = ", (all_times(2) - all_times(1))/dble(IPT_Temp%nb_procs)
     if(IPT_Temp%rang == 0) write(*,*) "Pre Organization = ", (all_times(3) - all_times(2))/dble(IPT_Temp%nb_procs)
     if(IPT_Temp%rang == 0) write(*,*) "Generation       = ", (all_times(4) - all_times(3))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Localization     = ", (all_times(5) - all_times(4))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Localization Int = ", (all_times(5) - all_times(4))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Localization Ext = ", (all_times(6) - all_times(5))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Writing Files    = ", (all_times(7) - all_times(6))/dble(IPT_Temp%nb_procs)
     if(IPT_Temp%rang == 0) write(*,*) ""
 
 	!Deallocating

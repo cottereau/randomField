@@ -21,6 +21,7 @@ module type_inputRF
         double precision, dimension(:), allocatable :: xMaxGlob_in, xMinGlob_in;
         integer         , dimension(:), allocatable :: pointsPerCorrL;
         integer         , dimension(:), allocatable :: procPerDim
+        integer         , dimension(:), allocatable :: coords
         !UNV
         double precision, dimension(:,:), allocatable :: coordList_local
         integer         , dimension(:,:), allocatable :: connectList_local
@@ -33,15 +34,15 @@ module type_inputRF
         !GENERATION
         integer :: nDim_gen
         double precision   :: fieldAvg = -1, fieldVar = -1;
-        double precision, dimension(:), allocatable :: corrL, overlap
+        double precision, dimension(:), allocatable :: corrL_in, overlap_in
         integer :: corrMod = -1 !1 for Gaussian
         integer :: margiFirst = -1 !1 for Gaussian, 2 for Lognormal
         integer :: method = -1 !1 for Isotropic, 2 for Shinozuka, 3 for Randomization, 4 for FFT
         integer :: Nmc = -1, seedStart
         !logical :: independent
-        integer :: nProcPerField
+        integer :: nProcPerField = -1
         integer, dimension(:), allocatable :: nFields
-        integer :: localizationLevel
+        integer :: localizationLevel = -1, nTotalFields = -1
 
         !FILE MANAGER
         logical :: writeDataSet = .true.
@@ -51,6 +52,16 @@ module type_inputRF
         integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
         logical :: sampleFields = .true.
         logical :: writeUNVinterpolation
+
+        !PROCESS
+        integer :: nDim = -1
+        double precision, dimension(:), allocatable :: corrL, overlap, xStep
+        double precision, dimension(:), allocatable :: stepProc, procExtent
+        integer :: gen_groupMax, gen_group, gen_comm, gen_nbProcs, gen_rang
+        integer :: loc_groupMax, loc_group, loc_comm, loc_nbProcs, loc_rang
+        logical :: extLoc
+        integer, dimension(:), allocatable :: neigh, op_neigh
+        integer, dimension(:,:), allocatable :: neighShift
 
     end type IPT_RF
 
@@ -78,8 +89,8 @@ contains
         unv_path, &
         fieldAvg, &
         fieldVar, &
-        corrL, &
-        overlap, &
+        corrL_in, &
+        overlap_in, &
         corrMod, &
         margiFirst, &
         method, &
@@ -120,7 +131,7 @@ contains
 
             !GENERATION
             double precision, intent(in)   :: fieldAvg, fieldVar
-            double precision, dimension(:), intent(in) :: corrL, overlap
+            double precision, dimension(:), intent(in) :: corrL_in, overlap_in
             integer, intent(in) :: corrMod!1 for Gaussian
             integer, intent(in) :: margiFirst!1 for Gaussian, 2 for Lognormal
             integer, intent(in) :: method!1 for Isotropic, 2 for Shinozuka, 3 for Randomization, 4 for FFT
@@ -154,8 +165,8 @@ contains
             IPT%unv_path = unv_path
             IPT%fieldAvg = fieldAvg
             IPT%fieldVar = fieldVar
-            IPT%corrL    = corrL
-            IPT%overlap  = overlap
+            IPT%corrL_in    = corrL_in
+            IPT%overlap_in  = overlap_in
             IPT%corrMod  = corrMod
             IPT%method   = method
             IPT%Nmc      = Nmc
@@ -197,10 +208,20 @@ contains
             if(.not. allocated(IPT%xMaxGlob_in)) allocate(IPT%xMaxGlob_in(nDim))
             if(.not. allocated(IPT%xMinGlob_in)) allocate(IPT%xMinGlob_in(nDim))
             if(.not. allocated(IPT%pointsPerCorrL)) allocate(IPT%pointsPerCorrL(nDim))
-            if(.not. allocated(IPT%corrL)) allocate(IPT%corrL(nDim))
-            if(.not. allocated(IPT%overlap)) allocate(IPT%overlap(nDim))
+            if(.not. allocated(IPT%corrL_in)) allocate(IPT%corrL_in(nDim))
+            if(.not. allocated(IPT%overlap_in)) allocate(IPT%overlap_in(nDim))
             if(.not. allocated(IPT%procPerDim)) allocate(IPT%procPerDim(nDim))
             if(.not. allocated(IPT%nFields)) allocate(IPT%nFields(nDim))
+            !Process
+            if(.not. allocated(IPT%corrL)) allocate(IPT%corrL(nDim))
+            if(.not. allocated(IPT%overlap)) allocate(IPT%overlap(nDim))
+            if(.not. allocated(IPT%xStep)) allocate(IPT%xStep(nDim))
+            if(.not. allocated(IPT%stepProc)) allocate(IPT%stepProc(nDim))
+            if(.not. allocated(IPT%procExtent)) allocate(IPT%procExtent(nDim))
+            if(.not. allocated(IPT%coords)) allocate(IPT%coords(nDim))
+            if(.not. allocated(IPT%neigh)) allocate(IPT%neigh((3**nDim)-1))
+            if(.not. allocated(IPT%op_neigh)) allocate(IPT%op_neigh((3**nDim)-1))
+            if(.not. allocated(IPT%neighShift)) allocate(IPT%neighShift(nDim,(3**nDim)-1))
 
             IPT%log_ID = log_file_RF_ID
             IPT%rang   = rang
@@ -217,6 +238,7 @@ contains
 
         end subroutine allocate_IPT_RF
 
+
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
@@ -231,8 +253,8 @@ contains
             if(allocated(IPT%xMaxGlob)) deallocate(IPT%xMaxGlob)
             if(allocated(IPT%xMinGlob)) deallocate(IPT%xMinGlob)
             if(allocated(IPT%pointsPerCorrL)) deallocate(IPT%pointsPerCorrL)
-            if(allocated(IPT%corrL)) deallocate(IPT%corrL)
-            if(allocated(IPT%overlap)) deallocate(IPT%overlap)
+            if(allocated(IPT%corrL_in)) deallocate(IPT%corrL_in)
+            if(allocated(IPT%overlap_in)) deallocate(IPT%overlap_in)
             if(allocated(IPT%procPerDim)) deallocate(IPT%procPerDim)
             if(allocated(IPT%nFields)) deallocate(IPT%nFields)
             if(allocated(IPT%xMaxGlob_in)) deallocate(IPT%xMaxGlob_in)
@@ -242,6 +264,17 @@ contains
             if(allocated(IPT%connectList_local)) deallocate(IPT%connectList_local)
             if(associated(IPT%coordList)) nullify(IPT%coordList)
             if(associated(IPT%connectList)) nullify(IPT%connectList)
+
+            if(allocated(IPT%corrL)) deallocate(IPT%corrL)
+            if(allocated(IPT%overlap)) deallocate(IPT%overlap)
+            if(allocated(IPT%xStep)) deallocate(IPT%xStep)
+            if(allocated(IPT%stepProc)) deallocate(IPT%stepProc)
+            if(allocated(IPT%procExtent)) deallocate(IPT%procExtent)
+            if(allocated(IPT%coords)) deallocate(IPT%coords)
+
+            if(allocated(IPT%neigh)) deallocate(IPT%neigh)
+            if(allocated(IPT%op_neigh)) deallocate(IPT%op_neigh)
+            if(allocated(IPT%neighShift)) deallocate(IPT%neighShift)
 
         end subroutine finalize_IPT_RF
 
@@ -264,8 +297,8 @@ contains
             IPT%xMinGlob_in = IPT_orig%xMinGlob_in
             IPT%xMinGlob_in = IPT_orig%xMinGlob_in
             IPT%pointsPerCorrL = IPT_orig%pointsPerCorrL
-            IPT%corrL   = IPT_orig%corrL
-            IPT%overlap = IPT_orig%overlap
+            IPT%corrL_in   = IPT_orig%corrL_in
+            IPT%overlap_in = IPT_orig%overlap_in
             IPT%procPerDim = IPT_orig%procPerDim
             IPT%nFields = IPT_orig%nFields
             IPT%log_ID = IPT_orig%log_ID
@@ -315,7 +348,11 @@ contains
             IPT%nFields = IPT_orig%nFields
             IPT%localizationLevel = IPT_orig%localizationLevel
 
-            !write(*,*) "Inside Copy 3"
+            IPT%corrL = IPT_orig%corrL
+            IPT%overlap = IPT_orig%overlap
+            IPT%xStep = IPT_orig%xStep
+            IPT%stepProc = IPT_orig%stepProc
+            IPT%procExtent = IPT_orig%procExtent
 
         end subroutine copy_IPT_RF
 
@@ -368,10 +405,8 @@ contains
                     call wLog("-> defining_UNV_extremes")
                     if(IPT%rang==0) write(*,*) "-> defining_UNV_extremes"
                     call get_Global_Extremes_Mesh(IPT%coordList, IPT%comm, IPT%xMinGlob_in, IPT%xMaxGlob_in)
-                    IPT%xMinGlob = IPT%xMinGlob_in
-                    IPT%xMaxGlob = IPT%xMaxGlob_in
-                    if(IPT%rang==0) write(*,*) " IPT%xMinGlob = ", IPT%xMinGlob
-                    if(IPT%rang==0) write(*,*) " IPT%xMaxGlob = ", IPT%xMaxGlob
+                    if(IPT%rang==0) write(*,*) " IPT%xMinGlob_in = ", IPT%xMinGlob_in
+                    if(IPT%rang==0) write(*,*) " IPT%xMaxGlob_in = ", IPT%xMaxGlob_in
 !                    call DispCarvalhol(transpose(IPT%connectList), "transpose(IPT%connectList)", &
 !                                       nColumns=8, unit_in=IPT%log_ID)
 !                    call DispCarvalhol(transpose(IPT%coordList), "transpose(IPT%coordList)", &
@@ -414,11 +449,11 @@ contains
             call read_DataTable(dataTable, "fieldVar"   , IPT%fieldVar)
             call read_DataTable(dataTable, "method"     , IPT%method)
             call read_DataTable(dataTable, "seedStart"  , IPT%seedStart)
-            call read_DataTable(dataTable, "corrL"      , IPT%corrL)
+            call read_DataTable(dataTable, "corrL"      , IPT%corrL_in)
             call read_DataTable(dataTable, "nFields"    , IPT%nFields)
             call read_DataTable(dataTable, "nProcPerField", IPT%nProcPerField)
             call read_DataTable(dataTable, "localizationLevel", IPT%localizationLevel)
-            call read_DataTable(dataTable, "overlap", IPT%overlap)
+            call read_DataTable(dataTable, "overlap", IPT%overlap_in)
 
 
 
@@ -454,12 +489,24 @@ contains
             end if
 
             do i = 1, IPT%nDim_gen
-               if(IPT%corrL(i) <= 0.0d0) then
+               if(IPT%corrL_in(i) <= 0.0d0) then
                    write(*,*) ""
-                   write(*,*) "ERROR - corrL should be a positive number greater than 0.0"
+                   write(*,*) "ERROR - corrL_in should be a positive number greater than 0.0"
                    stop(" ")
                end if
             end do
+
+            if(any(IPT%nFields < 1)) then
+               write(*,*) ""
+               write(*,*) "ERROR - IPT%nFields should be a positive non-zero value vector"
+               stop(" ")
+            end if
+
+            if(IPT%localizationLevel == 0 .and. any(IPT%nFields /=1)) then
+               write(*,*) ""
+               write(*,*) "ERROR - If locLevel = 0 IPT%nFields should have only ones"
+               stop(" ")
+            end if
 
         end subroutine validate_input
 
@@ -523,17 +570,24 @@ contains
                 write(unit,*) " nDim_gen = ", IPT%nDim_gen
                 write(unit,*) " fieldAvg = ", IPT%fieldAvg
                 write(unit,*) " fieldVar = ", IPT%fieldVar
-                write(unit,*) " corrL = ", IPT%corrL
+                write(unit,*) " overlap_in = ", IPT%overlap_in
+                write(unit,*) " corrL_in = ", IPT%corrL_in
                 write(unit,*) " overlap = ", IPT%overlap
+                write(unit,*) " corrL = ", IPT%corrL
                 write(unit,*) " corrMod = ", IPT%corrMod
                 write(unit,*) " margiFirst = ", IPT%margiFirst
                 write(unit,*) " method = ", IPT%method
                 write(unit,*) " Nmc = ", IPT%Nmc
-                !write(unit,*) " independent = ", IPT%independent
                 write(unit,*) " seedStart = ", IPT%seedStart
                 write(unit,*) " nProcPerField = ", IPT%nProcPerField
                 write(unit,*) " nFields = ", IPT%nFields
                 write(unit,*) " "
+
+                write(unit,*) " "
+                write(unit,*) " PROCESS -----------------"
+                write(unit,*) " xStep      = ", IPT%xStep
+                write(unit,*) " stepProc   = ", IPT%stepProc
+                write(unit,*) " procExtent = ", IPT%procExtent
 
 
             end if
@@ -586,5 +640,70 @@ contains
         if(allocated(xMaxLoc)) deallocate(xMaxLoc)
 
     end subroutine get_Global_Extremes_Mesh
+
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        subroutine show_IPTneigh(IPT, name, onlyExisting, forLog, unit_in)
+            implicit none
+            !INPUT
+            type(IPT_RF), intent(in) :: IPT
+            character(len=*), intent(in), optional :: name
+            logical, intent(in) :: onlyExisting
+            logical, intent(in), optional :: forLog
+            integer, intent(in), optional :: unit_in
+            !LOCAL
+            character(len = 3) :: nDim, space
+            character(len = 50) :: fmtNum, fmtChar
+            character(len = 1) :: nbChar
+            integer :: i
+            integer :: unit
+            logical :: active
+            integer :: numb_space = 9
+
+            active = .true.
+            unit = 6 !Screen
+            if(present(unit_in)) unit = unit_in
+
+            if(present(forLog)) then
+#ifdef MAKELOG
+                if(forLog) unit = IPT%log_ID
+#else
+                !if(forLog) write(*,*) "WARNING!!! Inside show_MESHneigh, forLog = .true. but MAKELOG was not defined"
+                if(forLog) active = .false.
+#endif
+            end if
+
+            if(active) then
+
+                if(unit <= 0) then
+                    write(*,*) "ERROR!!! Inside show_MESHneigh unit = ", unit
+                    stop("")
+                end if
+
+                nDim   = trim(numb2String(IPT%nDim))
+                space  = trim(numb2String(IPT%nDim*numb_space + 1))
+                nbChar = trim(numb2String(numb_space))
+
+                if(present(name)) write(unit,*) "|  ", name
+
+                fmtChar = "(A7, A"//space//")"
+                fmtNum = "(I6, A1, "//nDim//"I"//nbChar//",A1)"
+
+                write(unit,fmtChar) "Neigh|","Shift|"
+
+                do i = 1, size(IPT%neigh)
+                    if(onlyExisting .and. IPT%neigh(i)<0) cycle
+                    write(unit,fmtNum) IPT%neigh(i), &
+                                       "|", IPT%neighShift(:,i), "|"
+                end do
+
+
+                write(unit,*) ""
+
+            end if
+
+        end subroutine show_IPTneigh
 
 end module type_inputRF

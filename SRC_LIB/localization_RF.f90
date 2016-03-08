@@ -628,6 +628,282 @@ contains
 
     end subroutine addNeighboursFieldsV2
 
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine addNeighboursFieldsV3(randFieldGroup, xNStep, overlap, corrL, xStep,&
+                                     nDim, neigh, op_neigh, neighShift, xNTotal, &
+                                     rang, loc_comm)
+        implicit none
+
+        !INPUT OUTPUT
+        double precision, dimension(:,:), intent(inout) , target :: randFieldGroup
+
+        !INPUT
+        integer, dimension(:), intent(in) ::  xNStep
+        double precision, dimension(:)  , intent(in) :: overlap, corrL, xStep
+        integer, intent(in) :: nDim
+        integer, dimension(:), intent(in) :: neigh, op_neigh
+        integer, dimension(:,:), intent(in) :: neighShift
+        integer, intent(in) :: rang, loc_comm
+        integer(kind=8), intent(in) :: xNTotal
+
+        !LOCAL
+        integer :: direction, myRank
+        integer :: neighRank
+        integer, dimension(nDim) :: dirShift
+
+        double precision, dimension(nDim) ::xMinDir, xMaxDir
+        integer :: op_direction
+        integer(kind=8) :: nOvlpMax
+        integer :: code
+        integer, dimension(nDim) :: minPos, maxPos
+        integer, dimension(nDim) :: overlapNPoints
+        integer :: double_size
+        integer(kind=8) :: totalSize, overHead, overEst, bufferSize
+        double precision, dimension(:), allocatable :: buffer
+        !integer :: testrank = 1, testrank2 = 11
+        double precision, dimension(1:xNTotal), target :: tempRandField, tempRandField_Now
+        integer :: request
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        integer :: tag
+        logical :: snd, rcv
+        double precision, dimension(:, :), pointer :: TRF_2D, TRF_2D_Now, RF_2D
+        double precision, dimension(:, :, :), pointer :: TRF_3D, TRF_3D_Now, RF_3D
+
+
+        if(nDim == 2) RF_2D(1:xNStep(1),1:xNStep(2)) => randFieldGroup(:,1)
+        if(nDim == 3) RF_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => randFieldGroup(:,1)
+
+
+        call wLog ("Inside addNeighboursFieldsV2")
+
+        !Initialization
+        tempRandField = 0 !Contributions over the random field
+        tag = 0
+        myRank = rang
+        overlapNPoints = nint((overlap*corrL - 2*xStep)/xStep) + 1
+        nOvlpMax = maxval(overlapNPoints)*(maxval(xNStep)**(nDim-1)) !Max hypercube to send
+
+
+        !Buffer allocation
+        call wLog ("Allocating buffer")
+        !overEst = MSH%nDim + 1
+        overEst = 2
+        call MPI_TYPE_SIZE(MPI_DOUBLE_PRECISION,double_size,code)
+        overHead = int(1+(MPI_BSEND_OVERHEAD*1.)/double_size)
+        bufferSize = overEst*(nOvlpMax+overHead)
+        call wLog ("bufferSize = ")
+        call wLog (bufferSize)
+        allocate(buffer(bufferSize))
+        call MPI_BUFFER_ATTACH(buffer, double_size*bufferSize,code)
+        call wLog ("buffer allocation code= ")
+        call wLog (code)
+
+        !Allocation
+        if(nDim == 2) TRF_2D(1:xNStep(1),1:xNStep(2)) => tempRandField
+        if(nDim == 2) TRF_2D_Now(1:xNStep(1),1:xNStep(2)) => tempRandField_Now
+        if(nDim == 3) TRF_3D(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => tempRandField
+        if(nDim == 3) TRF_3D_Now(1:xNStep(1),1:xNStep(2),1:xNStep(3)) => tempRandField_Now
+
+        if(nDim == 2) then
+            call wLog("    shape(TRF_2D) ")
+            call wLog(shape(TRF_2D))
+            call wLog("    shape(RF_2D) ")
+            call wLog(shape(RF_2D))
+        else if(nDim == 3) then
+            call wLog("    shape(TRF_3D) ")
+            call wLog(shape(TRF_3D))
+            call wLog("    shape(RDF%RF_3D) ")
+            call wLog(shape(RF_3D))
+        end if
+
+
+
+
+        do direction = 1, size(neigh)
+
+            !write(*,*) "              FB RANG ", RDF%rang
+
+            call MPI_BARRIER(loc_comm, code) !This is necessary so we can reduce the size of the buffer
+
+            call wLog(" ")
+            call wLog(" ")
+            call wLog(" DIRECTION =========================================")
+            call wLog(direction)
+            call wLog("    Shift")
+            call wLog(neighShift(:, direction))
+
+            !SENDING---------------------------------------------------------------
+
+            snd = .true.
+            dirShift   = neighShift(:, direction)
+            neighRank  = neigh(direction)
+            minPos(:) = 1
+            maxPos(:) = xNStep
+            where(dirShift == 1 ) minPos = xNStep - overlapNPoints + 1
+            where(dirShift == -1) maxPos = overlapNPoints
+            totalSize = (product(maxPos - minPos + 1))
+
+
+
+            if(neigh(direction) < 0) snd = .false. !Check if this direction exists
+
+            if(snd) then
+                call wLog(" ")
+                call wLog(" SENDING ==============")
+                !Defining slice that should be sent
+                !call wLog("DIMENSIONING GOING SLICE!!!")
+
+                !xMinDir = MSH%xMinNeigh(:, direction)
+                !xMaxDir = MSH%xMaxNeigh(:, direction)
+                !minPos = nint((xMinDir - MSH%xMinBound(:))/MSH%xStep) + 1
+                !maxPos = nint((xMaxDir - MSH%xMinBound(:))/MSH%xStep) + 1
+
+                tag = neighRank
+
+                call wLog("totalSize")
+                call wLog(totalSize)
+                call wLog("minPos")
+                call wLog(minPos)
+                call wLog("maxPos")
+                call wLog(maxPos)
+                call wLog("dirShift")
+                call wLog(dirShift)
+                call wLog(" ")
+                call wLog(" TAG ")
+                call wLog(tag)
+                call wLog("    TO  rang ")
+                call wLog(neighRank)
+
+                if(nDim == 2) then
+                    !call wLog("Point in minimal position = ")
+                    !call wLog(RDF%xPoints_2D(:,minPos(1),minPos(2)))
+                    !call wLog("Point in maximal position = ")
+                    !call wLog(RDF%xPoints_2D(:,maxPos(1),maxPos(2)))
+    !                call MPI_ISEND (RDF%RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+    !                    totalSize, MPI_DOUBLE_PRECISION, &
+    !                    neighRank, tag, RDF%comm, request, code)
+
+                    call MPI_IBSEND (RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+                            totalSize, MPI_DOUBLE_PRECISION, &
+                            neighRank, tag, loc_comm, request, code)
+
+                end if
+                if(nDim == 3) then
+                    !call wLog("Point in minimal position = ")
+                    !call wLog(RDF%xPoints_3D(:,minPos(1),minPos(2),minPos(3)))
+                    !call wLog("Point in maximal position = ")
+                    !call wLog(RDF%xPoints_3D(:,maxPos(1),maxPos(2),maxPos(3)))
+    !                call MPI_ISEND (RDF%RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+    !                    totalSize, MPI_DOUBLE_PRECISION, &
+    !                    neighRank, tag, RDF%comm, request, code)
+
+                    call MPI_IBSEND (RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                        totalSize, MPI_DOUBLE_PRECISION, &
+                        neighRank, tag, loc_comm, request, code)
+                end if
+            else
+
+                call wLog(" not sending ===========")
+
+            end if
+
+            !RECEIVING---------------------------------------------------------------
+            rcv = .true.
+            dirShift   = -dirShift
+            neighRank  = op_neigh(direction)
+            minPos(:) = 1
+            maxPos(:) = xNStep
+            where(dirShift == 1 ) minPos = xNStep - overlapNPoints + 1
+            where(dirShift == -1) maxPos = overlapNPoints
+            totalSize = (product(maxPos - minPos + 1))
+
+            !write(*,*) "              FC RANG ", RDF%rang
+
+            if(op_neigh(direction) < 0) rcv = .false. !Check if this direction exists
+
+            !Finding opposite direction index
+            do op_direction = 1, size(neigh)
+                if(all(dirShift == neighShift(:, op_direction))) exit
+            end do
+
+            call wLog("op_direction = ")
+            call wLog(op_direction)
+
+            if(rcv) then
+                call wLog(" ")
+                call wLog(" RECEIVING ==============")
+                !Defining slice that should be sent
+
+                !xMinDir = MSH%xMinNeigh(:, op_direction)
+                !xMaxDir = MSH%xMaxNeigh(:, op_direction)
+
+                !minPos = nint((xMinDir - MSH%xMinBound(:))/MSH%xStep) + 1
+                !maxPos = nint((xMaxDir - MSH%xMinBound(:))/MSH%xStep) + 1
+                !totalSize = (product(maxPos - minPos + 1))
+                !neighRank = MSH%op_neigh(direction)
+                tag       = myRank
+
+                call wLog("totalSize")
+                call wLog(totalSize)
+                call wLog("minPos")
+                call wLog(minPos)
+                call wLog("maxPos")
+                call wLog(maxPos)
+                call wLog("dirShift")
+                call wLog(dirShift)
+                call wLog(" ")
+                call wLog(" TAG ")
+                call wLog(tag)
+                call wLog("    FROM  rang ")
+                call wLog(neighRank)
+
+                tempRandField_Now = 0.0D0
+
+                if(nDim == 2) then
+                    !call wLog("Point in minimal position = ")
+                    !call wLog(RDF%xPoints_2D(:,minPos(1),minPos(2)))
+                    !call wLog("Point in maximal position = ")
+                    !call wLog(RDF%xPoints_2D(:,maxPos(1),maxPos(2)))
+                    call MPI_RECV (TRF_2D_Now(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+                        totalSize, MPI_DOUBLE_PRECISION, &
+                        neighRank, tag, loc_comm, status, code)
+                        TRF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = &
+                        TRF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2))   &
+                        + TRF_2D_Now(minPos(1):maxPos(1),minPos(2):maxPos(2))
+                end if
+                if(nDim == 3) then
+                    !call wLog("Point in minimal position = ")
+                    !call wLog(RDF%xPoints_3D(:,minPos(1),minPos(2),minPos(3)))
+                    !call wLog("Point in maximal position = ")
+                    !call wLog(RDF%xPoints_3D(:,maxPos(1),maxPos(2),maxPos(3)))
+                    call MPI_RECV (TRF_3D_Now(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                        totalSize, MPI_DOUBLE_PRECISION, &
+                        neighRank, tag, loc_comm, status, code)
+                        TRF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)) = &
+                        TRF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3))   &
+                        + TRF_3D_Now(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3))
+                end if
+            else
+                call wLog(" not receiving ==============")
+            end if
+        end do
+
+        randFieldGroup(:,1) = randFieldGroup(:,1) + tempRandField
+
+        call MPI_BUFFER_DETACH (buffer,double_size*bufferSize,code)
+        if(allocated(buffer)) deallocate(buffer)
+
+        if(associated(TRF_2D_Now)) nullify(TRF_2D_Now)
+        if(associated(TRF_3D_Now)) nullify(TRF_3D_Now)
+        if(associated(TRF_2D)) nullify(TRF_2D)
+        if(associated(TRF_3D)) nullify(TRF_3D)
+
+
+    end subroutine addNeighboursFieldsV3
+
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------

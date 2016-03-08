@@ -992,6 +992,196 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
+    subroutine write_Simple_pHDF5_Str(randField, minPos, maxPos, &
+                                      nDim, Nmc, loc_Comm, RF_2D, RF_3D, &
+                                      origin, xNStep, xStep,&
+                                      xMinGlob, xNStep_Glob, &
+                                      filename, folderPath, &
+                                      HDF5Name, HDF5FullPath)
+        implicit none
+        !INPUT OUTPUT
+        double precision, dimension(:,:), intent(inout) :: randField
+        !INPUT
+        integer, dimension(:), intent(in) :: minPos, maxPos
+        integer, intent(in) :: nDim, loc_Comm, Nmc !OBS Nmc, was setted manually in the caller
+        double precision, dimension(:), intent(in) :: xMinGlob, xStep
+        double precision, dimension(:,:), intent(in)   :: RF_2D
+        double precision, dimension(:,:,:), intent(in) :: RF_3D
+        character(len=*)                  , intent(in) :: filename;
+        character(len=*)                  , intent(in) :: folderPath
+        integer, dimension(:), intent(in) :: origin, xNStep, xNStep_Glob
+        !OUTPUTS
+        character(len=*)  , intent(out), optional ::HDF5Name, HDF5FullPath
+
+        !HDF5 VARIABLES
+        character(len=110)             :: fileHDF5Name, fullPath !File name
+        integer(HID_T)                 :: file_id       !File identifier
+        integer(HID_T)                 :: dset_id       !Dataset identifier
+        integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
+        integer(HID_T)                 :: plist_id      ! Property list identifier
+        integer(HID_T)                 :: filespace
+        integer                        :: rank, rank1D !Dataset rank (number of dimensions)
+        integer(HSIZE_T), dimension(nDim) :: dims !Dataset dimensions
+        integer                        :: error !Error flag
+        integer                        :: info
+        integer(HSIZE_T) , dimension(nDim) :: countND
+        integer(HSSIZE_T), dimension(nDim) :: offset
+        integer(HSIZE_T) , dimension(1) :: count1D
+
+        !LOCAL VARIABLES
+        character(LEN=8) :: dsetname = "samples"
+        double precision, dimension(:), allocatable :: randFieldLinear
+        character(len=110) :: XMF_Folder, HDF5_Folder
+        double precision, dimension(nDim) :: xMaxGlob
+
+        xMaxGlob = xMinGlob + dble(xNStep_Glob-1)*xStep
+
+        call wLog("fileName         = ")
+        call wLog(fileName)
+        call wLog("folderPath       = ")
+        call wLog(folderPath)
+        !Creating file name
+        !dsetname = "samples" ! Dataset name
+        fileHDF5Name = trim(fileName)//".h5"
+        HDF5_Folder = string_join(folderPath,"/h5")
+        XMF_Folder = string_join(folderPath,"/xmf")
+
+
+
+        call wLog("------------START Writing result HDF5 file (MPI)-----------------------")
+
+        call wLog("fileName         = ")
+        call wLog(fileName)
+        call wLog("folderPath       = ")
+        call wLog(folderPath)
+        !Creating file name
+        !dsetname = "samples" ! Dataset name
+        fileHDF5Name = trim(fileName)//".h5"
+        fullPath     = string_join(HDF5_Folder,"/"//fileHDF5Name)
+        if(present(HDF5FullPath)) HDF5FullPath = fullPath
+        call wLog("' fileHDF5Name = ")
+        call wLog(fileHDF5Name)
+
+
+        !PREPARING ENVIROMENT
+        info = MPI_INFO_NULL
+        rank = nDim
+        countND = xNStep
+        rank1D = 1
+        count1D = product(int(xNStep_Glob,8))
+        dims = int(xNStep_Glob,8)
+        call wLog("dims = ")
+        call wLog(int(dims))
+
+        call wLog(" -> h5 creation")
+        call h5open_f(error) ! Initialize FORTRAN interface.
+        call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error) !NEW plist_id (for file)
+        !call h5pset_deflate_f(plist_id, 5, error) !Activates Compression  TO DO
+        call h5pset_fapl_mpio_f(plist_id, loc_Comm, info, error) !SET plist to MPI (for file)
+        call h5fcreate_f(fullPath, H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id) !NEW file_id
+        call h5pclose_f(plist_id, error) !CLOSE plist_id
+
+
+        call h5screate_simple_f(rank, dims, filespace, error) !NEW filespace (the size of the whole table)
+        call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, dset_id, error) !NEW dset_id
+        call h5sclose_f(filespace, error) !CLOSE filespace
+
+
+
+        call wLog("Parallel writing (localization topology)")
+        countND = maxPos - minPos + 1
+        offset = origin - 1
+        !dims   = countND
+        call wLog("minPos")
+        call wLog(int(minPos))
+        call wLog("maxPos")
+        call wLog(int(maxPos))
+        call wLog("countND")
+        call wLog(int(countND))
+        call wLog("offset")
+        call wLog(int(offset))
+        call wLog("minPos")
+        call wLog(minPos)
+        call wLog("maxPos")
+        call wLog(maxPos)
+
+        !CHOOSING SPACE IN MEMORY FOR THIS PROC
+        call wLog("countND = ")
+        call wLog(int(countND))
+        call wLog("offset = ")
+        call wLog(int(offset))
+        call h5screate_simple_f(rank, countND, memspace, error)  !NEW memspace
+
+        !CHOOSING SPACE IN FILE FOR THIS PROC
+        call h5dget_space_f(dset_id, filespace, error) !GET filespace
+        ! Select hyperslab in the file.
+        call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
+
+
+        ! Create property list for collective dataset write
+        call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error) !NEW plist_id (for dataset)
+        call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error) !SET plist to MPI (for dataset)
+
+        ! Putting data in a contiguous vector
+        allocate(randFieldLinear(product(int(countND,8))))
+
+
+        if(nDim == 2) then
+            !randFieldLinear = pack(RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), .true.)
+            randFieldLinear = reshape(RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
+                              [product(maxPos-minPos+1)])
+
+        else if (nDim == 3) then
+            !randFieldLinear = pack(RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), .true.)
+            randFieldLinear = reshape(RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
+                              [product(maxPos-minPos+1)])
+
+        end if
+
+        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+                            randFieldLinear, &
+                            dims, error, &
+                            file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+
+
+        ! Close dataspaces.
+        call h5sclose_f(filespace, error) !CLOSE filespace
+        call h5sclose_f(memspace, error) !CLOSE memspace
+
+        ! Close the property list
+        call h5pclose_f(plist_id, error) !CLOSE plist_id
+        ! Close the dataset.
+        call h5dclose_f(dset_id, error) !CLOSE dset_id
+
+
+        ! Close the file.
+        call h5fclose_f(file_id, error) !CLOSE file_id
+
+        ! Close FORTRAN predefined datatypes.
+        call h5close_f(error)
+
+        !write(*,*) "fileHDF5Name = ", fileHDF5Name
+        !if(present(HDF5Name)) then
+        !    HDF5Name = trim(adjustL(fileHDF5Name))
+        !    HDF5Name = adjustL(HDF5Name)
+        !    !write(get_fileId(),*) "'inside write HDF5' output -- HDF5Name = ", HDF5Name
+        !end if
+
+        if (allocated(randFieldLinear)) deallocate(randFieldLinear)
+        !if(allocated(localSlab)) deallocate(localSlab)
+
+        call write_MONO_HDF5_Str_XMF(trim(adjustL(fileHDF5Name)), xMinGlob, xMaxGlob, xStep, &
+                                     nDim, fileName, XMF_Folder, &
+                                     "../h5")
+
+        call wLog("------------END Writing result HDF5 file (MPI)-----------------------")
+
+    end subroutine write_Simple_pHDF5_Str
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
     subroutine write_pHDF5_Str(MSH, RDF, fileName, folderPath, &
                                  communicator, HDF5Name, HDF5FullPath, writeDataSet, localization)
         implicit none

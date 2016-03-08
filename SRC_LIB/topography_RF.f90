@@ -871,13 +871,14 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     subroutine set_communications_topology(MSH, coords, neigh, neighShift, considerNeighbour, &
-                                           mappingFromShift, op_neigh, procId_in)
+                                           mappingFromShift, op_neigh, procId_in, ext_Loc_in)
 
         implicit none
 
         !INPUT
         type(MESH), intent(in) :: MSH
         integer, intent(in), optional :: procId_in
+        logical, intent(in), optional :: ext_Loc_in
         !OUTPUT
         integer, dimension(:), intent(out) :: coords
         integer, dimension(:), intent(out) :: neigh
@@ -892,9 +893,13 @@ contains
         integer, dimension(MSH%nDim) :: deltaShift
         integer :: neighRank, coordComp, coordCompPos
         integer :: procId
+        logical :: ext_Loc
 
         procId = MSH%rang
         if(present(procId_in)) procId = procId_in
+        ext_Loc = .true.
+        if(present(ext_Loc_in)) ext_Loc = ext_Loc_in
+
 
         !Creating grids
         ones = 1.0D0
@@ -941,30 +946,15 @@ contains
 
         end do
 
+        if(.not. ext_Loc) then
+            coords(:)   = 0
+            neigh(:)    = -1
+            op_neigh(:) = -1
+        end if
+
         !Criteria to consider or not this neighbour
         considerNeighbour = .true.
         where(neigh < 0) considerNeighbour = .false.
-
-        !if (MSH%rang == 0) call show_MESHneigh(MSH, name="MSH NEIGHBOURS", onlyExisting=.false., unit_in=SCREEN)
-        !call show_MESHneigh(MSH, onlyExisting = .false., forLog = .true.)
-
-        !where(minval(MSH%neighShift,1) < 0) MSH%considerNeighbour = .false.
-
-        !call wLog("MSH%procPerDim = ")
-        !call wLog(MSH%procPerDim)
-        !call wLog("-> MPI_CART_CREATE")
-        !call MPI_CART_CREATE (MSH%comm, MSH%nDim, MSH%procPerDim, periods, .false., MSH%topComm, code)
-        !call wLog("-> MPI_CART_COORDS")
-        !call MPI_CART_COORDS (MSH%topComm, MSH%rang, MSH%nDim, MSH%coords, code)
-        !call wLog("     MSH%coords")
-        !call wLog(MSH%coords)
-
-        !if(MSH%independent) then
-            !call wLog("-> set_neighbours")
-            !call set_neighbours (MSH)
-            !call wLog("-> get_NeighbourCriteria")
-            !call get_NeighbourCriteria (MSH)
-        !end if
 
     end subroutine set_communications_topology
 
