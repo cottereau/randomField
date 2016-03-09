@@ -25,8 +25,8 @@ program main_RandomField
 
 	!LOCAL VARIABLES
     character(len=200) :: path, logFilePath
-    double precision, dimension(7) :: times, all_times
-    integer               :: code
+    double precision, dimension(10) :: times, all_times
+    integer :: code
 
     !INPUT VARIABLES
     type(IPT_RF)  :: IPT_Temp !Only for practicity purposes
@@ -40,7 +40,7 @@ program main_RandomField
     IPT_Temp%writeUNVinterpolation = .true.
     IPT_Temp%sameFolder = .true.
     IPT_Temp%outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
-    IPT_Temp%delete_intermediate_files = .false.
+    IPT_Temp%delete_intermediate_files = .true.
     IPT_Temp%sampleFields = .true.
     !Ps: IPT_Temp%ignoreTillLocLevel Defined after Reading Inputs
 
@@ -173,13 +173,24 @@ program main_RandomField
     if(IPT_Temp%rang == 0) write(*,*) ""
     if(IPT_Temp%rang == 0) write(*,*) ""
     if(IPT_Temp%rang == 0) write(*,*) "AVERAGE TIMES (WALL)------------------------ "
-    if(IPT_Temp%rang == 0) write(*,*) "Reading Inputs   = ", (all_times(2) - all_times(1))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Pre Organization = ", (all_times(3) - all_times(2))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Generation       = ", (all_times(4) - all_times(3))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Localization Int = ", (all_times(5) - all_times(4))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Localization Ext = ", (all_times(6) - all_times(5))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Writing Files    = ", (all_times(7) - all_times(6))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Reading Inputs        = ", (all_times(2) - all_times(1))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Pre Organization      = ", (all_times(3) - all_times(2))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Generation            = ", (all_times(4) - all_times(3))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Localization Int      = ", (all_times(5) - all_times(4))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Localization Ext      = ", (all_times(6) - all_times(5))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Writing Normalization = ", (all_times(7) - all_times(6))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Transforming          = ", (all_times(8) - all_times(7))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Writing Files         = ", (all_times(9) - all_times(8))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "UNV Interpolation     = ", (all_times(10) - all_times(9))/dble(IPT_Temp%nb_procs)
     if(IPT_Temp%rang == 0) write(*,*) ""
+
+    !4 - Sampling
+    !5 - Internal Localization
+    !6 - External Localization
+    !7 - Normalizing
+    !8 - Transformation
+    !9 - Writing Files
+    !10 - UNV Interpolation
 
 	!Deallocating
     call deallocate_all()

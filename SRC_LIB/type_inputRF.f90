@@ -174,6 +174,7 @@ contains
             IPT%margiFirst    = margiFirst
             IPT%seedStart     = seedStart
             IPT%nProcPerField = nProcPerField
+            IPT%procPerDim = procPerDim
             IPT%localizationLevel = localizationLevel
             IPT%writeDataSet = writeDataSet
             IPT%sameFolder = sameFolder

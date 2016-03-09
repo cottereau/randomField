@@ -653,8 +653,6 @@ contains
         integer :: direction, myRank
         integer :: neighRank
         integer, dimension(nDim) :: dirShift
-
-        double precision, dimension(nDim) ::xMinDir, xMaxDir
         integer :: op_direction
         integer(kind=8) :: nOvlpMax
         integer :: code
@@ -1105,8 +1103,6 @@ subroutine generateUnityPartition_Matrix(xNStep, overlap, corrL, xStep,&
     integer, dimension(nDim) :: overlapNPoints, overlapSizeInt
     double precision, dimension(nDim) :: originCorner
     double precision, dimension(:), allocatable :: pattern
-    integer :: dim1, dim2, sizeDim1, sizeDim2
-    !integer, dimension(nDim) :: minPos, maxPos
     integer, dimension(nDim) :: U_Lim, D_Lim
     logical :: considerNeighbour
 

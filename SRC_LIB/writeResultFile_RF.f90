@@ -68,8 +68,11 @@ contains
         end select
 
         if(RDF%rang == 0) then
-            call write_HDF5_attributes(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
-            !call finish_HDF5_file(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
+            !call write_HDF5_attributes(RDF, MSH, trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)))
+!            call write_HDF5_attributes(trim(adjustL(folderPath))//"/h5/"//trim(adjustL(HDF5Name)), &
+!                    RDF%nb_procs, RDF%nDim, RDF%Nmc, RDF%method, RDF%seedStart, &
+!                    RDF%corrMod, RDF%margiFirst, RDF%gen_CPU_Time, RDF%gen_CPU_Time/dble(RDF%nb_procs), &
+!                    MSH%xMinGlob, MSH%xMaxGlob, MSH%xStep, RDF%corrL, MSH%overlap)
         end if
 
         if(writeDataSet) then
@@ -753,20 +756,17 @@ contains
         integer(HID_T)                 :: file_id       !File identifier
         integer(HID_T)                 :: dset_id       !Dataset identifier
         integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
-        integer(HID_T)                 :: plist_id      ! Property list identifier
         integer(HID_T)                 :: filespace
         integer                        :: rank, rank1D !Dataset rank (number of dimensions)
         integer(HSIZE_T), dimension(nDim) :: dims !Dataset dimensions
         integer                        :: error !Error flag
         integer                        :: info
         integer(HSIZE_T) , dimension(nDim) :: countND
-        integer(HSSIZE_T), dimension(nDim) :: offset
         integer(HSIZE_T) , dimension(1) :: count1D
 
         !LOCAL VARIABLES
         integer(kind=8), dimension(nDim) :: total_xNStep
         character(LEN=8) :: dsetname = "samples"
-        integer, dimension(nDim) :: minPos, maxPos
         double precision, dimension(:), allocatable :: randFieldLinear
         character(len=110) :: XMF_Folder, HDF5_Folder
 
@@ -992,15 +992,13 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_Simple_pHDF5_Str(randField, minPos, maxPos, &
+    subroutine write_Simple_pHDF5_Str(minPos, maxPos, &
                                       nDim, Nmc, loc_Comm, RF_2D, RF_3D, &
                                       origin, xNStep, xStep,&
                                       xMinGlob, xNStep_Glob, &
                                       filename, folderPath, &
-                                      HDF5Name, HDF5FullPath)
+                                      HDF5FullPath, XMFFullPath)
         implicit none
-        !INPUT OUTPUT
-        double precision, dimension(:,:), intent(inout) :: randField
         !INPUT
         integer, dimension(:), intent(in) :: minPos, maxPos
         integer, intent(in) :: nDim, loc_Comm, Nmc !OBS Nmc, was setted manually in the caller
@@ -1011,7 +1009,7 @@ contains
         character(len=*)                  , intent(in) :: folderPath
         integer, dimension(:), intent(in) :: origin, xNStep, xNStep_Glob
         !OUTPUTS
-        character(len=*)  , intent(out), optional ::HDF5Name, HDF5FullPath
+        character(len=*)  , intent(out), optional ::HDF5FullPath, XMFFullPath
 
         !HDF5 VARIABLES
         character(len=110)             :: fileHDF5Name, fullPath !File name
@@ -1033,6 +1031,8 @@ contains
         double precision, dimension(:), allocatable :: randFieldLinear
         character(len=110) :: XMF_Folder, HDF5_Folder
         double precision, dimension(nDim) :: xMaxGlob
+
+        error = Nmc !To avoid warning while Nmc /= 1 not implemented
 
         xMaxGlob = xMinGlob + dble(xNStep_Glob-1)*xStep
 
@@ -1059,6 +1059,7 @@ contains
         fileHDF5Name = trim(fileName)//".h5"
         fullPath     = string_join(HDF5_Folder,"/"//fileHDF5Name)
         if(present(HDF5FullPath)) HDF5FullPath = fullPath
+        if(present(XMFFullPath)) XMFFullPath = string_join_many(XMF_Folder,"/",fileName,".xmf")
         call wLog("' fileHDF5Name = ")
         call wLog(fileHDF5Name)
 
@@ -1671,12 +1672,24 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_HDF5_attributes(RDF, MSH, HDF5Path)
+    subroutine write_HDF5_attributes(HDF5Path, &
+                                     nb_procs, nDim, Nmc, method, seedStart, &
+                                     corrMod, margiFirst, &
+                                     BT_avg, BT_stdDev, BT_min, BT_max, gen_times, gen_WALL_Time, &
+                                     localizationLevel, &
+                                     xMinGlob, xMaxGlob, xStep, corrL, overlap, &
+                                     procExtent, kMax_out, kNStep_out)
         implicit none
         !INPUTS
-        type(RF), intent(in)   :: RDF
-        type(MESH), intent(in) :: MSH
         character (len=*), intent(in) :: HDF5Path
+        integer, intent(in) :: nb_procs, nDim, Nmc, method, &
+                               seedStart, corrMod, margiFirst, localizationLevel
+        double precision, dimension(:), intent(in) :: BT_avg, BT_stdDev, BT_min, BT_max
+        double precision, dimension(:), intent(in) :: gen_times
+        double precision, intent(in) :: gen_WALL_Time
+        double precision, dimension(:), intent(in) :: xMinGlob, xMaxGlob, xStep, corrL, overlap
+        double precision, dimension(:), intent(in) :: procExtent, kMax_out
+        integer         , dimension(:), intent(in) :: kNStep_out
 
         !LOCAL
         character(len=50) :: attr_name
@@ -1694,39 +1707,42 @@ contains
         !attr_name = "independent"
         !call write_h5attr_bool(file_id, trim(adjustL(attr_name)), indep)
 
+
         !INTEGERS
         attr_name = "nb_procs"
-        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%nb_procs)
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), nb_procs)
         attr_name = "nDim"
-        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%nDim)
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), nDim)
         attr_name = "Nmc"
-        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%Nmc)
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), Nmc)
         attr_name = "method"
-        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%method)
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), method)
         attr_name = "seedStart"
-        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%seedStart)
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), seedStart)
         attr_name = "corrMod"
-        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%corrMod)
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), corrMod)
         attr_name = "margiFirst"
-        call write_h5attr_int(file_id, trim(adjustL(attr_name)), RDF%margiFirst)
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), margiFirst)
+        attr_name = "localizationLevel"
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), localizationLevel)
+
         !attr_name = "sum_xNTotal"
         !call write_h5attr_int_long(file_id, trim(adjustL(attr_name)), sum_xNTotal)
         !attr_name = "sum_kNTotal"
         !call write_h5attr_int(file_id, trim(adjustL(attr_name)), sum_kNTotal)
 
 
-
         !DOUBLE
-        attr_name = "gen_CPU_Time"
-        call write_h5attr_real(file_id, trim(adjustL(attr_name)), RDF%gen_CPU_Time)
+        !attr_name = "gen_CPU_Time"
+        !call write_h5attr_real(file_id, trim(adjustL(attr_name)), gen_CPU_Time)
         attr_name = "gen_WALL_Time"
-        call write_h5attr_real(file_id, trim(adjustL(attr_name)), RDF%gen_CPU_Time/dble(RDF%nb_procs))
+        call write_h5attr_real(file_id, trim(adjustL(attr_name)), gen_WALL_Time)
 
         !INTEGER VEC
-        attr_name = "seed"
-        call write_h5attr_int_vec(file_id, trim(adjustL(attr_name)), RDF%seed)
+        !attr_name = "seed"
+        !call write_h5attr_int_vec(file_id, trim(adjustL(attr_name)), seed)
         attr_name = "kNStep"
-        call write_h5attr_int_vec(file_id, attr_name, RDF%kNStep)
+        call write_h5attr_int_vec(file_id, attr_name, kNStep_out)
         !attr_name = "sum_xNStep"
         !call write_h5attr_int(file_id, trim(adjustL(attr_name)), sum_xNStep)
         !attr_name = "sum_kNStep"
@@ -1734,17 +1750,33 @@ contains
 
         !DOUBLE VEC
         attr_name = "xMinGlob"
-        call write_h5attr_real_vec(file_id, attr_name, MSH%xMinGlob)
+        call write_h5attr_real_vec(file_id, attr_name, xMinGlob)
         attr_name = "xMaxGlob"
-        call write_h5attr_real_vec(file_id, attr_name, MSH%xMaxGlob)
+        call write_h5attr_real_vec(file_id, attr_name, xMaxGlob)
         attr_name = "xStep"
-        call write_h5attr_real_vec(file_id, attr_name, MSH%xStep)
-        attr_name = "kMax"
-        call write_h5attr_real_vec(file_id, attr_name, RDF%kMax)
+        call write_h5attr_real_vec(file_id, attr_name, xStep)
+        !attr_name = "kMax"
+        !call write_h5attr_real_vec(file_id, attr_name, RDF%kMax)
         attr_name = "corrL"
-        call write_h5attr_real_vec(file_id, attr_name, RDF%corrL)
+        call write_h5attr_real_vec(file_id, attr_name, corrL)
         attr_name = "overlap"
-        call write_h5attr_real_vec(file_id, attr_name, MSH%overlap)
+        call write_h5attr_real_vec(file_id, attr_name, overlap)
+        attr_name = "procExtent"
+        call write_h5attr_real_vec(file_id, attr_name, procExtent)
+        attr_name = "kMax_out"
+        call write_h5attr_real_vec(file_id, attr_name, kMax_out)
+
+        attr_name = "BT_avg"
+        call write_h5attr_real_vec(file_id, attr_name, BT_avg)
+        attr_name = "BT_stdDev"
+        call write_h5attr_real_vec(file_id, attr_name, BT_stdDev)
+        attr_name = "BT_min"
+        call write_h5attr_real_vec(file_id, attr_name, BT_min)
+        attr_name = "BT_max"
+        call write_h5attr_real_vec(file_id, attr_name, BT_max)
+        attr_name = "gen_times"
+        call write_h5attr_real_vec(file_id, attr_name, gen_times)
+
 
         call h5fclose_f(file_id, error)! Close the file.
         call h5close_f(error) ! Close FORTRAN interface
