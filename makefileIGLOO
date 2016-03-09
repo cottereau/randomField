@@ -124,12 +124,13 @@ calls_RF.o           : constants_RF.o \
 			           mesh_RF.o \
 			           randomFieldND.o \
 			           ranlib.o \
+			           type_inputRF.o \
 			           type_MESH.o \
 			           type_RF.o \
 			           write_Log_File.o \
-			           writeResultFile_RF.o
-sample_RF.o          : calls_RF.o \
-					   constants_RF.o \
+			           writeResultFile_RF.o \
+			           sample_RF.o
+sample_RF.o          : constants_RF.o \
 			           common_variables_RF.o \
 			           displayCarvalhol.o \
 			           dgemm.o \
