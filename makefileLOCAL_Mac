@@ -91,124 +91,125 @@ INCLUDE = $(INCLUDEHDF5) $(INCLUDEMPI) $(INCLUDEFFTW)
 
 #Dependencies
 main_RandomField.o   : calls_RF.o \
-			           charFunctions.o \
-			           constants_RF.o \
-			           common_variables_RF.o \
-			           displayCarvalhol.o \
-					   dger.o mesh_RF.o \
-			           randomFieldND.o \
-			           readFile_RF.o \
-			           readUNV_RF.o \
-			           sample_RF.o \
-			           systemUt_RF.o \
+	               charFunctions.o \
+		       constants_RF.o \
+		       common_variables_RF.o \
+		       displayCarvalhol.o \
+		       dger.o mesh_RF.o \
+		       randomFieldND.o \
+		       readFile_RF.o \
+		       readUNV_RF.o \
+		       sample_RF.o \
+		       systemUt_RF.o \
                        statistics_RF.o \
                        type_inputRF.o \
-			           type_MESH.o \
-			           type_RF.o \
-			           write_Log_File.o \
-			           writeResultFile_RF.o
+		       type_MESH.o \
+		       type_RF.o \
+		       write_Log_File.o \
+		       writeResultFile_RF.o
 main_Stat.o          : charFunctions.o \
                        common_variables_RF.o \
-				       constants_RF.o \
-					   displayCarvalhol.o \
-					   hdf5_RF.o \
-					   math_RF.o \
+		       constants_RF.o \
+		       displayCarvalhol.o \
+	               hdf5_RF.o \
+		       math_RF.o \
                        write_Log_File.o \
                        readFile_RF.o \
                        systemUt_RF.o \
-					   statistics_RF.o \
-					   type_STAT.o	           				  
+		       statistics_RF.o \
+		       type_STAT.o	           				  
 calls_RF.o           : constants_RF.o \
-			           common_variables_RF.o \
-			           displayCarvalhol.o \
-			           dgemm.o \
-			           localization_RF.o \
-			           math_RF.o \
-			           mesh_RF.o \
-			           randomFieldND.o \
-			           ranlib.o \
-			           type_inputRF.o \
-			           type_MESH.o \
-			           type_RF.o \
-			           write_Log_File.o \
-			           writeResultFile_RF.o \
-			           sample_RF.o
+		       common_variables_RF.o \
+		       displayCarvalhol.o \
+		       dgemm.o \
+		       localization_RF.o \
+		       math_RF.o \
+		       mesh_RF.o \
+		       randomFieldND.o \
+		       ranlib.o \
+		       type_inputRF.o \
+		       type_MESH.o \
+		       type_RF.o \
+		       write_Log_File.o \
+		       writeResultFile_RF.o \
+		       sample_RF.o
 sample_RF.o          : constants_RF.o \
-			           common_variables_RF.o \
-			           displayCarvalhol.o \
-			           dgemm.o \
-			           localization_RF.o \
-			           math_RF.o \
-			           mesh_RF.o \
-			           randomFieldND.o \
-			           ranlib.o \
-			           type_inputRF.o \
-			           type_MESH.o \
-			           type_RF.o \
+		       common_variables_RF.o \
+		       displayCarvalhol.o \
+		       dgemm.o \
+		       localization_RF.o \
+		       math_RF.o \
+		       mesh_RF.o \
+		       randomFieldND.o \
+		       ranlib.o \
+		       type_inputRF.o \
+		       type_MESH.o \
+		       type_RF.o \
                        topography_RF.o \
-			           write_Log_File.o \
-			           writeResultFile_RF.o			           
+		       write_Log_File.o \
+		       writeResultFile_RF.o			           
 randomFieldND.o      : constants_RF.o \
                        common_variables_RF.o \
                        displayCarvalhol.o \
-			           dgemm.o \
-			           fftw3.o \
-			           math_RF.o \
-			           mesh_RF.o \
-			           ranlib.o \
-			           spectra_RF.o \
-			           type_MESH.o \
-			           type_RF.o \
-			           write_Log_File.o \
-			           writeResultFile_RF.o
+		       dgemm.o \
+		       fftw3.o \
+		       math_RF.o \
+		       mesh_RF.o \
+		       ranlib.o \
+		       spectra_RF.o \
+		       type_MESH.o \
+		       type_RF.o \
+		       write_Log_File.o \
+		       writeResultFile_RF.o
 localization_RF.o    : constants_RF.o \
-			           common_variables_RF.o \
+		       common_variables_RF.o \
                        displayCarvalhol.o \
-			           math_RF.o \
-			           randomFieldND.o \
-			           type_MESH.o \
-			           type_RF.o \
-			           write_Log_File.o
+		       math_RF.o \
+		       randomFieldND.o \
+		       type_MESH.o \
+		       type_RF.o \
+		       write_Log_File.o
 mesh_RF.o            : fftw3.o \
                        math_RF.o \
-			           type_MESH.o \
+		       type_MESH.o \
                        type_RF.o \
-			           write_Log_File.o
+		       write_Log_File.o
 topography_RF.o      : fftw3.o \
                        math_RF.o \
                        type_inputRF.o \
-			           type_MESH.o \
+		       type_MESH.o \
                        type_RF.o \
-			           write_Log_File.o			           
+		       write_Log_File.o			           
 writeResultFile_RF.o : displayCarvalhol.o \
-			           math_RF.o \
-			           statistics_RF.o \
-			           write_Log_File.o \
-			           constants_RF.o \
-			           mesh_RF.o \
-					   type_RF.o \
-			           type_MESH.o \
-			           hdf5_RF.o
+		       math_RF.o \
+		       statistics_RF.o \
+		       write_Log_File.o \
+		       constants_RF.o \
+		       mesh_RF.o \
+		       type_RF.o \
+		       type_MESH.o \
+		       hdf5_RF.o
 hdf5_RF.o            : displayCarvalhol.o \
                        math_RF.o \
                        write_Log_File.o
 statistics_RF.o      : displayCarvalhol.o \
-			           math_RF.o \
-			           write_Log_File.o \
-			           type_STAT.o
+		       math_RF.o \
+		       write_Log_File.o \
+		       type_STAT.o
 spectra_RF.o         : displayCarvalhol.o \
-			           math_RF.o \
-			           write_Log_File.o \
-			           constants_RF.o \
+		       math_RF.o \
+		       write_Log_File.o \
+		       constants_RF.o \
                        ranlib.o \
-			           type_RF.o
+		       type_RF.o
 math_RF.o            : displayCarvalhol.o \
-			           write_Log_File.o \
-			           constants_RF.o
+		       write_Log_File.o \
+		       constants_RF.o
 readUNV_RF.o         : displayCarvalhol.o \
-			           write_Log_File.o
+		       write_Log_File.o
 systemUt_RF.o        : write_Log_File.o
 write_Log_File.o     : charFunctions.o
+charFunctions.o      : constants_RF.o
 displayCarvalhol.o   : constants_RF.o \
                        write_Log_File.o
 type_RF.o            : charFunctions.o \
@@ -216,7 +217,7 @@ type_RF.o            : charFunctions.o \
                        type_inputRF.o \
                        type_MESH.o 
 type_MESH.o          : charFunctions.o \
-					   type_inputRF.o
+		       type_inputRF.o
 type_inputRF.o       : readFile_RF.o \
                        readUNV_RF.o
 dgemm.o              : lsame.o xerbla.o
@@ -226,10 +227,10 @@ spmpar.o             : ipmpar.o
 cumnor.o             : spmpar.o
 stvaln.o             : devlpl.o
 dinvnr.o             : stvaln.o \
-			           cumnor.o
+		       cumnor.o
 cdfnor.o             : dinvnr.o \
-			           spmpar.o \
-			           cumnor.o
+		       spmpar.o \
+		       cumnor.o
 
 # Making all the ".o" from the ".f90"
 %.o: ../randomField/SRC_EXE/%.f90
@@ -268,9 +269,8 @@ cdfnor.o             : dinvnr.o \
 	@echo ' '	
 	
 # All Target
-all: randomField statistics
-# all: randomField
-# all: statistics
+# all: randomField statistics
+all: randomField
 
 # Tool invocations
 randomField: $(RF_OBJ) $(COMM_OBJ)
