@@ -23,7 +23,7 @@ program main_RandomField
     !INPUTS
 
 
-	!LOCAL VARIABLES
+    !LOCAL VARIABLES
     character(len=200) :: path, logFilePath
     double precision, dimension(10) :: times, all_times
     integer :: code
@@ -40,9 +40,8 @@ program main_RandomField
     IPT_Temp%writeUNVinterpolation = .true.
     IPT_Temp%sameFolder = .true.
     IPT_Temp%outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
-    IPT_Temp%delete_intermediate_files = .true.
+    IPT_Temp%write_intermediate_files = .false.
     IPT_Temp%sampleFields = .true.
-    !Ps: IPT_Temp%ignoreTillLocLevel Defined after Reading Inputs
 
     times(1) = MPI_Wtime() !Initial Time
 
@@ -102,8 +101,6 @@ program main_RandomField
     !call wLog("        file: "//trim(path))
     call read_generation_input(path, IPT_Temp)
 
-    IPT_Temp%ignoreTillLocLevel = IPT_Temp%localizationLevel - 1 !<1 doesn't affetct the behaviour of the program (for restarts)
-
     !Validating Inputs----------------------------------------------
     if(IPT_Temp%rang == 0) write(*,*)  "     -> Validating Input (IPT_Temp)"
     call wLog("    Validating Inputs (IPT_Temp)")
@@ -160,8 +157,7 @@ program main_RandomField
         writeDataSet = IPT_Temp%writeDataSet, &
         sameFolder = IPT_Temp%sameFolder, &
         outputStyle = IPT_Temp%outputStyle, &
-        delete_intermediate_files = IPT_Temp%delete_intermediate_files, &
-        ignoreTillLocLevel = IPT_Temp%ignoreTillLocLevel, &
+        write_intermediate_files = IPT_Temp%write_intermediate_files, &
         sampleFields = IPT_Temp%sampleFields, &
         writeUNVinterpolation = IPT_Temp%writeUNVinterpolation)
 
@@ -271,11 +267,9 @@ program main_RandomField
             if(IPT_Temp%rang == 0) write(*,*) "     single_path = "//trim(single_path)
 
             !create xmf and h5 folders
-            !if(writeFiles) then
-            path = string_vec_join([results_path,"/",results_folder_name])
+            path = string_join_many(results_path,"/",results_folder_name)
             call create_folder("xmf", path, IPT_Temp%rang, comm)
             call create_folder("h5", path, IPT_Temp%rang, comm)
-            !end if
 
         end subroutine init_basic_folders
 

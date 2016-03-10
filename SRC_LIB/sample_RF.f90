@@ -397,10 +397,10 @@ contains
             !call DispCarvalhol(randField_Local, "randField_Local ")
 
             !write(*,*) "AFTER Gathering Sample"
-            if(gen_rang == 0) write(*,*) "shape(randField_Local) = ", shape(randField_Local)
+            !if(gen_rang == 0) write(*,*) "shape(randField_Local) = ", shape(randField_Local)
             !if(gen_rang == 0) write(*,*) "shape(randField_Test) = ", shape(randField_Test)
-            if(gen_rang == 0) write(*,*) "rf_sizes = ", rf_sizes
-            if(gen_rang == 0) write(*,*) "offset = ", offset
+            !if(gen_rang == 0) write(*,*) "rf_sizes = ", rf_sizes
+            !if(gen_rang == 0) write(*,*) "offset = ", offset
             !if(gen_rang == 0) call DispCarvalhol(randField_inProc, "randField_inProc ")
             !if(gen_rang == 0) write(*,*) "randField_Test = ", randField_Test
 
@@ -415,7 +415,7 @@ contains
 !        subroutine combine_subdivisions(IPT, outputStyle, randField_Group, &
 !                                        stepProc, procExtent, overlap, &
 !                                        t_ref, t_prep, t_gen, gen_times, &
-!                                        delete_intermediate_files, &
+!                                        write_intermediate_files, &
 !                                        loc_group, loc_Comm, loc_groupMax, finalFieldPath)
 !            implicit none
 !            !INPUT
@@ -426,7 +426,7 @@ contains
 !            double precision, intent(in) :: t_ref, t_prep, t_gen
 !            double precision, dimension(:), intent(in) :: gen_times
 !            !integer, intent(in) :: nGenGroups
-!            logical, intent(in) :: delete_intermediate_files
+!            logical, intent(in) :: write_intermediate_files
 !            integer, intent(in) :: loc_group, loc_Comm, loc_groupMax
 !
 !            !OUTPUT
@@ -663,8 +663,8 @@ contains
 !                        !call h5fclose_f(file_id, hdferr) ! Close the file.
 !                        !call h5close_f(hdferr) ! Close FORTRAN interface.
 !                        !
-!                        !if(delete_intermediate_files) call system("rm "//trim(randFieldFilePath))
-!                        !if(delete_intermediate_files) call system("rm "//trim(XMFFilePath))
+!                        !if(write_intermediate_files) call system("rm "//trim(randFieldFilePath))
+!                        !if(write_intermediate_files) call system("rm "//trim(XMFFilePath))
 !                        !!call DispCarvalhol(globRDF%randField_Local, "globRDF%randField_Local")
 !
 !                        if(globRDF%nb_procs > 1) then

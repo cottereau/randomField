@@ -176,7 +176,7 @@ contains
             subdivisionId(:,i) = nint((subdivisionCoords(:,i)-IPT%xMinGlob)/IPT%stepProc)
         end do
         if(IPT%rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
-        if(IPT%rang == 0) call DispCarvalhol(subdivisionId, "subdivisionId")
+        !if(IPT%rang == 0) call DispCarvalhol(subdivisionId, "subdivisionId")
         if(IPT%rang == 0) write(*,*) "Max Coord = ", subdivisionCoords(:, size(subdivisionCoords,2)) + IPT%procExtent
 
         !Discovering number of fields in each proc
@@ -194,7 +194,7 @@ contains
 
             allocate(randField_inProc(xNTotal_Proc, IPT%Nmc, nSamplesInProc))
 
-            if(.not. IPT%delete_intermediate_files) allocate(MONO_FileNames(nSamplesInProc))
+            if(IPT%write_intermediate_files) allocate(MONO_FileNames(nSamplesInProc))
             allocate(xMinFiles(IPT%nDim, nSamplesInProc))
             allocate(xMaxFiles(IPT%nDim, nSamplesInProc))
 
@@ -264,7 +264,7 @@ contains
                     if(IPT%gen_rang == 0) then
                         xMinFiles(:, countFields) = subdivisionCoords(:,i)
                         xMaxFiles(:, countFields) = xMinFiles(:, countFields) + IPT%procExtent
-                        if(.not. IPT%delete_intermediate_files) then
+                        if(IPT%write_intermediate_files) then
                             call wLog("Writing intermediate generation file")
                             MONO_FileNames(countFields) = "GEN"
 
@@ -290,6 +290,9 @@ contains
         build_times(3) = MPI_Wtime() !Sampling
 
         ! INTERNAL LOCALIZATION-----------------------------------
+        if(IPT%rang == 0) write(*,*) " "
+        if(IPT%rang == 0) write(*,*) "-> INTERNAL LOCALIZATION----------------------------------------"
+
         if(IPT%loc_group == 0) then
 
             !Localization Inside Group
@@ -325,7 +328,7 @@ contains
             call wLog("Generating Partition of Unity")
             call generateUnityPartition_Matrix(xNStep_Proc, IPT%overlap, IPT%corrL, IPT%xStep,&
                                          1, unityPartition, IPT%nDim)
-            if(.not. IPT%delete_intermediate_files) then
+            if(IPT%write_intermediate_files) then
                 MONO_FileName = string_join_many("PofUnit_L0_Group",numb2String(IPT%gen_group))
                 call write_MONO_proc_result(IPT%procExtent*0, IPT%procExtent, &
                                             IPT%xStep, IPT%nDim, &
@@ -340,7 +343,7 @@ contains
                 !Multiplication
                 do j = 1, IPT%Nmc
                     randField_inProc(:,j,i) = randField_inProc(:,j,i)*unityPartition
-                    if(.not. IPT%delete_intermediate_files) then
+                    if(IPT%write_intermediate_files) then
                         MONO_FileName = MONO_FileNames(i)
                         MONO_FileName = string_join_many("LOC_L0_P", numb2String(IPT%rang), "-",MONO_FileName)
                         if(IPT%gen_rang == 0) call write_MONO_proc_result(xMinFiles(:, i), xMaxFiles(:, i), &
@@ -353,7 +356,8 @@ contains
 
                 !Sum
                 minP = find_xNStep(xMin_Group, xMinFiles(:, i), IPT%xStep)
-                maxP = minP + find_xNStep(xMaxExt=IPT%procExtent, xStep=IPT%xStep)
+                maxP = minP + xNStep_Proc - 1
+
                 if(IPT%nDim_gen == 2) then
                     RF_2D_Proc(1:xNStep_Proc(1),1:xNStep_Proc(2)) => randField_inProc(:,1,i)
 
@@ -373,7 +377,7 @@ contains
 
             if(allocated(unityPartition)) deallocate(unityPartition)
 
-            if(.not. IPT%delete_intermediate_files) then
+            if(IPT%write_intermediate_files) then
                 MONO_FileName = string_join_many("LOC_L1_P", numb2String(IPT%rang), "BEF_Cor-GROUP",numb2String(IPT%gen_group))
                 if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
                                                               IPT%xStep, IPT%nDim, &
@@ -387,7 +391,7 @@ contains
                                                1, unityPartition, IPT%nDim, &
                                                IPT%neigh, IPT%neighShift, reverse = .true.)
 
-            if(.not. IPT%delete_intermediate_files) then
+            if(IPT%write_intermediate_files) then
                 MONO_FileName = string_join_many("PofUnit_L1_Group",numb2String(IPT%gen_group))
                 if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
                                                               IPT%xStep, IPT%nDim, &
@@ -411,7 +415,7 @@ contains
 
             randField_Group(:,1) = randField_Group(:,1)/unityPartition
 
-            if(.not. IPT%delete_intermediate_files) then
+            if(IPT%write_intermediate_files) then
                 MONO_FileName = string_join_many("LOC_L1_P", numb2String(IPT%rang), "AFT_Cor-GROUP",numb2String(IPT%gen_group))
                 if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
                                                               IPT%xStep, IPT%nDim, &
@@ -426,14 +430,15 @@ contains
 
             if(allocated(unityPartition)) deallocate(unityPartition)
 
-        end if
+        end if !END INTERNAL LOCALIZATION
 
         !call MPI_BARRIER(IPT%loc_Comm, code)
         build_times(4) = MPI_Wtime() !Internal Localization Time
 
+         ! EXTERNAL LOCALIZATION-----------------------------------
+         if(IPT%rang == 0) write(*,*) " "
+         if(IPT%rang == 0) write(*,*) "-> EXTERNAL LOCALIZATION----------------------------------------"
 
-
-        ! EXTERNAL LOCALIZATION-----------------------------------
         if(IPT%loc_group == 0 .and. IPT%extLoc) then
             !Combining realizations (communicating between procs)
 
@@ -444,7 +449,7 @@ contains
                                         IPT%nDim, IPT%neigh, IPT%op_neigh, IPT%neighShift, xNTotal_Group, &
                                         IPT%rang, IPT%loc_comm)
 
-            if(.not. IPT%delete_intermediate_files) then
+            if(IPT%write_intermediate_files) then
                 MONO_FileName = string_join_many("LOC_L1_P", numb2String(IPT%rang), "AFT_Sum-GROUP",numb2String(IPT%gen_group))
                 if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
                                                                   IPT%xStep, IPT%nDim, &
@@ -459,10 +464,10 @@ contains
 
         ! TRANSFORMATION AND OUTPUT WRITING
         if(IPT%rang == 0) write(*,*) "-> TRANFORMING AND WRITING OUTPUT--------------------"
-            call wLog("-> TRANFORMING AND WRITING OUTPUT--------------------")
+        call wLog("-> TRANFORMING AND WRITING OUTPUT--------------------")
+
         if(IPT%loc_group == 0) then
             !Normalizing and Writing files
-            !xNTotal = product(nint((IPT%xMaxGlob-IPT%xMinGlob)/IPT%xStep,8) +1)
             call transform_and_write_output(randField_Group, xNStep_Group, origin_Group, &
                                             IPT, build_times, BBoxPath, XMFPath)
         end if
@@ -551,32 +556,37 @@ contains
         call wLog(t_final)
         call wLog("gen_WALL_Time = ")
         call wLog(gen_WALL_Time)
-
+!
         if(IPT%rang == 0) then
+
+
+            BT_avg    = BT_sum/dble(IPT%nb_procs)
+            BT_stdDev = sqrt(BT2_sum/dble(IPT%nb_procs) - BT_avg**2.0D0)
+
+            call wLog("Build Times (BT)")
+            call wLog("|1 - Reference")
+            call wLog("|2 - Organizing")
+            call wLog("|3 - Sampling")
+            call wLog("|4 - Internal Localization")
+            call wLog("|5 - External Localization")
+            call wLog("|6 - Normalizing")
+            call wLog("|7 - Transformation")
+            call wLog("|8 - Writing Files")
+            call wLog("|9 - UNV Interpolation")
 
             call wLog("BT_min = ")
             call wLog(BT_min)
             call wLog("BT_max = ")
             call wLog(BT_max)
+            call wLog("BT_avg    = ")
+            call wLog(BT_avg)
+            call wLog("BT_stdDev = ")
+            call wLog(BT_stdDev)
 
-            call wLog("BT_sum = ")
-            call wLog(BT_sum)
-            call wLog("BT2_sum = ")
-            call wLog(BT2_sum)
-
-            BT_avg    = BT_sum/dble(IPT%nb_procs)
-            BT_stdDev = sqrt(BT2_sum/dble(IPT%nb_procs) - BT_avg**2.0D0)
-!            write(*,*) "BT_avg     = ", BT_avg
-!            write(*,*) "BT_stdDev  = ", BT_stdDev
-
-            write(*,*) "BT_avg      = ", BT_avg
-            write(*,*) "BT_stdDev   = ", BT_stdDev
-            write(*,*) " "
-            write(*,*) " "
             call getcwd(MONO_FileName)
             !write(*,*) "PATH: ", MONO_FileName
-            write(*,*) "OUTPUT HDF5 ON: ", string_join_many(MONO_FileName, BBoxPath(2:))
-            write(*,*) "OUTPUT XMF ON:  ", string_join_many(MONO_FileName, XMFPath(2:))
+            write(*,*) "OUTPUT HDF5 ON: ", trim(string_join_many(MONO_FileName, BBoxPath(2:)))
+            write(*,*) "OUTPUT XMF  ON: ", trim(string_join_many(MONO_FileName, XMFPath(2:)))
 
             call write_HDF5_attributes(BBoxPath, &
                 IPT%nb_procs, IPT%nDim, IPT%Nmc, IPT%method, IPT%seedStart, &

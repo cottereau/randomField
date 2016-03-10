@@ -1,34 +1,36 @@
 module charFunctions
 
+    use constants_RF
+
     implicit none
 
 contains
 
-    !-----------------------------------------------------------------------------------------------
-    !-----------------------------------------------------------------------------------------------
-    function string_vec_join(stringVec) result(stringTot)
-
-        implicit none
-
-        !INPUT
-        character (len=*), dimension(:), intent(in) :: stringVec;
-
-        !OUTPUT
-        character (len=200) :: stringTot;
-
-        !LOCAL
-        integer :: i
-
-        !write(*,*) "WRITE Flag string_join"
-        stringTot = ""
-
-        do i = 1, size(stringVec)
-            stringTot = string_join(stringTot, stringVec(i))
-        end do
-
-        stringTot = adjustL(stringTot)
-
-    end function string_vec_join
+!    !-----------------------------------------------------------------------------------------------
+!    !-----------------------------------------------------------------------------------------------
+!    function string_vec_join(stringVec) result(stringTot)
+!
+!        implicit none
+!
+!        !INPUT
+!        character (len=*), dimension(:), intent(in) :: stringVec;
+!
+!        !OUTPUT
+!        character (len=200) :: stringTot;
+!
+!        !LOCAL
+!        integer :: i
+!
+!        !write(*,*) "WRITE Flag string_join"
+!        stringTot = ""
+!
+!        do i = 1, size(stringVec)
+!            stringTot = string_join(stringTot, stringVec(i))
+!        end do
+!
+!        stringTot = adjustL(stringTot)
+!
+!    end function string_vec_join
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -57,7 +59,7 @@ contains
         character (len=*), intent(in), optional  :: string15;
 
         !OUTPUT
-        character (len=200) :: stringTot;
+        character (len=buf_RF) :: stringTot;
 
         !write(*,*) "WRITE Flag string_join"
         stringTot = ""
@@ -92,7 +94,7 @@ contains
         character (len=*)  , intent(in) :: string1, string2;
 
         !OUTPUT
-        character (len=100) :: stringTot;
+        character (len=buf_RF) :: stringTot;
 
         !write(*,*) "WRITE Flag string_join"
 
@@ -112,7 +114,7 @@ contains
         integer            , intent(in) :: number
 
         !OUTPUT
-        character (len=100) :: stringTot;
+        character (len=buf_RF) :: stringTot;
 
         !LOCAL
         character (len=30)  :: nmbString

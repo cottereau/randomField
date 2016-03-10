@@ -48,8 +48,8 @@ module type_inputRF
         logical :: writeDataSet = .true.
         logical :: sameFolder = .false.
         integer :: outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
-        logical :: delete_intermediate_files = .true.
-        integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
+        logical :: write_intermediate_files = .false.
+        !integer :: ignoreTillLocLevel = 0 !<1 doesn't affetct the behaviour of the program (for restarts)
         logical :: sampleFields = .true.
         logical :: writeUNVinterpolation
 
@@ -102,8 +102,7 @@ contains
         writeDataSet, &
         sameFolder, &
         outputStyle, &
-        delete_intermediate_files, &
-        ignoreTillLocLevel, &
+        write_intermediate_files, &
         sampleFields, &
         writeUNVinterpolation  )
 
@@ -144,8 +143,7 @@ contains
             logical, intent(in) :: writeDataSet
             logical, intent(in) :: sameFolder
             integer, intent(in) :: outputStyle!1: parallel hdf5, 2: hdf5 per proc
-            logical, intent(in) :: delete_intermediate_files
-            integer, intent(in) :: ignoreTillLocLevel!<1 doesn't affetct the behaviour of the program (for restarts)
+            logical, intent(in) :: write_intermediate_files
             logical, intent(in) :: sampleFields
             logical, intent(in) :: writeUNVinterpolation
 
@@ -179,8 +177,7 @@ contains
             IPT%writeDataSet = writeDataSet
             IPT%sameFolder = sameFolder
             IPT%outputStyle = outputStyle
-            IPT%delete_intermediate_files = delete_intermediate_files
-            IPT%ignoreTillLocLevel = ignoreTillLocLevel
+            IPT%write_intermediate_files = write_intermediate_files
             IPT%sampleFields = sampleFields
             IPT%writeUNVinterpolation = writeUNVinterpolation
 
@@ -452,7 +449,6 @@ contains
             call read_DataTable(dataTable, "seedStart"  , IPT%seedStart)
             call read_DataTable(dataTable, "corrL"      , IPT%corrL_in)
             call read_DataTable(dataTable, "nFields"    , IPT%nFields)
-            call read_DataTable(dataTable, "nProcPerField", IPT%nProcPerField)
             call read_DataTable(dataTable, "localizationLevel", IPT%localizationLevel)
             call read_DataTable(dataTable, "overlap", IPT%overlap_in)
 

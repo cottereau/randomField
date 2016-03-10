@@ -182,8 +182,8 @@ module type_MESH
 
                 dblFmt = "T20,F15.5"
                 intFmt = "T20,I15"
-                matDblFmt = string_vec_join(["T20,",trim(numb2String(MESH_a%nDim)),"F15.5"])
-                matIntFmt = string_vec_join(["T20,",trim(numb2String(MESH_a%nDim)),"I15"])
+                matDblFmt = string_join_many("T20,",trim(numb2String(MESH_a%nDim)),"F15.5")
+                matIntFmt = string_join_many("T20,",trim(numb2String(MESH_a%nDim)),"I15")
                 if(present(fmt)) dblFmt = fmt
 
                 write(unit,*) "MESH------------------------------------------------------------"

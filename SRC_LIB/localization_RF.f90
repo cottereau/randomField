@@ -688,7 +688,7 @@ contains
         !Buffer allocation
         call wLog ("Allocating buffer")
         !overEst = MSH%nDim + 1
-        overEst = 2
+        overEst = 100
         call MPI_TYPE_SIZE(MPI_DOUBLE_PRECISION,double_size,code)
         overHead = int(1+(MPI_BSEND_OVERHEAD*1.)/double_size)
         bufferSize = overEst*(nOvlpMax+overHead)

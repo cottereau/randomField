@@ -737,186 +737,139 @@ contains
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_MONO_proc_result(xMinGlob, xMaxGlob, xStep, nDim, &
+    subroutine write_MONO_proc_result(xMin, xMax, xStep, nDim, &
                                       randField, fileName, folderPath, &
-                                      HDF5Name, HDF5FullPath)
+                                      HDF5_RePath_out)
 
         implicit none
 
         !INPUTS
-        double precision, dimension(:), intent(in) ::   xMinGlob, xMaxGlob, xStep, randField
+        double precision, dimension(:), intent(in) ::   xMin, xMax, xStep, randField
         integer, intent(in) :: nDim
         character(len=*)                  , intent(in) :: filename;
         character(len=*)                  , intent(in) :: folderPath
         !OUTPUTS
-        character(len=110)  , intent(out), optional ::HDF5Name, HDF5FullPath
-
+        character(len=*)  , intent(out), optional :: HDF5_RePath_out
         !HDF5 VARIABLES
-        character(len=110)             :: fileHDF5Name, fullPath !File name
+        character(len=buf_RF)          :: HDF5_FileName, HDF5_RePath
+        character(len=buf_RF)          :: H5_TO_XMF_Path
         integer(HID_T)                 :: file_id       !File identifier
         integer(HID_T)                 :: dset_id       !Dataset identifier
         integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
         integer(HID_T)                 :: filespace
-        integer                        :: rank, rank1D !Dataset rank (number of dimensions)
+        integer                        :: rank !Dataset rank (number of dimensions)
         integer(HSIZE_T), dimension(nDim) :: dims !Dataset dimensions
         integer                        :: error !Error flag
-        integer                        :: info
-        integer(HSIZE_T) , dimension(nDim) :: countND
-        integer(HSIZE_T) , dimension(1) :: count1D
+        !integer                        :: info
+        !integer(HSIZE_T) , dimension(nDim) :: countND
 
         !LOCAL VARIABLES
-        integer(kind=8), dimension(nDim) :: total_xNStep
-        character(LEN=8) :: dsetname = "samples"
-        double precision, dimension(:), allocatable :: randFieldLinear
-        character(len=110) :: XMF_Folder, HDF5_Folder
+        !integer(kind=8), dimension(nDim) :: total_xNStep
+        character(LEN=buf_RF) :: dsetname
+        !double precision, dimension(:), allocatable :: randFieldLinear
+        character(len=buf_RF) :: XMF_Folder, HDF5_Folder
 
-        call wLog("------------START Writing result HDF5 file (MONO)-----------------------")
+        call wLog(" ")
+        call wLog("------------Writing HDF5 Mono Processor (Elements)-------------------")
 
-        call wLog("fileName         = ")
-        call wLog(fileName)
-        call wLog("folderPath       = ")
-        call wLog(folderPath)
-        !Creating file name
-        !dsetname = "samples" ! Dataset name
-        fileHDF5Name = trim(fileName)//".h5"
-        HDF5_Folder = string_join(folderPath,"/h5")
-        XMF_Folder = string_join(folderPath,"/xmf")
-        fullPath     = string_join(HDF5_Folder,"/"//fileHDF5Name)
-        if(present(HDF5FullPath)) HDF5FullPath = fullPath
-        call wLog("' fileHDF5Name = ")
-        call wLog(fileHDF5Name)
+        !Creating names and paths
+        HDF5_FileName  = trim(fileName)//".h5"
+        HDF5_Folder    = string_join(folderPath,"/h5")
+        HDF5_RePath    = string_join(HDF5_Folder,"/"//HDF5_FileName)
+        XMF_Folder     = string_join(folderPath,"/xmf")
+        H5_TO_XMF_Path = "../h5"
+
+        call wLog("HDF5_FileName    = ")
+        call wLog(trim(adjustL(HDF5_FileName)))
+        call wLog("HDF5_Folder      = ")
+        call wLog(trim(adjustL(HDF5_Folder)))
+
+        if(present(HDF5_RePath_out)) HDF5_RePath_out = HDF5_RePath
 
         !PREPARING ENVIROMENT
-        info = MPI_INFO_NULL
-        rank = nDim
-        total_xNStep = nint((xMaxGlob - xMinGlob)/xStep, 8) + 1
-        countND = total_xNStep
-        rank1D = 1
-        count1D = total_xNStep
-        dims = total_xNStep
-        call wLog("dims = ")
+        rank         = nDim !Matrix Rank
+        dims = nint((xMax - xMin)/xStep, 8) + 1
+        call wLog("Dataset dims = ")
         call wLog(int(dims))
 
         call wLog(" -> h5 creation")
+        call wLog("   Creating File On:")
+        call wLog(trim(adjustL(HDF5_RePath)))
+        dsetname = "samples"
+
+        !HDF5 WRITING
         call h5open_f(error) ! Initialize FORTRAN interface.
-        !call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error) !NEW plist_id (for file)
-        !call h5pset_deflate_f(plist_id, 5, error) !Activates Compression  TO DO
-        !call h5pset_fapl_mpio_f(plist_id, communicator, info, error) !SET plist to MPI (for file)
-        call h5fcreate_f(fullPath, H5F_ACC_TRUNC_F, file_id, error) !NEW file_id
-        !call h5pclose_f(plist_id, error) !CLOSE plist_id
+        call h5fcreate_f(HDF5_RePath, H5F_ACC_TRUNC_F, file_id, error) !NEW file_id
+        call h5screate_simple_f(rank, dims, filespace, error) !NEW filespace (the size of the whole table)
+        call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, dset_id, error) !NEW dset_id
+        !call h5sclose_f(filespace, error) !CLOSE filespace
 
+        call h5screate_simple_f(rank, dims, memspace, error)  !NEW memspace
+        !call h5dget_space_f(dset_id, filespace, error) !GET filespace
 
-        if(.true.)then
-            call h5screate_simple_f(rank, dims, filespace, error) !NEW filespace (the size of the whole table)
-            call h5dcreate_f(file_id, dsetname, H5T_NATIVE_DOUBLE, filespace, dset_id, error) !NEW dset_id
-            call h5sclose_f(filespace, error) !CLOSE filespace
+        call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
+                        randField,  &
+                        dims, error, &
+                        file_space_id = filespace, &
+                        mem_space_id = memspace) !Write dset, INPUT form = memspace, OUTPUT form = filespace
+        call wLog("   HDF5 Writing Error Code:")
+        call wLog(error)
 
-            if(.true.) then
-                    call wLog("GLOBAL")
-                    countND = total_xNStep
-
-                    call wLog("countND = ")
-                    call wLog(int(countND))
-                    !write(*,*) "countND = ", countND
-                    call h5screate_simple_f(rank, countND, memspace, error)  !NEW memspace
-
-                    !CHOOSING SPACE IN FILE FOR THIS PROC
-                    call h5dget_space_f(dset_id, filespace, error) !GET filespace
-                    ! Select hyperslab in the file.
-                    !offset = MSH%origin - 1!Lines Offset to start writing
-                    !call wLog("offset = ")
-                    !call wLog(int(offset))
-                    !write(*,*) "offset = ", offset
-                    !call h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, countND, error) !SET filespace (to the portion in the hyperslab)
-
-            end if
-
-            ! Create property list for collective dataset write
-            !call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error) !NEW plist_id (for dataset)
-            !call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error) !SET plist to MPI (for dataset)
-
-            if(.true.) then
-
-                call h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, &
-                                   randField,  &
-                                   dims, error, &
-                                   file_space_id = filespace, mem_space_id = memspace) !Write dset, INPUT form = memspace, OUTPUT form = filespace
-
-            end if
-
-            ! Close dataspaces.
-            call h5sclose_f(filespace, error) !CLOSE filespace
-            call h5sclose_f(memspace, error) !CLOSE memspace
-
-            ! Close the property list
-            !call h5pclose_f(plist_id, error) !CLOSE plist_id
-            ! Close the dataset.
-            call h5dclose_f(dset_id, error) !CLOSE dset_id
-        end if
-
-
-        ! Close the file.
+        ! Closing
+        call h5sclose_f(memspace, error) !CLOSE memspace
+        call h5dclose_f(dset_id, error) !CLOSE dset_id
+        call h5sclose_f(filespace, error) !CLOSE filespace
         call h5fclose_f(file_id, error) !CLOSE file_id
+        call h5close_f(error) ! Close FORTRAN interface
 
-        ! Close FORTRAN predefined datatypes.
-        call h5close_f(error)
-
-        !write(*,*) "fileHDF5Name = ", fileHDF5Name
-        if(present(HDF5Name)) then
-            HDF5Name = trim(adjustL(fileHDF5Name))
-            HDF5Name = adjustL(HDF5Name)
-            !write(get_fileId(),*) "'inside write HDF5' output -- HDF5Name = ", HDF5Name
-        end if
-
-        if (allocated(randFieldLinear)) deallocate(randFieldLinear)
-        !if(allocated(localSlab)) deallocate(localSlab)
-
-
-        call write_MONO_HDF5_Str_XMF(trim(adjustL(fileHDF5Name)), xMinGlob, xMaxGlob, xStep, &
+        ! Writing XMF
+        call write_XMF_Elements(trim(adjustL(HDF5_FileName)), xMin, xMax, xStep, &
                                      nDim, fileName, XMF_Folder, &
-                                     "../h5")
+                                     H5_TO_XMF_Path, dsetname)
 
-
-        call wLog("------------END Writing MONO Proc result file (MPI)-----------------------")
+        call wLog("------------END Writing HDF5 Mono Processor (Elements)---------------")
+        call wLog(" ")
     end subroutine write_MONO_proc_result
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
-    subroutine write_MONO_HDF5_Str_XMF(HDF5name, xMinGlob, xMaxGlob, xStep, &
-                                       nDim, fileName, folderPath, &
-                                       HDF5relativePath)
+    subroutine write_XMF_Elements(HDF5_FileName, xMin, xMax, xStep, &
+                                  nDim, fileName, XMF_Folder, &
+                                  H5_TO_XMF_PATH, dsetname)
 
         implicit none
 
         !INPUTS
-        double precision, dimension(:), intent(in) :: xMinGlob, xMaxGlob, xStep
-        character(len=*), intent(in) :: HDF5name
+        double precision, dimension(:), intent(in) :: xMin, xMax, xStep
+        character(len=*), intent(in) :: HDF5_FileName
         character(len=*)              , intent(in) :: filename;
         integer, intent(in) :: nDim
-        character(len=*)              , intent(in) :: folderPath
-        character(len=*)              , intent(in) :: HDF5relativePath
+        character(len=*)              , intent(in) :: XMF_Folder
+        character(len=*)              , intent(in) :: H5_TO_XMF_Path, dsetname
 
         !LOCAL VARIABLES
         integer             :: i, file
-        character (len=110) :: fileXMFName, fullPathXMF, HDF5path, dimText;
+        character (len=110) :: dimText;
         integer, dimension(nDim) :: total_xNStep
+        character(len=buf_RF) :: XMF_FileName, XMF_RePath
 
 
-        call wLog("------------START Writing result XMF file-----------------------")
+        call wLog("------------Writing XMF Mono Processor (Elements)--------------------")
 
-        if(nDim == 1 .or. nDim == 2 .or. nDim == 3) then
+        if(nDim == 2 .or. nDim == 3) then
 
-            fileXMFName = string_join(fileName,".xmf")
-            fullPathXMF = string_join(folderPath, "/"//fileXMFName)
-            HDF5path = string_join(HDF5relativePath, "/")
+            XMF_FileName = trim(fileName)//".xmf"
+            XMF_RePath   = string_join(XMF_Folder,"/"//XMF_FileName)
+            !HDF5path = string_join(H5_TO_XMF_PATH, "/")
             !write(*,*) "fileXMFName = ", fileXMFName
             !write(*,*) "fullPathXMF = ", fullPathXMF
             !write(*,*) "HDF5path    = ", HDF5path
 
-            total_xNStep = nint((xMaxGlob - xMinGlob)/xStep) + 1
+            total_xNStep = nint((xMax - xMin)/xStep,8) + 1
 
+            !Writing Number of points in each Dimensions in the reverse order
             dimText = ""
             do i = size(total_xNStep), 1, -1
                 dimText = trim(dimText)//" "//trim(numb2String(total_xNStep(i)))
@@ -925,16 +878,15 @@ contains
 
             !Building file
             file=21;
-            !write(*,*) "Flag 2"
-            open (unit = file , file = fullPathXMF, action = 'write')
+            open (unit = file , file = XMF_RePath, action = 'write')
 
             write (file,'(A)'      )'<?xml version="1.0" ?>'
             write (file,'(A)'      )'<Xdmf Version="2.0">'
             write (file,'(A)'      )' <Domain>'
             i = 1
-            write (file,'(3A)'     )'   <DataItem Name="samples" Format="HDF" DataType="Float" Precision="8" &
+            write (file,'(3A)'     )'   <DataItem Name="RF_1" Format="HDF" DataType="Float" Precision="8" &
                                      &Dimensions="',trim(dimText),'">'
-            write (file,'(4A)'     )'        ',trim(HDF5path),trim(HDF5name),':/samples'
+            write (file,'(6A)'     )'        ',trim(H5_TO_XMF_PATH),'/',trim(HDF5_FileName),':/',trim(adjustL(dsetname))
             write (file,'(A)'      )'   </DataItem>'
             write (file,'(A)'      )'  <Grid GridType="Collection" CollectionType="Spatial">' !Opens the Collection
 
@@ -951,9 +903,9 @@ contains
             end if
             write (file,'(3A)'     )'   <DataItem Name="origin" Format="XML" DataType="Float" &
                                         &Precision="8" Dimensions="',trim(numb2String(nDim)),'">'
-            if(nDim == 1) write (file,'(A,F25.10)'      )'    ', xMinGlob(1)
-            if(nDim == 2) write (file,'(A,F25.10)'      )'    ', xMinGlob(2), ' ', xMinGlob(1)
-            if(nDim == 3) write (file,'(A,F25.10)'      )'    ', xMinGlob(3), ' ', xMinGlob(2), ' ', xMinGlob(1)
+            if(nDim == 1) write (file,'(A,F25.10)'      )'    ', xMin(1)
+            if(nDim == 2) write (file,'(A,F25.10)'      )'    ', xMin(2), ' ', xMin(1)
+            if(nDim == 3) write (file,'(A,F25.10)'      )'    ', xMin(3), ' ', xMin(2), ' ', xMin(1)
             write (file,'(A)'      )'   </DataItem>'
             write (file,'(3A)'     )'   <DataItem Name="step" Format="XML" DataType="Float" &
                                         &Precision="8" Dimensions="',trim(numb2String(nDim)),'">'
@@ -967,7 +919,7 @@ contains
             do i = 1, 1
                 write (file,'(3A)'     )'     <Attribute Name="RF1" Center="Node" AttributeType="Scalar">'
                 write (file,'(A)'     )'       <DataItem Reference="XML">'
-                write (file,'(A)'     )'         /Xdmf/Domain/DataItem[@Name="samples"]'
+                write (file,'(3A)'     )'         /Xdmf/Domain/DataItem[@Name="RF_1"]'
                 write (file,'(A)'     )'       </DataItem>'
                 write (file,'(A)'      )'     </Attribute>'
             end do
@@ -983,10 +935,10 @@ contains
             write(*,*) "nDim = ", nDim
             write(*,*) "The file won't be created"
         end if
-!
-!        !write(get_fileId(),*) "------------END Writing result XMF file-----------------------";
 
-    end subroutine write_MONO_HDF5_Str_XMF
+        call wLog("------------END Writing XMF Mono Processor (Elements)----------------")
+
+    end subroutine write_XMF_Elements
 
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -1171,9 +1123,9 @@ contains
         if (allocated(randFieldLinear)) deallocate(randFieldLinear)
         !if(allocated(localSlab)) deallocate(localSlab)
 
-        call write_MONO_HDF5_Str_XMF(trim(adjustL(fileHDF5Name)), xMinGlob, xMaxGlob, xStep, &
+        call write_XMF_Elements(trim(adjustL(fileHDF5Name)), xMinGlob, xMaxGlob, xStep, &
                                      nDim, fileName, XMF_Folder, &
-                                     "../h5")
+                                     "../h5", dsetname)
 
         call wLog("------------END Writing result HDF5 file (MPI)-----------------------")
 
@@ -1599,7 +1551,7 @@ contains
 
             write(doubleFmt, fmt="(A,i1,A)") "(", RDF%nDim, "F30.15)";
 
-            open (unit = fileId , file = string_vec_join([folderpath, "/", name]), action = 'write')
+            open (unit = fileId , file = string_join_many(folderpath, "/", name), action = 'write')
 
             write(fileId,*) "FILE:", name
             write(fileId,*) "--nb_procs-----------------------"
