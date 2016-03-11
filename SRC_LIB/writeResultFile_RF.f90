@@ -1354,59 +1354,6 @@ contains
 
     end subroutine write_pHDF5_Str
 
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    subroutine finish_HDF5_file(RDF, MSH, HDF5Path)
-!        implicit none
-!        !INPUTS
-!        type(RF), intent(in)   :: RDF
-!        type(MESH), intent(in) :: MSH
-!        character (len=*), intent(in) :: HDF5Path
-!        integer(HSIZE_T), dimension(MSH%nDim) :: total_xNStep
-!
-!        !LOCAL
-!        character(len=50) :: attr_name
-!        integer :: error, code
-!        character(len=50) :: dset="samples"
-!        logical :: indep
-!        integer(HID_T)                 :: file_id       !File identifier
-!        integer(HID_T)                 :: dset_id       !Dataset identifier
-!        integer(HID_T)                 :: space_id, space_id2      !Dataset space
-!
-!        if(.not. RDF%independent) then
-!            write(*,*) " FINISHING HDF5 FILE"
-!            total_xNStep = nint((MSH%xMaxGlob - MSH%xMinGlob)/MSH%xStep, 8) + 1
-!
-!            call h5open_f(error) ! Initialize FORTRAN interface.
-!            call h5fopen_f(trim(HDF5Path), H5F_ACC_RDWR_F, file_id, error) !Open File
-!            if(error /= 0) stop("ERROR OPENING FILE inside finish_HDF5_file")
-!            !write(*,*) "hdferr = ", hdferr
-!
-!            !call h5screate_simple_f(RDF%nDim, total_xNStep, space_id2, error) !Second space, with the desired dimensions
-!
-!            !MATRIX
-!            call h5dopen_f(file_id, trim(dset), dset_id, error)! Open Dataset
-!            call h5dget_space_f(dset_id, space_id, error) !Open Dataset Space
-!            if(error /= 0) stop("ERROR OPENING DATA SET inside finish_HDF5_file")
-!
-!!            call h5sset_extent_simple_f(space_id, RDF%nDim, total_xNStep, &
-!!                                        total_xNStep, error) !Reshaping Dataset Space
-!            total_xNStep = 40
-!            !call h5sset_extent_simple_f(space_id, 2, total_xNStep, &
-!            !                            total_xNStep, error) !Reshaping Dataset Space
-!            !call h5sset_extent_none_f(space_id, error) ! Erasing dimensions
-!            call h5dset_extent_f(dset_id, total_xNStep, error) ! Reshape Dataset
-!
-!            call h5dclose_f(dset_id, error) !Close Dataset
-!            call h5sclose_f(space_id, error) !Close Dataset Space
-!
-!            call h5fclose_f(file_id, error)! Close the file.
-!            call h5close_f(error) ! Close FORTRAN interface
-!        end if
-!    end subroutine finish_HDF5_file
-
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
     !-----------------------------------------------------------------------------------------------
@@ -1628,7 +1575,7 @@ contains
                                      nb_procs, nDim, Nmc, method, seedStart, &
                                      corrMod, margiFirst, &
                                      BT_avg, BT_stdDev, BT_min, BT_max, gen_times, gen_WALL_Time, &
-                                     localizationLevel, &
+                                     localizationLevel, nFields, &
                                      xMinGlob, xMaxGlob, xStep, corrL, overlap, &
                                      procExtent, kMax_out, kNStep_out)
         implicit none
@@ -1641,7 +1588,7 @@ contains
         double precision, intent(in) :: gen_WALL_Time
         double precision, dimension(:), intent(in) :: xMinGlob, xMaxGlob, xStep, corrL, overlap
         double precision, dimension(:), intent(in) :: procExtent, kMax_out
-        integer         , dimension(:), intent(in) :: kNStep_out
+        integer         , dimension(:), intent(in) :: kNStep_out, nFields
 
         !LOCAL
         character(len=50) :: attr_name
@@ -1677,6 +1624,8 @@ contains
         call write_h5attr_int(file_id, trim(adjustL(attr_name)), margiFirst)
         attr_name = "localizationLevel"
         call write_h5attr_int(file_id, trim(adjustL(attr_name)), localizationLevel)
+        attr_name = "BT_size"
+        call write_h5attr_int(file_id, trim(adjustL(attr_name)), size(BT_avg))
 
         !attr_name = "sum_xNTotal"
         !call write_h5attr_int_long(file_id, trim(adjustL(attr_name)), sum_xNTotal)
@@ -1695,6 +1644,8 @@ contains
         !call write_h5attr_int_vec(file_id, trim(adjustL(attr_name)), seed)
         attr_name = "kNStep"
         call write_h5attr_int_vec(file_id, attr_name, kNStep_out)
+        attr_name = "nFields"
+        call write_h5attr_int_vec(file_id, attr_name, nFields)
         !attr_name = "sum_xNStep"
         !call write_h5attr_int(file_id, trim(adjustL(attr_name)), sum_xNStep)
         !attr_name = "sum_kNStep"

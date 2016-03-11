@@ -265,4 +265,27 @@ contains
 
     end subroutine read_h5attr_real_vec
 
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine read_h5attr_int_vec(file_id, attr_name, data)
+        use HDF5
+        integer(HID_T), intent(in) :: file_id
+        character(len=*), intent(in) :: attr_name
+        integer, dimension(:), intent(out) :: data
+        integer :: hdferr
+        integer(HID_T) :: attr_id, space_id
+        integer(HSIZE_T), dimension(1) :: dims
+
+        dims(1) = size(data)
+        call h5aopen_f(file_id, attr_name, attr_id, hdferr)
+        call h5aget_space_f(attr_id, space_id, hdferr)
+        call h5sget_simple_extent_dims_f(space_id, dims, dims, hdferr) !Get the size of the attribute
+        call h5aread_f(attr_id, H5T_NATIVE_INTEGER, data, dims, hdferr)
+        call h5aclose_f(attr_id, hdferr)
+        call h5sclose_f(space_id, hdferr)
+
+    end subroutine read_h5attr_int_vec
+
 end module hdf5_RF

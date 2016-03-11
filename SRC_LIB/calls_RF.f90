@@ -556,7 +556,7 @@ contains
         call wLog(t_final)
         call wLog("gen_WALL_Time = ")
         call wLog(gen_WALL_Time)
-!
+
         if(IPT%rang == 0) then
 
 
@@ -592,7 +592,7 @@ contains
                 IPT%nb_procs, IPT%nDim, IPT%Nmc, IPT%method, IPT%seedStart, &
                 IPT%corrMod, IPT%margiFirst, &
                 BT_avg, BT_stdDev, BT_min, BT_max, gen_times, gen_WALL_Time, &
-                IPT%localizationLevel, &
+                IPT%localizationLevel, IPT%nFields, &
                 IPT%xMinGlob, IPT%xMaxGlob, IPT%xStep, IPT%corrL, IPT%overlap, &
                 IPT%procExtent, kMax_out, kNStep_out)
         end if

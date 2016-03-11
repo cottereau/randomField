@@ -266,8 +266,8 @@ cdfnor.o             : dinvnr.o \
 	@echo ' '	
 	
 # All Target
-# all: randomField statistics
-all: randomField
+all: randomField statistics
+# all: randomField
 
 # Tool invocations
 randomField: $(RF_OBJ) $(COMM_OBJ)

@@ -28,6 +28,7 @@ program main_Stat
     character(len=200), parameter :: statPath = "./stat_input"
     character(len=200), parameter :: outPath = "./results/res/singleGen"
     integer :: nFiles
+    logical :: deleteSampleInTheEnd=.true.
 
     !LOCAL
     integer :: i
@@ -83,6 +84,10 @@ program main_Stat
         if(STA%rang == 0) call write_StatisticsOnH5(STA, resPath)
 
         if(STA%rang == 0) call show_STAT(STA, "Calculated Statistics", 6)
+
+        if(STA%rang == 0) then
+            call makeInfoFile(resPath, STA%nDim, STA, deleteSampleInTheEnd)
+        end if
 
         call finalize_STAT(STA)
 
@@ -174,7 +179,7 @@ program main_Stat
         subroutine write_StatisticsOnH5(STA, resPath)
             implicit none
             !INPUT
-            type(STAT) :: STA
+            type(STAT), intent(in) :: STA
             character(len=*), intent(in) :: resPath
             !LOCAL
             character(len=200) :: attr_name
@@ -429,6 +434,184 @@ program main_Stat
             !if(allocated(locRF)) deallocate(locRF)
 
         end subroutine read_RF_h5_File_Table
+
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        subroutine makeInfoFile(resPath, nDim_in, STA, deleteSampleInTheEnd)
+            implicit none
+            !INPUT
+            character(len=*), intent(in) :: resPath
+            integer, intent(in) :: nDim_in
+            type(STAT), intent(in) :: STA
+            logical, intent(in) :: deleteSampleInTheEnd
+            !LOCAL
+            character(len=200) :: attr_name
+            integer(HID_T)  :: new_file_id, old_file_id       !File identifier
+            integer :: error
+            integer :: i
+            logical :: attr_exists
+            character(len=buf_RF) :: newFile = "Sample_Info.h5"
+            character(len=buf_RF) :: newFile_Path
+            character(len=buf_RF) :: command, absPath
+            integer :: nSubSamples
+
+            !Attributes
+            integer :: nb_procs, nDim, Nmc, method, &
+                       seedStart, corrMod, margiFirst, localizationLevel
+            integer :: BT_size
+            double precision, dimension(:), allocatable :: BT_avg, BT_stdDev, BT_min, BT_max
+            double precision, dimension(:), allocatable :: gen_times
+            double precision :: gen_WALL_Time
+            double precision, dimension(nDim_in) :: xMinGlob, xMaxGlob, xStep, corrL, overlap
+            double precision, dimension(nDim_in) :: procExtent, kMax_out
+            integer         , dimension(nDim_in) :: kNStep_out, nFields
+            integer(kind=8) :: old_file_bytes_size
+            double precision :: old_file_mb_size
+
+            inquire(FILE=resPath, SIZE=old_file_bytes_size)
+            old_file_mb_size = dble(old_file_bytes_size)/dble(1024.0D0 ** 2.0D0)
+
+            !if(STA%rang == 0) write(*,*) "Copying Infos From File: ", trim(resPath)
+
+            do i = len(resPath), 1, -1
+                if(resPath(i:i) == "/") then
+                    newFile_Path = resPath(1:i)
+                    exit
+                end if
+            end do
+            newFile_Path = string_join_many(newFile_Path,newFile)
+
+           !if(STA%rang == 0) write(*,*) "newFile_Path: ", trim(newFile_Path)
+
+            call h5open_f(error) ! Initialize FORTRAN interface.
+            call h5fopen_f(trim(adjustL(resPath)), H5F_ACC_RDONLY_F, old_file_id, error) !Open Existing File (For Reading)
+            call h5fcreate_f(trim(adjustL(newFile_Path)), H5F_ACC_TRUNC_F, new_file_id, error) !NEW file_id(For Writing)
+
+            !INTEGERS
+            attr_name = "nb_procs"
+            call read_h5attr_int(old_file_id, attr_name, nb_procs)
+            call write_h5attr_int(new_file_id, trim(adjustL(attr_name)), nb_procs)
+            attr_name = "nDim"
+            call read_h5attr_int(old_file_id, attr_name, nDim)
+            call write_h5attr_int(new_file_id, trim(adjustL(attr_name)), nDim)
+            attr_name = "Nmc"
+            call read_h5attr_int(old_file_id, attr_name, Nmc)
+            call write_h5attr_int(new_file_id, trim(adjustL(attr_name)), Nmc)
+            attr_name = "method"
+            call read_h5attr_int(old_file_id, attr_name, method)
+            call write_h5attr_int(new_file_id, trim(adjustL(attr_name)), method)
+            attr_name = "seedStart"
+            call read_h5attr_int(old_file_id, attr_name, seedStart)
+            call write_h5attr_int(new_file_id, trim(adjustL(attr_name)), seedStart)
+            attr_name = "corrMod"
+            call read_h5attr_int(old_file_id, attr_name, corrMod)
+            call write_h5attr_int(new_file_id, trim(adjustL(attr_name)), corrMod)
+            attr_name = "margiFirst"
+            call read_h5attr_int(old_file_id, attr_name, margiFirst)
+            call write_h5attr_int(new_file_id, trim(adjustL(attr_name)), margiFirst)
+            attr_name = "localizationLevel"
+            call read_h5attr_int(old_file_id, attr_name, localizationLevel)
+            call write_h5attr_int(new_file_id, trim(adjustL(attr_name)), localizationLevel)
+            attr_name = "BT_size"
+            call read_h5attr_int(old_file_id, attr_name, BT_size)
+            call write_h5attr_int(new_file_id, trim(adjustL(attr_name)), BT_size)
+
+            !DOUBLE
+            attr_name = "gen_WALL_Time"
+            call read_h5attr_real(old_file_id, attr_name, gen_WALL_Time)
+            call write_h5attr_real(new_file_id, trim(adjustL(attr_name)), gen_WALL_Time)
+            attr_name = "old_file_mb_size"
+            call write_h5attr_real(new_file_id, trim(adjustL(attr_name)), old_file_mb_size)
+
+            !INTEGER VEC
+            attr_name = "kNStep"
+            call read_h5attr_int_vec(old_file_id, attr_name, kNStep_out)
+            call write_h5attr_int_vec(new_file_id, attr_name, kNStep_out)
+            attr_name = "nFields"
+            call read_h5attr_int_vec(old_file_id, attr_name, nFields)
+            call write_h5attr_int_vec(new_file_id, attr_name, nFields)
+
+            !DOUBLE VEC
+            attr_name = "xMinGlob"
+            call read_h5attr_real_vec(old_file_id, attr_name, xMinGlob)
+            call write_h5attr_real_vec(new_file_id, attr_name, xMinGlob)
+            attr_name = "xMaxGlob"
+            call read_h5attr_real_vec(old_file_id, attr_name, xMaxGlob)
+            call write_h5attr_real_vec(new_file_id, attr_name, xMaxGlob)
+            attr_name = "xStep"
+            call read_h5attr_real_vec(old_file_id, attr_name, xStep)
+            call write_h5attr_real_vec(new_file_id, attr_name, xStep)
+            !attr_name = "kMax"
+            !call write_h5attr_real_vec(file_id, attr_name, RDF%kMax)
+            attr_name = "corrL"
+            call read_h5attr_real_vec(old_file_id, attr_name, corrL)
+            call write_h5attr_real_vec(new_file_id, attr_name, corrL)
+            attr_name = "overlap"
+            call read_h5attr_real_vec(old_file_id, attr_name, overlap)
+            call write_h5attr_real_vec(new_file_id, attr_name, overlap)
+            attr_name = "procExtent"
+            call read_h5attr_real_vec(old_file_id, attr_name, procExtent)
+            call write_h5attr_real_vec(new_file_id, attr_name, procExtent)
+            attr_name = "kMax_out"
+            call read_h5attr_real_vec(old_file_id, attr_name, kMax_out)
+            call write_h5attr_real_vec(new_file_id, attr_name, kMax_out)
+
+            nSubSamples = product(nFields**localizationLevel)
+            allocate(gen_times(nSubSamples))
+            allocate(BT_avg(BT_size))
+            allocate(BT_stdDev(BT_size))
+            allocate(BT_min(BT_size))
+            allocate(BT_max(BT_size))
+
+            attr_name = "BT_avg"
+            call read_h5attr_real_vec(old_file_id, attr_name, BT_avg)
+            call write_h5attr_real_vec(new_file_id, attr_name, BT_avg)
+            attr_name = "BT_stdDev"
+            call read_h5attr_real_vec(old_file_id, attr_name, BT_stdDev)
+            call write_h5attr_real_vec(new_file_id, attr_name, BT_stdDev)
+            attr_name = "BT_min"
+            call read_h5attr_real_vec(old_file_id, attr_name, BT_min)
+            call write_h5attr_real_vec(new_file_id, attr_name, BT_min)
+            attr_name = "BT_max"
+            call read_h5attr_real_vec(old_file_id, attr_name, BT_max)
+            call write_h5attr_real_vec(new_file_id, attr_name, BT_max)
+            attr_name = "gen_times"
+            call read_h5attr_real_vec(old_file_id, attr_name, gen_times)
+            call write_h5attr_real_vec(new_file_id, attr_name, gen_times)
+
+            call h5fclose_f(new_file_id, error)! Close the new file.
+            call h5fclose_f(old_file_id, error)! Close the oldfile.
+            call h5close_f(error) ! Close FORTRAN interface
+
+            !Write Statistics Results On New File
+            call write_StatisticsOnH5(STA, newFile_Path)
+
+            call getcwd(absPath)
+
+            write(*,*) " "
+            !Delete Old File
+            if(deleteSampleInTheEnd) then
+                if(STA%rang == 0) then
+                    write(*,*) " "
+                    write(*,*) "Deleting file : ", trim(string_join_many(absPath, resPath(2:)))
+                    command = "rm "//trim(adjustL(resPath))
+                    call system(command)
+                    write(*,*) "old_file_mb_size: ", old_file_mb_size
+                    write(*,*) " "
+                end if
+            end if
+
+            write(*,*) "INFO Output on: ", trim(string_join_many(absPath, newFile_Path(2:)))
+
+            if(allocated(gen_times)) deallocate(gen_times)
+            if(allocated(BT_max)) deallocate(BT_max)
+            if(allocated(BT_min)) deallocate(BT_min)
+            if(allocated(BT_stdDev)) deallocate(BT_stdDev)
+            if(allocated(BT_avg)) deallocate(BT_avg)
+
+        end subroutine makeInfoFile
 
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------

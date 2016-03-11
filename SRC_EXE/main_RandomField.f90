@@ -38,7 +38,7 @@ program main_RandomField
     !Options
     IPT_Temp%writeDataSet = .true.
     IPT_Temp%writeUNVinterpolation = .true.
-    IPT_Temp%sameFolder = .true.
+    IPT_Temp%sameFolder = .false.
     IPT_Temp%outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
     IPT_Temp%write_intermediate_files = .false.
     IPT_Temp%sampleFields = .true.
@@ -116,11 +116,6 @@ program main_RandomField
     !Initial allocation---------------------------------------------
     call allocate_init()
 
-    if(IPT_Temp%nProcPerField > IPT_Temp%nb_procs) then
-        write(*,*) "ERROR, IPT_Temp%nProcPerField cannot be superior to IPT_Temp%nb_procs"
-        stop(" ")
-    end if
-
     !Initialize Inputs
     if(IPT_Temp%rang == 0) write(*,*)  " "
     if(IPT_Temp%rang == 0) write(*,*)  " "
@@ -151,7 +146,6 @@ program main_RandomField
         method = IPT_Temp%method, &
         Nmc = IPT_Temp%Nmc, &
         seedStart = IPT_Temp%seedStart, &
-        nProcPerField = IPT_Temp%nProcPerField, &
         nFields = IPT_Temp%nFields, &
         localizationLevel = IPT_Temp%localizationLevel, &
         writeDataSet = IPT_Temp%writeDataSet, &

@@ -39,8 +39,6 @@ module type_inputRF
         integer :: margiFirst = -1 !1 for Gaussian, 2 for Lognormal
         integer :: method = -1 !1 for Isotropic, 2 for Shinozuka, 3 for Randomization, 4 for FFT
         integer :: Nmc = -1, seedStart
-        !logical :: independent
-        integer :: nProcPerField = -1
         integer, dimension(:), allocatable :: nFields
         integer :: localizationLevel = -1, nTotalFields = -1
 
@@ -96,7 +94,6 @@ contains
         method, &
         Nmc, &
         seedStart, &
-        nProcPerField, &
         nFields, &
         localizationLevel, &
         writeDataSet, &
@@ -135,7 +132,6 @@ contains
             integer, intent(in) :: margiFirst!1 for Gaussian, 2 for Lognormal
             integer, intent(in) :: method!1 for Isotropic, 2 for Shinozuka, 3 for Randomization, 4 for FFT
             integer, intent(in) :: Nmc, seedStart
-            integer, intent(in) :: nProcPerField
             integer, dimension(:), intent(in) :: nFields
             integer, intent(in) :: localizationLevel
 
@@ -171,7 +167,6 @@ contains
             IPT%nFields  = nFields
             IPT%margiFirst    = margiFirst
             IPT%seedStart     = seedStart
-            IPT%nProcPerField = nProcPerField
             IPT%procPerDim = procPerDim
             IPT%localizationLevel = localizationLevel
             IPT%writeDataSet = writeDataSet
@@ -341,8 +336,6 @@ contains
             IPT%method = IPT_orig%method
             IPT%Nmc = IPT_orig%Nmc
             IPT%seedStart = IPT_orig%seedStart
-            !IPT%independent = IPT_orig%independent
-            IPT%nProcPerField = IPT_orig%nProcPerField
             IPT%nFields = IPT_orig%nFields
             IPT%localizationLevel = IPT_orig%localizationLevel
 
@@ -576,7 +569,6 @@ contains
                 write(unit,*) " method = ", IPT%method
                 write(unit,*) " Nmc = ", IPT%Nmc
                 write(unit,*) " seedStart = ", IPT%seedStart
-                write(unit,*) " nProcPerField = ", IPT%nProcPerField
                 write(unit,*) " nFields = ", IPT%nFields
                 write(unit,*) " "
 
