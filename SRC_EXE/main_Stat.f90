@@ -453,9 +453,10 @@ program main_Stat
             integer :: i
             logical :: attr_exists
             character(len=buf_RF) :: newFile = "Sample_Info.h5"
-            character(len=buf_RF) :: newFile_Path
+            character(len=buf_RF) :: newFile_Path, newFile_Folder
             character(len=buf_RF) :: command, absPath
             integer :: nSubSamples
+            integer :: counter
 
             !Attributes
             integer :: nb_procs, nDim, Nmc, method, &
@@ -474,16 +475,20 @@ program main_Stat
             old_file_mb_size = dble(old_file_bytes_size)/dble(1024.0D0 ** 2.0D0)
 
             !if(STA%rang == 0) write(*,*) "Copying Infos From File: ", trim(resPath)
-
+            counter = 0
             do i = len(resPath), 1, -1
                 if(resPath(i:i) == "/") then
-                    newFile_Path = resPath(1:i)
-                    exit
+                    counter = counter + 1
+                    if(counter == 2) then
+                        newFile_Folder = resPath(1:i)
+                        exit
+                    end if
                 end if
             end do
-            newFile_Path = string_join_many(newFile_Path,newFile)
+            newFile_Path = string_join_many(newFile_Folder,newFile)
 
-           !if(STA%rang == 0) write(*,*) "newFile_Path: ", trim(newFile_Path)
+           if(STA%rang == 0) write(*,*) "newFile_Folder: ", trim(newFile_Folder)
+           if(STA%rang == 0) write(*,*) "newFile_Path: ", trim(newFile_Path)
 
             call h5open_f(error) ! Initialize FORTRAN interface.
             call h5fopen_f(trim(adjustL(resPath)), H5F_ACC_RDONLY_F, old_file_id, error) !Open Existing File (For Reading)
@@ -595,8 +600,13 @@ program main_Stat
             if(deleteSampleInTheEnd) then
                 if(STA%rang == 0) then
                     write(*,*) " "
-                    write(*,*) "Deleting file : ", trim(string_join_many(absPath, resPath(2:)))
-                    command = "rm "//trim(adjustL(resPath))
+                    write(*,*) "Deleting file (and folders): ", trim(string_join_many(absPath, resPath(2:)))
+                    !command = "rm "//trim(adjustL(resPath))
+                    command = "rm -r "//trim(adjustL(newFile_Folder))//"log"
+                    call system(command)
+                    command = "rm -r "//trim(adjustL(newFile_Folder))//"h5"
+                    call system(command)
+                    command = "rm -r "//trim(adjustL(newFile_Folder))//"xmf"
                     call system(command)
                     write(*,*) "old_file_mb_size: ", old_file_mb_size
                     write(*,*) " "
