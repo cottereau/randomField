@@ -29,7 +29,7 @@ program main_RandomField
     integer :: code
 
     !INPUT VARIABLES
-    type(IPT_RF)  :: IPT_Temp !Only for practicity purposes
+    type(IPT_RF)  :: IPT_Temp !Only for sake ok practicity
     type(IPT_RF)  :: IPT !The one that shoud be initialized when calling from an external program
 
     !Initializing MPI

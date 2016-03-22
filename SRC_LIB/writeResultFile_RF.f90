@@ -1594,6 +1594,7 @@ contains
         character(len=50) :: attr_name
         integer(HID_T)  :: file_id       !File identifier
         integer :: error
+        double precision :: GT_avg, GT_stdDev, GT_min, GT_max
         !integer(kind=8) :: sum_xNTotal, sum_kNTotal
         !logical :: indep
 
@@ -1606,6 +1607,10 @@ contains
         !attr_name = "independent"
         !call write_h5attr_bool(file_id, trim(adjustL(attr_name)), indep)
 
+        GT_avg = sum(gen_times)/dble(size(gen_times))
+        GT_stdDev = sum(gen_times**2.D0)/dble(size(gen_times)) - GT_avg**2.D0
+        GT_min = minval(gen_times)
+        GT_max = maxval(gen_times)
 
         !INTEGERS
         attr_name = "nb_procs"
@@ -1638,6 +1643,14 @@ contains
         !call write_h5attr_real(file_id, trim(adjustL(attr_name)), gen_CPU_Time)
         attr_name = "gen_WALL_Time"
         call write_h5attr_real(file_id, trim(adjustL(attr_name)), gen_WALL_Time)
+        attr_name = "GT_avg"
+        call write_h5attr_real(file_id, trim(adjustL(attr_name)), GT_avg)
+        attr_name = "GT_stdDev"
+        call write_h5attr_real(file_id, trim(adjustL(attr_name)), GT_stdDev)
+        attr_name = "GT_min"
+        call write_h5attr_real(file_id, trim(adjustL(attr_name)), GT_min)
+        attr_name = "GT_max"
+        call write_h5attr_real(file_id, trim(adjustL(attr_name)), GT_max)
 
         !INTEGER VEC
         !attr_name = "seed"
@@ -1677,8 +1690,6 @@ contains
         call write_h5attr_real_vec(file_id, attr_name, BT_min)
         attr_name = "BT_max"
         call write_h5attr_real_vec(file_id, attr_name, BT_max)
-        attr_name = "gen_times"
-        call write_h5attr_real_vec(file_id, attr_name, gen_times)
 
 
         call h5fclose_f(file_id, error)! Close the file.

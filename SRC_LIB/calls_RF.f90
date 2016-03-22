@@ -35,6 +35,7 @@ contains
         double precision, dimension(:), intent(inout) :: times
         !LOCAL
         double precision :: t_initial
+        integer :: code
 
         call CPU_TIME(t_initial)
 
@@ -104,6 +105,8 @@ contains
 
         call build_random_field (IPT, times, t_initial)
 
+        call MPI_COMM_FREE (IPT%gen_Comm, code)
+        call MPI_COMM_FREE (IPT%loc_Comm, code)
 
     end subroutine make_random_field
 
@@ -149,6 +152,8 @@ contains
         double precision :: t_final
         double precision, dimension(IPT%nDim) :: kMax_out
         integer, dimension(IPT%nDim) :: kNStep_out
+        integer(kind=8) :: file_bytes_size
+        double precision :: file_mb_size
 
         if(IPT%rang == 0) write(*,*) "  "
         if(IPT%rang == 0) write(*,*) " Inside 'build_random_field'"
@@ -175,7 +180,7 @@ contains
         do i = 1, size(subdivisionCoords, 2)
             subdivisionId(:,i) = nint((subdivisionCoords(:,i)-IPT%xMinGlob)/IPT%stepProc)
         end do
-        if(IPT%rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
+        !if(IPT%rang == 0) call DispCarvalhol(subdivisionCoords, "subdivisionCoords")
         !if(IPT%rang == 0) call DispCarvalhol(subdivisionId, "subdivisionId")
         if(IPT%rang == 0) write(*,*) "Max Coord = ", subdivisionCoords(:, size(subdivisionCoords,2)) + IPT%procExtent
 
@@ -458,6 +463,14 @@ contains
             end if
         end if
 
+        if(IPT%write_intermediate_files) then
+            MONO_FileName = string_join_many("EXT_LOC_L1_P", numb2String(IPT%rang), "-GROUP",numb2String(IPT%gen_group))
+            if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
+                                                          IPT%xStep, IPT%nDim, &
+                                                          randField_Group(:,1), MONO_FileName, &
+                                                          single_path)
+        end if
+
         !call MPI_BARRIER(IPT%loc_Comm, code)
         build_times(5:9) = MPI_Wtime() !External Localization Time
         times(6) = build_times(5) !External Localization Time
@@ -470,6 +483,14 @@ contains
             !Normalizing and Writing files
             call transform_and_write_output(randField_Group, xNStep_Group, origin_Group, &
                                             IPT, build_times, BBoxPath, XMFPath)
+        end if
+
+        if(IPT%write_intermediate_files) then
+            MONO_FileName = string_join_many("TRANS_LOC_L1_P", numb2String(IPT%rang), "-GROUP",numb2String(IPT%gen_group))
+            if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
+                                                          IPT%xStep, IPT%nDim, &
+                                                          randField_Group(:,1), MONO_FileName, &
+                                                          single_path)
         end if
 
 
@@ -583,11 +604,6 @@ contains
             call wLog("BT_stdDev = ")
             call wLog(BT_stdDev)
 
-            call getcwd(MONO_FileName)
-            !write(*,*) "PATH: ", MONO_FileName
-            write(*,*) "OUTPUT HDF5 ON: ", trim(string_join_many(MONO_FileName, BBoxPath(2:)))
-            write(*,*) "OUTPUT XMF  ON: ", trim(string_join_many(MONO_FileName, XMFPath(2:)))
-
             call write_HDF5_attributes(BBoxPath, &
                 IPT%nb_procs, IPT%nDim, IPT%Nmc, IPT%method, IPT%seedStart, &
                 IPT%corrMod, IPT%margiFirst, &
@@ -595,6 +611,14 @@ contains
                 IPT%localizationLevel, IPT%nFields, &
                 IPT%xMinGlob, IPT%xMaxGlob, IPT%xStep, IPT%corrL, IPT%overlap, &
                 IPT%procExtent, kMax_out, kNStep_out)
+
+            call getcwd(MONO_FileName)
+            !write(*,*) "PATH: ", MONO_FileName
+            write(*,*) "OUTPUT HDF5 ON: ", trim(string_join_many(MONO_FileName, BBoxPath(2:)))
+            inquire(FILE=trim(string_join_many(MONO_FileName, BBoxPath(2:))), SIZE=file_bytes_size)
+            file_mb_size = dble(file_bytes_size)/dble(1024.0D0 ** 2.0D0)
+            write(*,*) "    file_mb_size: ", file_mb_size
+            write(*,*) "OUTPUT XMF  ON: ", trim(string_join_many(MONO_FileName, XMFPath(2:)))
         end if
 
 

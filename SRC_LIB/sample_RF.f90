@@ -345,6 +345,8 @@ contains
 
             end if
 
+            call MPI_COMM_FREE (MSH%comm, code)
+
             call finalize_MESH(MSH)
             call finalize_RF(RDF)
 
@@ -812,6 +814,7 @@ contains
             minP(:) = 1
             maxP(:) = xNStep - overlapNPoints
             where(IPT%coords == IPT%nFields - 1) maxP = xNStep
+            if(.not. IPT%extLoc) maxP = xNStep
 
             if(IPT%nDim == 2) then
                 call normalize_randField(randField, minP, maxP, &
