@@ -126,7 +126,7 @@ contains
         logical :: sndRcv
         double precision, dimension(:, :), pointer :: TRF_2D
         double precision, dimension(:, :, :), pointer :: TRF_3D
-
+        integer :: BufDT_size
 
         call wLog ("Inside addNeighboursFields")
 
@@ -353,7 +353,8 @@ contains
         !call MPI_WAITALL (countReq, request(1:countReq), status(:,1:countReq), code)
         !if(MSH%rang == testrank) write(*,*) "RDF%randField(:,1) = ", RDF%randField(:,1)
 
-        call MPI_BUFFER_DETACH (buffer,double_size*bufferSize,code)
+        BufDT_size = double_size*bufferSize
+        call MPI_BUFFER_DETACH (buffer,BufDT_size,code)
         if(allocated(buffer)) deallocate(buffer)
 
         if(allocated(request)) deallocate(request)
@@ -398,7 +399,7 @@ contains
         logical :: snd, rcv
         double precision, dimension(:, :), pointer :: TRF_2D, TRF_2D_Now
         double precision, dimension(:, :, :), pointer :: TRF_3D, TRF_3D_Now
-
+        integer :: BufDT_size
 
         call wLog ("Inside addNeighboursFieldsV2")
 
@@ -616,8 +617,8 @@ contains
         end do
 
         RDF%randField(:,1) = RDF%randField(:,1) + tempRandField
-
-        call MPI_BUFFER_DETACH (buffer,double_size*bufferSize,code)
+        BufDT_size = int(double_size*bufferSize)
+        call MPI_BUFFER_DETACH (buffer,BufDT_size,code)
         if(allocated(buffer)) deallocate(buffer)
 
         if(associated(TRF_2D_Now)) nullify(TRF_2D_Now)
@@ -667,6 +668,7 @@ contains
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer :: tag
         logical :: snd, rcv
+        integer :: BufDT_size
         double precision, dimension(:, :), pointer :: TRF_2D, TRF_2D_Now, RF_2D
         double precision, dimension(:, :, :), pointer :: TRF_3D, TRF_3D_Now, RF_3D
 
@@ -717,7 +719,7 @@ contains
         call wLog ("bufferSize = ")
         call wLog (bufferSize)
         allocate(buffer(bufferSize))
-        call MPI_BUFFER_ATTACH(buffer, double_size*bufferSize,code)
+        call MPI_BUFFER_ATTACH(buffer, int(double_size*bufferSize),code)
         call wLog ("buffer allocation code= ")
         call wLog (code)
 
@@ -796,13 +798,13 @@ contains
 
                 if(nDim == 2) then
                     call MPI_IBSEND (RF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
-                            totalSize, MPI_DOUBLE_PRECISION, &
+                            int(totalSize), MPI_DOUBLE_PRECISION, &
                             neighRank, tag, loc_comm, request, code)
 
                 end if
                 if(nDim == 3) then
                     call MPI_IBSEND (RF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
-                        totalSize, MPI_DOUBLE_PRECISION, &
+                        int(totalSize), MPI_DOUBLE_PRECISION, &
                         neighRank, tag, loc_comm, request, code)
                 end if
             else
@@ -857,7 +859,7 @@ contains
 
                 if(nDim == 2) then
                     call MPI_RECV (TRF_2D_Now(minPos(1):maxPos(1),minPos(2):maxPos(2)), &
-                        totalSize, MPI_DOUBLE_PRECISION, &
+                        int(totalSize), MPI_DOUBLE_PRECISION, &
                         neighRank, tag, loc_comm, status, code)
                         TRF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2)) = &
                         TRF_2D(minPos(1):maxPos(1),minPos(2):maxPos(2))   &
@@ -865,7 +867,7 @@ contains
                 end if
                 if(nDim == 3) then
                     call MPI_RECV (TRF_3D_Now(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)), &
-                        totalSize, MPI_DOUBLE_PRECISION, &
+                        int(totalSize), MPI_DOUBLE_PRECISION, &
                         neighRank, tag, loc_comm, status, code)
                         TRF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3)) = &
                         TRF_3D(minPos(1):maxPos(1),minPos(2):maxPos(2),minPos(3):maxPos(3))   &
@@ -878,7 +880,8 @@ contains
 
         randFieldGroup(:,1) = randFieldGroup(:,1) + tempRandField
 
-        call MPI_BUFFER_DETACH (buffer,double_size*bufferSize,code)
+        BufDT_size = int(double_size*bufferSize)
+        call MPI_BUFFER_DETACH (buffer,BufDT_size,code)
         if(allocated(buffer)) deallocate(buffer)
 
         if(associated(TRF_2D_Now)) nullify(TRF_2D_Now)
