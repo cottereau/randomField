@@ -24,13 +24,17 @@ program main_RandomField
 
 
     !LOCAL VARIABLES
-    character(len=200) :: path, logFilePath
-    double precision, dimension(10) :: times, all_times
+    character(len=buf_RF) :: path
+    double precision, dimension(9) :: times, all_times
     integer :: code
 
     !INPUT VARIABLES
     type(IPT_RF)  :: IPT_Temp !Only for sake ok practicity
     type(IPT_RF)  :: IPT !The one that shoud be initialized when calling from an external program
+
+    !call MPI_INIT(code)
+    !write(*,*) "HERE"
+    !call MPI_FINALIZE(code)
 
     !Initializing MPI
     call init_communication(MPI_COMM_WORLD, IPT_Temp%comm, IPT_Temp%rang, IPT_Temp%nb_procs)
@@ -38,7 +42,7 @@ program main_RandomField
     !Options
     IPT_Temp%writeDataSet = .true.
     IPT_Temp%writeUNVinterpolation = .true.
-    IPT_Temp%sameFolder = .false.
+    IPT_Temp%sameFolder = .true.
     IPT_Temp%outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
     IPT_Temp%write_intermediate_files = .false.
     IPT_Temp%sampleFields = .true.
@@ -67,7 +71,7 @@ program main_RandomField
 
     !Initializing folders
     if(IPT_Temp%rang == 0) write(*,*)  "-> Initialize Folders"
-    call init_basic_folders(IPT_Temp%comm)
+    call init_basic_folders(IPT_Temp%comm, IPT_Temp)
 
 #ifdef MAKELOG
     if(IPT_Temp%rang == 0) write(*,*) "IFDEF MAKELOG DEFINED"
@@ -166,12 +170,12 @@ program main_RandomField
     if(IPT_Temp%rang == 0) write(*,*) "Reading Inputs        = ", (all_times(2) - all_times(1))/dble(IPT_Temp%nb_procs)
     if(IPT_Temp%rang == 0) write(*,*) "Pre Organization      = ", (all_times(3) - all_times(2))/dble(IPT_Temp%nb_procs)
     if(IPT_Temp%rang == 0) write(*,*) "Generation            = ", (all_times(4) - all_times(3))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Localization Int      = ", (all_times(5) - all_times(4))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Localization Ext      = ", (all_times(6) - all_times(5))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Writing Normalization = ", (all_times(7) - all_times(6))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Transforming          = ", (all_times(8) - all_times(7))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "Writing Files         = ", (all_times(9) - all_times(8))/dble(IPT_Temp%nb_procs)
-    if(IPT_Temp%rang == 0) write(*,*) "UNV Interpolation     = ", (all_times(10) - all_times(9))/dble(IPT_Temp%nb_procs)
+    !if(IPT_Temp%rang == 0) write(*,*) "Localization Int      = ", (all_times(5) - all_times(4))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Localization Ext      = ", (all_times(5) - all_times(4))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Writing Normalization = ", (all_times(6) - all_times(5))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Transforming          = ", (all_times(7) - all_times(6))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "Writing Files         = ", (all_times(8) - all_times(7))/dble(IPT_Temp%nb_procs)
+    if(IPT_Temp%rang == 0) write(*,*) "UNV Interpolation     = ", (all_times(9) - all_times(8))/dble(IPT_Temp%nb_procs)
     if(IPT_Temp%rang == 0) write(*,*) ""
 
     !4 - Sampling
@@ -183,7 +187,7 @@ program main_RandomField
     !10 - UNV Interpolation
 
 	!Deallocating
-    call deallocate_all()
+    call deallocate_all(IPT)
 
     if(IPT_Temp%rang == 0) then
         write(*,*) ""
@@ -192,6 +196,8 @@ program main_RandomField
         write(*,*) "---------------------------------------------------------------------";
         write(*,*) ""
     end if
+
+    call MPI_BARRIER(IPT_Temp%comm, code)
 
     call finalize_IPT_RF(IPT_Temp)
 
@@ -233,14 +239,18 @@ program main_RandomField
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine init_basic_folders(comm)
+        subroutine init_basic_folders(comm, IPT_Temp)
             implicit none
             !INPUT
             integer, intent(in) :: comm
+            type(IPT_RF), intent(in)  :: IPT_Temp !Only for sake ok practicity
             !LOCAL
             integer, dimension(8) :: date_time
             integer :: code
             character(len=10), dimension(3) :: strings
+            !    !LOCAL VARIABLES
+            character(len=buf_RF) :: path!, logFilePath
+
 
             !date_time_label
             call date_and_time(strings(1), strings(2), strings(3), date_time)
@@ -282,18 +292,23 @@ program main_RandomField
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         subroutine end_communication()
+            implicit none
             !LOCAL
             integer :: code
 
-            call finalize_log_file()
+            !call finalize_log_file()
             call MPI_FINALIZE(code)
+
         end subroutine end_communication
 
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine deallocate_all()
+        subroutine deallocate_all(IPT)
+            implicit none
+            !LOCAL
+            type(IPT_RF), intent(inout)  :: IPT
 
             call finalize_IPT_RF(IPT)
 

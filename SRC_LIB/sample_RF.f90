@@ -824,11 +824,11 @@ contains
                                          IPT%nDim, 1, IPT%loc_Comm, RF_3D=RF_3D)
             end if
 
-            build_times(6) = MPI_Wtime() !Normalization Time
+            build_times(5) = MPI_Wtime() !Normalization Time
 
             call multiVariateTransformation (IPT%margiFirst, IPT%fieldAvg, IPT%fieldVar, randField)
 
-            build_times(7) = MPI_Wtime() !Transformation Time
+            build_times(6) = MPI_Wtime() !Transformation Time
 
             call write_Simple_pHDF5_Str(minP, maxP, &
                                         IPT%nDim, IPT%Nmc, IPT%loc_Comm, RF_2D, RF_3D, &
@@ -837,7 +837,7 @@ contains
                                         filename, single_path, &
                                         BBoxPath, XMFPath)
 
-            build_times(8) = MPI_Wtime() !Writing Sample Time
+            build_times(7) = MPI_Wtime() !Writing Sample Time
 
 
             if(associated(RF_2D)) nullify(RF_2D)
