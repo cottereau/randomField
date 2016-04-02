@@ -160,7 +160,7 @@ contains
             prodNFields  = product(IPT%nFields) !Number of fields (ignoring localization level)
 
             !DEFINING GROUPS AND COMMUNICATORS FOR LOCALIZATION
-            if(IPT%nb_procs < prodNFields) then
+            if(IPT%nb_procs < prodNFields .or. prodNFields == 1) then
                 loc_groupMax = 0 !No external localization
                 loc_nbProcs = 1
                 extLoc = .false.
@@ -173,6 +173,7 @@ contains
                 loc_nbProcs  = prodNFields
                 extLoc = .true.
             end if
+            !if(prodNFields == 1) extLoc = .false.
             call MPI_COMM_SPLIT(IPT%comm, loc_group, IPT%rang, loc_Comm, code)
             call MPI_COMM_RANK(loc_Comm, loc_rang, code)
 
@@ -312,13 +313,15 @@ contains
                 call wLog(RDF%seed)
                 call wLog(" ")
 
-                call wLog("-> Setting xPoints")
-                !write(*,*) "Setting xPoints"
-                call set_xPoints(MSH, RDF, RDF%xPoints_Local)
-                call wLog("      maxval(RDF%xPoints,2) = ")
-                call wLog(maxval(RDF%xPoints,2))
-                call wLog( "      minval(RDF%xPoints,2) = ")
-                call wLog(minval(RDF%xPoints,2))
+                if(IPT%method /= FFT) then
+                    call wLog("-> Setting xPoints")
+                    !write(*,*) "Setting xPoints"
+                    call set_xPoints(MSH, RDF, RDF%xPoints_Local)
+                    call wLog("      maxval(RDF%xPoints,2) = ")
+                    call wLog(maxval(RDF%xPoints,2))
+                    call wLog( "      minval(RDF%xPoints,2) = ")
+                    call wLog(minval(RDF%xPoints,2))
+                end if
 
                 !i = size(RDF%xPoints,2)
                 !if(i>50) i = 50

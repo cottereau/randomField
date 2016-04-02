@@ -336,7 +336,17 @@ contains
                         end if
 
 
+!                        call wLog("shape(randField_Group(:,1)) = ")
+!                        call wLog(shape(randField_Group(:,1)))
+!                        call wLog("shape(unityPartition) = ")
+!                        call wLog(shape(unityPartition))
+!
+!                        if(any(shape(unityPartition) /= shape(randField_Group(:,1)))) then
+!                            write(*,*) "ERROR in internal localization, unityPartition and randField_Group don't have the same sizes"
+!                        end if
+
                         do j = 1, IPT%Nmc
+
 
                             !Multiplication
                             randField_Gen(:,j) = randField_Gen(:,j)*unityPartition
@@ -392,47 +402,53 @@ contains
 
         !Correcting Borders (From internal localization)
         if(allocated(unityPartition)) deallocate(unityPartition)
-        allocate(unityPartition(xNTotal_Group))
-        call generateUnityPartition_Matrix(xNStep_Group, IPT%overlap, IPT%corrL, IPT%xStep,&
-                                           1, unityPartition, IPT%nDim, &
-                                           IPT%neigh, IPT%neighShift, reverse = .true.)
 
-        if(IPT%write_intermediate_files) then
-            MONO_FileName = string_join_many("PofUnit_L1_Group",numb2String(IPT%gen_group))
-            if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
-                                                          IPT%xStep, IPT%nDim, &
-                                                          unityPartition, MONO_FileName, &
-                                                          single_path)
+        if(IPT%loc_group == 0) then
+            allocate(unityPartition(xNTotal_Group))
+
+            call wLog("shape(randField_Group(:,1)) = ")
+            call wLog(shape(randField_Group(:,1)))
+            call wLog("shape(unityPartition) = ")
+            call wLog(shape(unityPartition))
+
+            if(any(shape(unityPartition) /= shape(randField_Group(:,1)))) then
+                write(*,*) "shape(randField_Group(:,1)) = ", shape(randField_Group(:,1))
+                write(*,*) "shape(unityPartition) = ", shape(unityPartition)
+                write(*,*) "ERROR in correcting borders, unityPartition and randField_Group don't have the same sizes"
+            end if
+
+            call generateUnityPartition_Matrix(xNStep_Group, IPT%overlap, IPT%corrL, IPT%xStep,&
+                                               1, unityPartition, IPT%nDim, &
+                                               IPT%neigh, IPT%neighShift, reverse = .true.)
+
+            if(IPT%write_intermediate_files) then
+                MONO_FileName = string_join_many("PofUnit_L1_Group",numb2String(IPT%gen_group))
+                if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
+                                                              IPT%xStep, IPT%nDim, &
+                                                              unityPartition, MONO_FileName, &
+                                                              single_path)
+            end if
+
+            call wLog("BEFmaxval(randField_Group(:,:)) = ")
+            call wLog(maxval(randField_Group(:,:)))
+            call wLog("BEFminval(randField_Group(:,:)) = ")
+            call wLog(minval(randField_Group(:,:)))
+
+            randField_Group(:,1) = randField_Group(:,1)/unityPartition
+
+            if(IPT%write_intermediate_files) then
+                MONO_FileName = string_join_many("LOC_L1_P", numb2String(IPT%rang), "AFT_Cor-GROUP",numb2String(IPT%gen_group))
+                if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
+                                                              IPT%xStep, IPT%nDim, &
+                                                              randField_Group(:,1), MONO_FileName, &
+                                                              single_path)
+            end if
+
+            call wLog("AFTmaxval(randField_Group(:,:)) = ")
+            call wLog(maxval(randField_Group(:,:)))
+            call wLog("AFTminval(randField_Group(:,:)) = ")
+            call wLog(minval(randField_Group(:,:)))
         end if
-
-        call wLog("shape(randField_Group(:,1)) = ")
-        call wLog(shape(randField_Group(:,1)))
-        call wLog("shape(unityPartition) = ")
-        call wLog(shape(unityPartition))
-
-        if(any(shape(unityPartition) /= shape(randField_Group(:,1)))) then
-            write(*,*) "ERROR in internal localization, unityPartition and randField_Group don't have the same sizes"
-        end if
-
-        call wLog("BEFmaxval(randField_Group(:,:)) = ")
-        call wLog(maxval(randField_Group(:,:)))
-        call wLog("BEFminval(randField_Group(:,:)) = ")
-        call wLog(minval(randField_Group(:,:)))
-
-        randField_Group(:,1) = randField_Group(:,1)/unityPartition
-
-        if(IPT%write_intermediate_files) then
-            MONO_FileName = string_join_many("LOC_L1_P", numb2String(IPT%rang), "AFT_Cor-GROUP",numb2String(IPT%gen_group))
-            if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
-                                                          IPT%xStep, IPT%nDim, &
-                                                          randField_Group(:,1), MONO_FileName, &
-                                                          single_path)
-        end if
-
-        call wLog("AFTmaxval(randField_Group(:,:)) = ")
-        call wLog(maxval(randField_Group(:,:)))
-        call wLog("AFTminval(randField_Group(:,:)) = ")
-        call wLog(minval(randField_Group(:,:)))
 
         if(allocated(unityPartition)) deallocate(unityPartition)
 
