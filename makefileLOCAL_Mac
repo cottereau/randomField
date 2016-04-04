@@ -168,6 +168,7 @@ localization_RF.o    : constants_RF.o \
                        displayCarvalhol.o \
 		       math_RF.o \
 		       randomFieldND.o \
+		       type_inputRF.o \
 		       type_MESH.o \
 		       type_RF.o \
 		       write_Log_File.o
@@ -212,6 +213,7 @@ readUNV_RF.o         : displayCarvalhol.o \
 systemUt_RF.o        : write_Log_File.o
 write_Log_File.o     : charFunctions.o
 charFunctions.o      : constants_RF.o
+common_variables_RF.o      : constants_RF.o
 displayCarvalhol.o   : constants_RF.o \
                        write_Log_File.o
 type_RF.o            : charFunctions.o \

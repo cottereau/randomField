@@ -163,6 +163,7 @@ localization_RF.o    : constants_RF.o \
                        displayCarvalhol.o \
 		       math_RF.o \
 		       randomFieldND.o \
+		       type_inputRF.o \
 		       type_MESH.o \
 		       type_RF.o \
 		       write_Log_File.o
@@ -207,6 +208,7 @@ readUNV_RF.o         : displayCarvalhol.o \
 systemUt_RF.o        : write_Log_File.o
 write_Log_File.o     : charFunctions.o
 charFunctions.o      : constants_RF.o
+common_variables_RF.o      : constants_RF.o
 displayCarvalhol.o   : constants_RF.o \
                        write_Log_File.o
 type_RF.o            : charFunctions.o \
@@ -216,7 +218,8 @@ type_RF.o            : charFunctions.o \
 type_MESH.o          : charFunctions.o \
 		       type_inputRF.o
 type_inputRF.o       : readFile_RF.o \
-                       readUNV_RF.o
+                       readUNV_RF.o \
+                       systemUt_RF.o
 dgemm.o              : lsame.o xerbla.o
 dger.o               : xerbla.o
 ranlib.o             : rnglib.o
@@ -267,7 +270,7 @@ cdfnor.o             : dinvnr.o \
 	
 # All Target
 all: randomField statistics
-# all: randomField
+#all: randomField
 
 # Tool invocations
 randomField: $(RF_OBJ) $(COMM_OBJ)
