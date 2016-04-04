@@ -229,7 +229,7 @@ contains
         !---------------------------------------------------------------------------------
 
         subroutine single_realization(IPT, &
-                                      fieldComm, fieldNumber, subdivisionStart, stepProc, &
+                                      fieldComm, fieldNumber, subdivisionStart, &
                                       randField_Local, kMax_out, kNStep_out)
 
             implicit none
@@ -237,7 +237,7 @@ contains
             type(IPT_RF), intent(in) :: IPT
             !type(MESH)  , intent(in) :: globMSH
             integer, intent(in) :: fieldComm, fieldNumber
-            double precision, dimension(:), intent(in) :: subdivisionStart, stepProc
+            double precision, dimension(:), intent(in) :: subdivisionStart
 
             !OUTPUT
             double precision, dimension(:,:), allocatable, intent(out) :: randField_Local
@@ -251,48 +251,45 @@ contains
             logical :: validProc
             integer :: rang
             integer :: newNbProcs, newRang
+            integer :: validComm
 
             integer, dimension(IPT%nDim_gen) :: globCoord
 
 
-            validProc = .true.
-            call MPI_COMM_RANK(fieldComm, newRang, code)
-            call MPI_COMM_SIZE(fieldComm, newNbProcs, code)
-
-            call init_MESH(MSH, IPT, fieldComm, newRang, newNbProcs)
-            call init_RF(RDF, IPT, fieldComm, newNbProcs, newRang)
-
-            !Copy from globMSH
-            MSH%xStep    = IPT%xStep
-            MSH%overlap  = IPT%overlap
-            MSH%xMinGlob = subdivisionStart
-            MSH%xMaxGlob = MSH%xMinGlob + IPT%procExtent
-            MSH%procExtent = IPT%procExtent
-
-            MSH%procPerDim(:) = 1
-            MSH%procPerDim(MSH%nDim) = newNbProcs
-            MSH%coords = 0
-            MSH%coords(MSH%nDim) = newRang
-            globCoord = nint((subdivisionStart - IPT%xMinGlob)/stepProc)
-            call wLog("  globCoord = ")
-            call wLog(globCoord)
-
-            call wLog("-> set_local_bounding_box")
-
-            call set_local_bounding_box(MSH,&
-                                        MSH%xMinBound, MSH%xMaxBound, &
-                                        MSH%xNStep, MSH%xNTotal, MSH%origin, validProc, &
-                                        localization = .false.)
-            !write(*,*) "After set_local_bounding_box"
-            rang = MSH%rang
-            call set_validProcs_comm(validProc, fieldComm, rang, &
-                                     MSH%validProc, RDF%validProc, MSH%comm, RDF%comm, &
-                                     MSH%nb_procs, RDF%nb_procs, MSH%rang, RDF%rang)
-
-            call wLog("MSH%xNTotal = ")
-            call wLog(MSH%xNTotal)
+            call set_validProcs_comm(IPT, fieldComm, validProc, validComm)
 
             if(validProc) then
+
+                call MPI_COMM_RANK(validComm, newRang, code)
+                call MPI_COMM_SIZE(validComm, newNbProcs, code)
+
+                call init_MESH(MSH, IPT, validComm, newRang, newNbProcs)
+                call init_RF(RDF, IPT, validComm, newNbProcs, newRang)
+
+                !Outside Initialization
+                MSH%xMinGlob = subdivisionStart
+                MSH%xMaxGlob = MSH%xMinGlob + IPT%procExtent
+                MSH%procPerDim(:) = 1
+                MSH%procPerDim(MSH%nDim) = newNbProcs
+                MSH%coords = 0
+                MSH%coords(MSH%nDim) = newRang
+                globCoord = nint((subdivisionStart - IPT%xMinGlob)/IPT%stepProc)
+                call wLog("  globCoord = ")
+                call wLog(globCoord)
+
+                call wLog("-> set_local_bounding_box")
+
+                call set_local_bounding_box(MSH,&
+                                            MSH%xMinBound, MSH%xMaxBound, RDF%xRange, &
+                                            MSH%xNStep, MSH%xNTotal, MSH%origin)
+
+                !write(*,*) "After set_local_bounding_box"
+                rang = MSH%rang
+
+
+                call wLog("MSH%xNTotal = ")
+                call wLog(MSH%xNTotal)
+
 
                 call wLog("-> Initializing Random Seed")
 

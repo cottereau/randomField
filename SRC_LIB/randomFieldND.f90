@@ -63,7 +63,7 @@ contains
         call wLog("->Normalizing Coordinates")
         call wLog(" ")
         do i = 1, RDF%nDim
-            RDF%xPoints(i,:)   = RDF%xPoints(i,:)/RDF%corrL(i)
+            if(associated(RDF%xPoints)) RDF%xPoints(i,:)   = RDF%xPoints(i,:)/RDF%corrL(i)
             MSH%xStep(i)       = MSH%xStep(i) /RDF%corrL(i)
             MSH%xMinInt(i)     = MSH%xMinInt(i)/RDF%corrL(i)
             MSH%xMaxInt(i)     = MSH%xMaxInt(i)/RDF%corrL(i)
@@ -79,19 +79,10 @@ contains
             RDF%xRange(i)      = RDF%xRange(i)/RDF%corrL(i)
         end do
 
-        !if(RDF%independent) then
-            !RDF%xRange = MSH%xMaxExt - MSH%xMinExt !Delta max in between two wave numbers to avoid periodicity
-            !RDF%xRange = MSH%xMaxBound - MSH%xMinBound !Delta max in between two wave numbers to avoid periodicity
-        !else
-            RDF%xRange = MSH%xMaxGlob - MSH%xMinGlob !Delta max in between two wave numbers to avoid periodicity
-        !end if
-
         !Generating Standard Gaussian Field
         call wLog("")
         call wLog("GENERATING RANDOM FIELDS")
         call wLog("-------------------------------")
-        !if(RDF%rang == 0) write(*,*)"GENERATING RANDOM FIELDS"
-        !if(RDF%rang == 0) write(*,*) "-------------------------------"
         call wLog("")
 
         select case (RDF%method)
@@ -124,7 +115,7 @@ contains
         call wLog(" ")
         call wLog("->Reverting Normalization")
         do i = 1, RDF%nDim
-            RDF%xPoints(i,:)   = RDF%xPoints(i,:)*RDF%corrL(i)
+            if(associated(RDF%xPoints)) RDF%xPoints(i,:)   = RDF%xPoints(i,:)*RDF%corrL(i)
             RDF%xRange(i)      = RDF%xRange(i)*RDF%corrL(i)
             MSH%xStep(i)       = MSH%xStep(i)*RDF%corrL(i)
             MSH%xMinInt(i)     = MSH%xMinInt(i)*RDF%corrL(i)

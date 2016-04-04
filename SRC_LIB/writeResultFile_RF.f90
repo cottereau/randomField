@@ -41,10 +41,7 @@ contains
         character(len=*), intent(out), optional :: HDF5FullPath
 
         !LOCAL
-
-
-
-        character(len=110) :: XMFName, HDF5Name
+        character(len=buf_RF) :: XMFName, HDF5Name
 
         !!!!!!!!!!!!HDF5
         call wLog("-> Writing h5 file in"//trim(adjustL(folderPath))//"/h5");
@@ -115,9 +112,9 @@ contains
         integer                           , intent(in) :: communicator, indexXMF
 
         !LOCAL
-        character(len=110), dimension(3) :: HDF5Names
+        character(len=buf_RF), dimension(3) :: HDF5Names
         integer, dimension(3) :: xSz, ySz
-        character(len=110) :: XMFName, HDF5Name, fileName2
+        character(len=buf_RF) :: XMFName, HDF5Name, fileName2
 
 
 
@@ -182,7 +179,7 @@ contains
         integer, intent(out) :: xSz, ySz
 
         !HDF5 VARIABLES
-        character(len=110)             :: fileHDF5Name, fullPath !File name
+        character(len=buf_RF)             :: fileHDF5Name, fullPath !File name
 
         integer(HID_T)                 :: file_id       !File identifier
         integer(HID_T)                 :: dset_id       !Dataset identifier
@@ -348,7 +345,7 @@ contains
 
         !LOCAL VARIABLES
         integer             :: Nmc, i, file, nDim;
-        character (len=110) :: fileXMFName, fullPathXMF, HDF5path;
+        character (len=buf_RF) :: fileXMFName, fullPathXMF, HDF5path;
 
 
         !write(get_fileId(),*) "------------START Writing result XMF file-----------------------";
@@ -448,10 +445,10 @@ contains
         integer          , dimension(1:), optional  , intent(in) :: indexes
 
         !OUTPUTS
-        character(len=110) , optional  , intent(out) ::HDF5Name, HDF5FullPath
+        character(len=buf_RF) , optional  , intent(out) ::HDF5Name, HDF5FullPath
 
         !HDF5 VARIABLES
-        character(len=110)             :: fileHDF5Name, fullPath !File name
+        character(len=buf_RF)             :: fileHDF5Name, fullPath !File name
         character(len=30)              :: eventName, coordName;        !Dataset names
         integer(HID_T)                 :: file_id       !File identifier
         integer(HID_T)                 :: dset_id       !Dataset identifier
@@ -593,11 +590,11 @@ contains
         !LOCAL VARIABLES
         integer             :: Nmc, i, j, file, nb_procs, code;
         integer             :: effectComm
-        character (len=110) :: fileXMFName, fullPathXMF, effecHDF5path;
-        character (len=100) :: meshName;
-        character (len=100) , dimension(:), allocatable :: effectAttName;
+        character (len=buf_RF) :: fileXMFName, fullPathXMF, effecHDF5path;
+        character (len=buf_RF) :: meshName;
+        character (len=buf_RF) , dimension(:), allocatable :: effectAttName;
         integer            , dimension(:), allocatable :: all_nPointList
-        character (len=110), dimension(:), allocatable :: all_HDF5nameList
+        character (len=buf_RF), dimension(:), allocatable :: all_HDF5nameList
         logical            , dimension(:), allocatable :: all_mask
 
         effectComm = communicator
@@ -852,7 +849,7 @@ contains
         !LOCAL VARIABLES
         integer             :: i, file
         character (len=110) :: dimText;
-        integer, dimension(nDim) :: total_xNStep
+        integer(kind=8), dimension(nDim) :: total_xNStep
         character(len=buf_RF) :: XMF_FileName, XMF_RePath
 
 
@@ -872,7 +869,7 @@ contains
             !Writing Number of points in each Dimensions in the reverse order
             dimText = ""
             do i = size(total_xNStep), 1, -1
-                dimText = trim(dimText)//" "//trim(numb2String(total_xNStep(i)))
+                dimText = trim(dimText)//" "//trim(numb2StringLong(total_xNStep(i)))
             end do
             dimText = trim(adjustL(dimText))
 
@@ -964,7 +961,7 @@ contains
         character(len=*)  , intent(out), optional ::HDF5FullPath, XMFFullPath
 
         !HDF5 VARIABLES
-        character(len=110)             :: fileHDF5Name, fullPath !File name
+        character(len=buf_RF)             :: fileHDF5Name, fullPath !File name
         integer(HID_T)                 :: file_id       !File identifier
         integer(HID_T)                 :: dset_id       !Dataset identifier
         integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
@@ -981,7 +978,7 @@ contains
         !LOCAL VARIABLES
         character(LEN=8) :: dsetname = "samples"
         double precision, dimension(:), allocatable :: randFieldLinear
-        character(len=110) :: XMF_Folder, HDF5_Folder
+        character(len=buf_RF) :: XMF_Folder, HDF5_Folder
         double precision, dimension(nDim) :: xMaxGlob
 
         error = Nmc !To avoid warning while Nmc /= 1 not implemented
@@ -1150,10 +1147,10 @@ contains
         logical                           , intent(in) :: localization
 
         !OUTPUTS
-        character(len=110) , optional  , intent(out) ::HDF5Name, HDF5FullPath
+        character(len=buf_RF) , optional  , intent(out) ::HDF5Name, HDF5FullPath
 
         !HDF5 VARIABLES
-        character(len=110)             :: fileHDF5Name, fullPath !File name
+        character(len=buf_RF)             :: fileHDF5Name, fullPath !File name
         integer(HID_T)                 :: file_id       !File identifier
         integer(HID_T)                 :: dset_id       !Dataset identifier
         integer(HID_T)                 :: memspace      ! Dataspace identifier in memory
@@ -1374,7 +1371,7 @@ contains
 
         !LOCAL VARIABLES
         integer             :: i, file, nDim;
-        character (len=110) :: fileXMFName, fullPathXMF, HDF5path, dimText;
+        character (len=buf_RF) :: fileXMFName, fullPathXMF, HDF5path, dimText;
         integer, dimension(MSH%nDim) :: total_xNStep
 
 

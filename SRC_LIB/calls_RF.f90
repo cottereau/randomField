@@ -129,22 +129,22 @@ contains
         integer         , dimension(IPT%nDim, IPT%nTotalFields) :: subdivisionId
         double precision      :: t_bef, t_aft
         integer               :: fieldNumber
-        character(len=200) :: BBoxPath, XMFPath, MONO_FileName
-        character(len=200), dimension(:), allocatable :: MONO_FileNames
+        character(len=buf_RF) :: BBoxPath, XMFPath, MONO_FileName
+        character(len=buf_RF), dimension(:), allocatable :: MONO_FileNames
         double precision, dimension(IPT%nTotalFields) :: gen_times, temp_gen_times
         integer :: i, d, countFields, j
-        integer :: nSamplesInProc, nSamplesInAllProc, rest, sum_SamplesInProc
+        integer :: nSamplesInProc
         double precision, dimension(:,:), allocatable, target :: randField_Gen
         double precision, dimension(:,:), allocatable, target :: randField_Group
         double precision, dimension(:,:), allocatable :: randField_Local
         double precision, dimension(:), allocatable ::unityPartition
         integer(kind=8) :: xNTotal_Proc, xNTotal_Group
         double precision, dimension(:,:), allocatable :: xMinFiles, xMaxFiles
-        double precision, dimension(IPT%nDim) :: ones, xMin_Group, xMax_Group
+        double precision, dimension(IPT%nDim) :: xMin_Group, xMax_Group
         integer, dimension(IPT%nDim) :: xNStep_Proc, xNStep_Group, origin_Group
-        integer, dimension(IPT%nDim) :: locStep, minP, maxP
-        double precision, dimension(:, :), pointer :: RF_2D_Proc, RF_2D_Group
-        double precision, dimension(:, :, :), pointer :: RF_3D_Proc, RF_3D_Group
+        integer, dimension(IPT%nDim) :: minP, maxP
+        double precision, dimension(:, :), pointer :: RF_2D_Group
+        double precision, dimension(:, :, :), pointer :: RF_3D_Group
         double precision :: gen_WALL_Time
         double precision, dimension(8) :: build_times, BT_sum, BT2_sum
         double precision, dimension(8) :: BT_avg
@@ -172,97 +172,27 @@ contains
 
         build_times(1) = MPI_Wtime() !Reference
 
-        !Init
-        ones = 1.0D0
-        locStep = IPT%nFields**(IPT%localizationLevel)
-        call setGrid(subdivisionCoords, IPT%xMinGlob, IPT%stepProc, locStep, inverse=.true.)
-        do i = 1, size(subdivisionCoords, 2)
-            subdivisionId(:,i) = nint((subdivisionCoords(:,i)-IPT%xMinGlob)/IPT%stepProc)
-        end do
-        if(IPT%rang == 0) write(*,*) "Max Coord = ", subdivisionCoords(:, size(subdivisionCoords,2)) + IPT%procExtent
-
         !Discovering number of fields in each proc
         nSamplesInProc = 0
         xNTotal_Proc   = 0
 
-        if(IPT%gen_rang == 0) then
-            nSamplesInAllProc = int(IPT%nTotalFields/(IPT%loc_nbProcs))
-            rest              = IPT%nTotalFields - (nSamplesInAllProc*IPT%loc_nbProcs)
-            nSamplesInProc    = nSamplesInAllProc
-            if(IPT%rang < rest) nSamplesInProc = nSamplesInProc + 1
+        call find_nSamples_in_proc(IPT, nSamplesInProc, xNStep_Proc, xNTotal_Proc)
 
-            xNStep_Proc = find_xNStep(xMaxExt=IPT%procExtent, xStep=IPT%xStep)
-            xNTotal_Proc = product(int(xNStep_Proc, 8))
-
-            !allocate(randField_inProc(xNTotal_Proc, IPT%Nmc, nSamplesInProc))
+        if(IPT%loc_group == 0) then
             allocate(randField_Gen(xNTotal_Proc, IPT%Nmc))
-
             if(IPT%write_intermediate_files) allocate(MONO_FileNames(nSamplesInProc))
             allocate(xMinFiles(IPT%nDim, nSamplesInProc))
             allocate(xMaxFiles(IPT%nDim, nSamplesInProc))
         end if
 
+        call prepare_Localization(IPT, subdivisionCoords, subdivisionId, &
+                                    xMinFiles, xMaxFiles, xMin_Group, xMax_Group, &
+                                    gen_GroupRange, xNStep_Group, origin_Group, &
+                                    xNTotal_Group)
 
-        !Verification
-        call MPI_ALLREDUCE (nSamplesInProc, sum_SamplesInProc, 1, MPI_INTEGER, MPI_SUM, IPT%comm, code)
-        if(IPT%nTotalFields /= sum_SamplesInProc) then
-            write(*,*) "ERROR in 'build_random_field' IPT%nTotalFields and sum_SamplesInProc are different"
-            write(*,*) "IPT%nTotalFields  = ", IPT%nTotalFields
-            write(*,*) "sum_SamplesInProc = ", sum_SamplesInProc
-            call wLog("ERROR in 'build_random_field' IPT%nTotalFields and sum_SamplesInProc are different")
-            call wLog("nSamplesInProc = ")
-            call wLog(nSamplesInProc)
-            call wLog("IPT%nTotalFields = ")
-            call wLog(IPT%nTotalFields)
-            call wLog("sum_SamplesInProc = ")
-            call wLog(sum_SamplesInProc)
-            stop (" ")
-        end if
-
-        call wLog("IPT%gen_rang = ")
-        call wLog(IPT%gen_rang)
-        call wLog("nSamplesInProc = ")
-        call wLog(nSamplesInProc)
-        call wLog("xNTotal_Proc = ")
-        call wLog(xNTotal_Proc)
-        call wLog("IPT%coords = ")
-        call wLog(IPT%coords)
-
-        ! PREPARING INTERNAL LOCALIZATION-----------------------------------
-        if(IPT%rang == 0) write(*,*) " "
-        if(IPT%rang == 0) write(*,*) "-> PREPARING INTERNAL LOCALIZATION----------------------------------------"
         if(IPT%loc_group == 0) then
-
-            countFields  = 0
-            do i = 1, IPT%nTotalFields
-                if(all(subdivisionId(:,i)/(IPT%nFields**(IPT%localizationLevel - 1)) == IPT%coords) &
-                   .or. (.not. IPT%extLoc)) then
-                    countFields = countFields + 1
-                    xMinFiles(:, countFields) = subdivisionCoords(:,i)
-                    xMaxFiles(:, countFields) = xMinFiles(:, countFields) + IPT%procExtent
-                end if
-            end do
-
-            xMin_Group    = minval(xMinFiles(:, :),2)
-            xMax_Group    = maxval(xMaxFiles(:, :),2)
-            gen_GroupRange = xMax_Group - xMin_Group
-            xNStep_Group  = find_xNStep(xMaxExt=gen_GroupRange, xStep=IPT%xStep)
-            origin_Group  = find_xNStep(xMinExt=IPT%xMinGlob, xMaxExt=xMin_Group, xStep=IPT%xStep)
-            xNTotal_Group = product(int(xNStep_Group,8))
-            call wLog("xMin_Group = ")
-            call wLog(xMin_Group)
-            call wLog("xMax_Group = ")
-            call wLog(xMax_Group)
-            call wLog("gen_GroupRange = ")
-            call wLog(gen_GroupRange)
-            call wLog("xNStep_Group = ")
-            call wLog(xNStep_Group)
-            call wLog("xNTotal_Group = ")
-            call wLog(xNTotal_Group)
-
             allocate(randField_Group(xNTotal_Group, IPT%Nmc))
             randField_Group = 0.0D0
-
             if(IPT%nDim_gen == 2) then
                 RF_2D_Group(1:xNStep_Group(1),1:xNStep_Group(2)) => randField_Group
             else if(IPT%nDim_gen == 3) then
@@ -280,7 +210,6 @@ contains
                                             IPT%xStep, IPT%nDim, &
                                             unityPartition, MONO_FileName, single_path)
             end if
-
         end if
 
 
@@ -299,7 +228,6 @@ contains
             call wLog("-> SAMPLING----------------------------------------")
             do i = 1, IPT%nTotalFields
             !do i = 1, 1 !FOR TESTS
-                !if(mod(i, gen_groupMax) == gen_group) then
                 if(all(subdivisionId(:,i)/(IPT%nFields**(IPT%localizationLevel - 1)) == IPT%coords) &
                    .or. (.not. IPT%extLoc)) then
 
@@ -312,14 +240,12 @@ contains
                     countFields = countFields + 1
                     call single_realization(IPT, &
                                             IPT%gen_Comm, fieldNumber, subdivisionCoords(:,i), &
-                                            IPT%stepProc, randField_Local, kMax_out, kNStep_out)
+                                            randField_Local, kMax_out, kNStep_out)
                     call wLog("Gathering Sample")
                     call gather_sample(randField_Local, randField_Gen, &
                                        IPT%gen_rang, IPT%gen_nbProcs, IPT%gen_comm)
 
                     if(IPT%gen_rang == 0) then
-                        xMinFiles(:, countFields) = subdivisionCoords(:,i)
-                        xMaxFiles(:, countFields) = xMinFiles(:, countFields) + IPT%procExtent
                         if(IPT%write_intermediate_files) then
                             call wLog("Writing intermediate generation file")
                             MONO_FileNames(countFields) = "GEN"
@@ -334,57 +260,30 @@ contains
                                                         randField_Gen(:,1), &
                                                         MONO_FileNames(countFields), single_path)
                         end if
-
-
-!                        call wLog("shape(randField_Group(:,1)) = ")
-!                        call wLog(shape(randField_Group(:,1)))
-!                        call wLog("shape(unityPartition) = ")
-!                        call wLog(shape(unityPartition))
-!
-!                        if(any(shape(unityPartition) /= shape(randField_Group(:,1)))) then
-!                            write(*,*) "ERROR in internal localization, unityPartition and randField_Group don't have the same sizes"
-!                        end if
-
-                        do j = 1, IPT%Nmc
-
-
-                            !Multiplication
-                            randField_Gen(:,j) = randField_Gen(:,j)*unityPartition
-                            if(IPT%write_intermediate_files) then
-                                MONO_FileName = MONO_FileNames(countFields)
-                                MONO_FileName = string_join_many("LOC_L0_P", numb2String(IPT%rang), "-",MONO_FileName)
-                                if(IPT%gen_rang == 0) call write_MONO_proc_result(xMinFiles(:, countFields), &
-                                                                                  xMaxFiles(:, countFields), &
-                                                                                  IPT%xStep, IPT%nDim, &
-                                                                                  randField_Gen(:,j), MONO_FileName, &
-                                                                                  single_path)
-
-                            end if
-
-                            !Sum
-                            minP = find_xNStep(xMin_Group, xMinFiles(:, countFields), IPT%xStep)
-                            maxP = minP + xNStep_Proc - 1
-
-                            if(IPT%nDim_gen == 2) then
-                                RF_2D_Proc(1:xNStep_Proc(1),1:xNStep_Proc(2)) => randField_Gen(:,j)
-
-                                RF_2D_Group(minP(1):maxP(1),minP(2):maxP(2)) = RF_2D_Proc &
-                                                                   + RF_2D_Group(minP(1):maxP(1),minP(2):maxP(2))
-                            else if(IPT%nDim_gen == 3) then
-                                RF_3D_Proc(1:xNStep_Proc(1),1:xNStep_Proc(2),1:xNStep_Proc(3)) => randField_Gen(:,j)
-
-                                RF_3D_Group(minP(1):maxP(1),minP(2):maxP(2),minP(3):maxP(3)) = RF_3D_Proc &
-                                                          + RF_3D_Group(minP(1):maxP(1),minP(2):maxP(2),minP(3):maxP(3))
-                            end if
-                        end do
-
-
                     end if
 
-                    if(allocated(randField_Local)) deallocate(randField_Local)
 
-                    t_aft = MPI_Wtime()
-                    temp_gen_times(i) = t_aft-t_bef
+                   call add_RF_to_Group(IPT, randField_Local, xNStep_Proc, &
+                                        unityPartition, &
+                                        xMinFiles(:, countFields), xMaxFiles(:, countFields), &
+                                        xMin_Group, &
+                                        subdivisionId(:,i), RF_2D_Group, RF_3D_Group)
+
+
+                   if(IPT%gen_rang == 0) then
+                        if(IPT%write_intermediate_files) then
+                            call wLog("Writing intermediate localized generation file")
+                            MONO_FileName = MONO_FileNames(countFields)
+                            MONO_FileName = string_join_many("LOC_L0_P", numb2String(IPT%rang), "-",MONO_FileName)
+                            if(IPT%gen_rang == 0) call write_MONO_proc_result( &
+                                xMinFiles(:, countFields), xMaxFiles(:, countFields), &
+                                IPT%xStep, IPT%nDim, &
+                                randField_Gen(:,1), MONO_FileName, &
+                                single_path)
+                        end if
+                   end if
+
+                    !if(allocated(randField_Local)) deallocate(randField_Local)
                     !write(*,*) "After single"
                 end if
             end do
@@ -525,9 +424,9 @@ contains
         !if(allocated(randField_inProc)) deallocate(randField_inProc)
         if(allocated(randField_Local))  deallocate(randField_Local)
         if(allocated(randField_Group))  deallocate(randField_Group)
-        if(associated(RF_2D_Proc))  nullify(RF_2D_Proc)
+        !if(associated(RF_2D_Proc))  nullify(RF_2D_Proc)
         if(associated(RF_2D_Group)) nullify(RF_2D_Group)
-        if(associated(RF_3D_Proc))  nullify(RF_3D_Proc)
+        !if(associated(RF_3D_Proc))  nullify(RF_3D_Proc)
         if(associated(RF_3D_Group)) nullify(RF_3D_Group)
 
         !Build Times
@@ -652,59 +551,11 @@ contains
         !if(allocated(randField_inProc)) deallocate(randField_inProc)
         if(allocated(randField_Local))  deallocate(randField_Local)
         if(allocated(randField_Group))  deallocate(randField_Group)
-        if(associated(RF_2D_Proc))  nullify(RF_2D_Proc)
         if(associated(RF_2D_Group)) nullify(RF_2D_Group)
-        if(associated(RF_3D_Proc))  nullify(RF_3D_Proc)
         if(associated(RF_3D_Group)) nullify(RF_3D_Group)
+        !if(associated(RF_2D_Gen))  nullify(RF_2D_Gen)
+        !if(associated(RF_3D_Gen))  nullify(RF_3D_Gen)
 
     end subroutine build_random_field
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    !-----------------------------------------------------------------------------------------------
-!    subroutine create_RF_Unstruct_noInit (xPoints, corrL, corrMod, Nmc,   &
-!                                          randField, method, seedStart,   &
-!                                          margiFirst, fieldAvg, fieldVar, &
-!                                          comm, rang, nb_procs, calculate, MSH)
-!        !INPUT
-!        double precision, dimension(1:, 1:), intent(in), target :: xPoints;
-!        double precision, dimension(1:)    , intent(in) :: corrL;
-!        integer                            , intent(in) :: corrMod;
-!        integer                            , intent(in) :: Nmc;
-!        integer                            , intent(in) :: method
-!        integer                            , intent(in) :: seedStart
-!        integer                            , intent(in) :: margiFirst;
-!        double precision                   , intent(in) :: fieldAvg
-!        double precision                   , intent(in) :: fieldVar;
-!        integer                            , intent(in) :: comm, rang, nb_procs
-!        logical, dimension(1:), optional   , intent(in) :: calculate
-!        type(MESH), intent(inout) :: MSH
-!
-!        !OUTPUT
-!        double precision, dimension(:, :), intent(out), target :: randField;
-!
-!        !LOCAL
-!        type(RF) :: RDF
-!
-!        write(*,*) "Inside create_RF_Unstruct_noInit"
-!
-!        !Initializing RF
-!        call init_RF(RDF, size(corrL), Nmc, comm, rang, nb_procs)
-!        RDF%xPoints   => xPoints
-!        RDF%randField => randField
-!        RDF%xNTotal    = size(RDF%xPoints, 2)
-!        RDF%corrL      = corrL
-!        RDF%corrMod    = corrMod
-!        RDF%Nmc        = Nmc
-!        RDF%method     = method
-!        RDF%seedStart  = seedStart
-!        RDF%margiFirst = margiFirst
-!        RDF%fieldAvg   = fieldAvg
-!        RDF%fieldVar   = fieldVar
-!        if(present(calculate)) RDF%calculate  = calculate
-!
-!        call create_RF_Unstruct_Init(RDF, MSH)
-!
-!    end subroutine create_RF_Unstruct_noInit
 
 end module calls_RF
