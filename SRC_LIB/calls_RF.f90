@@ -262,12 +262,19 @@ contains
                         end if
                     end if
 
-
-                   call add_RF_to_Group(IPT, randField_Local, xNStep_Proc, &
+                    if(IPT%nDim == 2) then
+                        call add_RF_to_Group(IPT, randField_Gen, xNStep_Proc, &
                                         unityPartition, &
                                         xMinFiles(:, countFields), xMaxFiles(:, countFields), &
                                         xMin_Group, &
-                                        subdivisionId(:,i), RF_2D_Group, RF_3D_Group)
+                                        subdivisionId(:,i), RF_2D_Group=RF_2D_Group)
+                   else if(IPT%nDim == 3) then
+                       call add_RF_to_Group(IPT, randField_Gen, xNStep_Proc, &
+                                        unityPartition, &
+                                        xMinFiles(:, countFields), xMaxFiles(:, countFields), &
+                                        xMin_Group, &
+                                        subdivisionId(:,i), RF_3D_Group=RF_3D_Group)
+                   end if
 
 
                    if(IPT%gen_rang == 0) then

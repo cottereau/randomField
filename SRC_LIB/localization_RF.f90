@@ -211,8 +211,8 @@ contains
 
         !OUTPUT
         double precision, dimension(:,:), intent(inout), target :: randField_Gen
-        double precision, dimension(:, :), pointer, intent(inout) :: RF_2D_Group
-        double precision, dimension(:, :, :), pointer, intent(inout) :: RF_3D_Group
+        double precision, dimension(:, :), pointer, intent(inout), optional :: RF_2D_Group
+        double precision, dimension(:, :, :), pointer, intent(inout), optional :: RF_3D_Group
 
 
         !LOCAL
@@ -233,13 +233,25 @@ contains
                 maxP = minP + xNStep_Proc - 1
 
                 if(IPT%nDim_gen == 2) then
+                    if(.not. present(RF_2D_Group)) stop("RF_2D_Group not present inside add_RF_to_Group")
                     RF_2D_Gen(1:xNStep_Proc(1),1:xNStep_Proc(2)) => randField_Gen(:,j)
+
+                    if(size(randField_Gen(:,j)) /= product(shape(RF_2D_Group(minP(1):maxP(1),&
+                                                                   minP(2):maxP(2)))))&
+                 stop("RF_2D_Gen and randField_Gen don't have consistent sizes inside add_RF_to_Group")
 
                     RF_2D_Group(minP(1):maxP(1),minP(2):maxP(2)) = RF_2D_Gen &
                         + RF_2D_Group(minP(1):maxP(1),minP(2):maxP(2))
                 else if(IPT%nDim_gen == 3) then
+                    if(.not. present(RF_3D_Group)) stop("RF_3D_Group not present inside add_RF_to_Group")
                     RF_3D_Gen(1:xNStep_Proc(1),1:xNStep_Proc(2),1:xNStep_Proc(3)) => randField_Gen(:,j)
 
+                    if(size(randField_Gen(:,j)) /= product(shape(RF_3D_Group(minP(1):maxP(1),&
+                                                                   minP(2):maxP(2),&
+                                                                   minP(3):maxP(3)))))&
+                 stop("RF_3D_Gen and randField_Gen don't have consistent sizes inside add_RF_to_Group")
+
+                    write(*,*) "Shape Gen = ", shape(RF_3D_Gen)
                     RF_3D_Group(minP(1):maxP(1),minP(2):maxP(2),minP(3):maxP(3)) = RF_3D_Gen &
                         + RF_3D_Group(minP(1):maxP(1),minP(2):maxP(2),minP(3):maxP(3))
                 end if

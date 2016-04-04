@@ -345,7 +345,7 @@ contains
 
             end if
 
-            call MPI_COMM_FREE (MSH%comm, code)
+            call MPI_COMM_FREE (validComm, code)
 
             call finalize_MESH(MSH)
             call finalize_RF(RDF)
