@@ -240,10 +240,7 @@ contains
                     countFields = countFields + 1
                     call single_realization(IPT, &
                                             IPT%gen_Comm, fieldNumber, subdivisionCoords(:,i), &
-                                            randField_Local, kMax_out, kNStep_out)
-                    call wLog("Gathering Sample")
-                    call gather_sample(randField_Local, randField_Gen, &
-                                       IPT%gen_rang, IPT%gen_nbProcs, IPT%gen_comm)
+                                            randField_Local, randField_Gen, kMax_out, kNStep_out)
 
                     if(IPT%gen_rang == 0) then
                         if(IPT%write_intermediate_files) then

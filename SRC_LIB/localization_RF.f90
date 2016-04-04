@@ -251,7 +251,6 @@ contains
                                                                    minP(3):maxP(3)))))&
                  stop("RF_3D_Gen and randField_Gen don't have consistent sizes inside add_RF_to_Group")
 
-                    write(*,*) "Shape Gen = ", shape(RF_3D_Gen)
                     RF_3D_Group(minP(1):maxP(1),minP(2):maxP(2),minP(3):maxP(3)) = RF_3D_Gen &
                         + RF_3D_Group(minP(1):maxP(1),minP(2):maxP(2),minP(3):maxP(3))
                 end if

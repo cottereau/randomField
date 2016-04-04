@@ -39,9 +39,9 @@ program main_RandomField
     !Options
     IPT_Temp%writeDataSet = .true.
     IPT_Temp%writeUNVinterpolation = .true.
-    IPT_Temp%sameFolder = .true.
+    IPT_Temp%sameFolder = .false.
     IPT_Temp%outputStyle = 1 !1: parallel hdf5, 2: hdf5 per proc
-    IPT_Temp%write_intermediate_files = .true.
+    IPT_Temp%write_intermediate_files = .false.
     IPT_Temp%sampleFields = .true.
 
     times(1) = MPI_Wtime() !Initial Time

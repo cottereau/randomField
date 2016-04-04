@@ -230,7 +230,8 @@ contains
 
         subroutine single_realization(IPT, &
                                       fieldComm, fieldNumber, subdivisionStart, &
-                                      randField_Local, kMax_out, kNStep_out)
+                                      randField_Local, randField_Gen, &
+                                      kMax_out, kNStep_out)
 
             implicit none
             !INPUT
@@ -238,6 +239,7 @@ contains
             !type(MESH)  , intent(in) :: globMSH
             integer, intent(in) :: fieldComm, fieldNumber
             double precision, dimension(:), intent(in) :: subdivisionStart
+            double precision, dimension(:,:), intent(out) :: randField_Gen
 
             !OUTPUT
             double precision, dimension(:,:), allocatable, intent(out) :: randField_Local
@@ -342,6 +344,10 @@ contains
 
                 if(present(kMax_out))   kMax_out   = RDF%kMax
                 if(present(kNStep_out)) kNStep_out = RDF%kNStep
+
+                call wLog("Gathering Sample")
+                call gather_sample(RDF%randField, randField_Gen, &
+                                   RDF%rang, RDF%nb_procs, RDF%comm)
 
             end if
 
