@@ -247,25 +247,34 @@ program main_RandomField
             character(len=10), dimension(3) :: strings
             !    !LOCAL VARIABLES
             character(len=buf_RF) :: path!, logFilePath
+            logical :: folderExist1
 
 
-            !date_time_label
-            call date_and_time(strings(1), strings(2), strings(3), date_time)
-            results_folder_name = strings(1)(3:8)//"_"//strings(2)(1:6)//"_res"
+            if(IPT_Temp%sameFolder) then
+                results_folder_name = "res"
+            else
+                !date_time_label
+                if(IPT_Temp%rang == 0) then
+                    folderExist1 = .true.
+                    do while(folderExist1)
+                        call date_and_time(strings(1), strings(2), strings(3), date_time)
+                        results_folder_name = strings(1)(3:8)//"_"//strings(2)(1:6)//"_res"
+                        folderExist1 = folderExist(results_folder_name, results_path)
+                        if(folderExist1) write(*,*) "Repeated result folder, changing name"
+                    end do
+                end if
+                call MPI_BCAST (results_folder_name, len(results_folder_name), &
+                                MPI_CHARACTER, 0, comm, code)
+            end if
 
-            if(IPT_Temp%sameFolder) results_folder_name = "res"
-
-            call MPI_BARRIER (comm ,code) !Necessary because each proc can have a different time
-            call MPI_BCAST (results_folder_name, 100, MPI_CHARACTER, 0, comm, code)
+            if(IPT_Temp%rang == 0) write(*,*) "-> Setting folder path"
+            single_path = string_join_many(results_path,"/",results_folder_name)
+            if(IPT_Temp%rang == 0) write(*,*) "     single_path = "//trim(single_path)
 
             log_folder_name     = trim(adjustL(results_folder_name))//"/log"
             if(IPT_Temp%sameFolder) log_folder_name     = ".."
 
             call create_folder(log_folder_name, results_path, IPT_Temp%rang, comm)
-
-            if(IPT_Temp%rang == 0) write(*,*) "-> Setting folder path"
-            single_path = string_join_many(results_path,"/",results_folder_name)
-            if(IPT_Temp%rang == 0) write(*,*) "     single_path = "//trim(single_path)
 
             !create xmf and h5 folders
             path = string_join_many(results_path,"/",results_folder_name)

@@ -292,7 +292,6 @@ contains
                 call wLog("MSH%xNTotal = ")
                 call wLog(MSH%xNTotal)
 
-
                 call wLog("-> Initializing Random Seed")
 
                 if(RDF%seedStart >= 0) then
