@@ -806,7 +806,6 @@ contains
             double precision, dimension(:, :, :), pointer :: RF_3D
             integer, dimension(IPT%nDim) :: minP, maxP, overlapNPoints
             integer, dimension(IPT%nDim) :: xNStep_Glob
-            character(len=100) :: filename="NEW_RF"
 
 
             if(IPT%nDim == 2) RF_2D(1:xNStep(1),1:xNStep(2)) => randField(:,1)
@@ -839,8 +838,10 @@ contains
                                         IPT%nDim, IPT%Nmc, IPT%loc_Comm, RF_2D, RF_3D, &
                                         origin, xNStep, IPT%xStep, &
                                         IPT%xMinGlob, xNStep_Glob, &
-                                        filename, single_path, &
+                                        IPT%outputName, IPT%outputFolder, &
                                         BBoxPath, XMFPath)
+
+            if(IPT%rang == 0) write(*,*) "    BBoxPath = ", trim(BBoxPath)
 
             build_times(7) = MPI_Wtime() !Writing Sample Time
 
