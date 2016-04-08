@@ -855,13 +855,15 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine interpolateToMesh(BBoxFileName, coordList, UNV_randField, rang)
+        subroutine interpolateToMesh(BBoxFileName, coordList, UNV_randField, rang, &
+            xMinLoc_In, xMaxLoc_In)
             implicit none
 
             !INPUT
             character(len=*), intent(in)      :: BBoxFileName
             double precision, dimension(:,:), intent(in) :: coordList
             integer, intent(in) :: rang
+            double precision, dimension(:), intent(in), optional :: xMinLoc_In, xMaxLoc_In
             !OUTPUT
             double precision, dimension(:,:), intent(out) :: UNV_randField
             !LOCAL
@@ -913,10 +915,15 @@ contains
             xNStep = nint((xMaxGlob-xMinGlob)/xStep) +1
 
             !DEFINE LOCAL BOUNDING BOX
-            do i = 1, nDim
-                xMin_Loc_UNV(i) = minval(coordList(i,:))
-                xMax_Loc_UNV(i) = maxval(coordList(i,:))
-            end do
+            if(present(xMinLoc_In) .and. present(xMaxLoc_In)) then
+                xMin_Loc_UNV = xMinLoc_In
+                xMax_Loc_UNV = xMaxLoc_In
+            else
+                do i = 1, nDim
+                    xMin_Loc_UNV(i) = minval(coordList(i,:))
+                    xMax_Loc_UNV(i) = maxval(coordList(i,:))
+                end do
+            end if
 
             minPos = floor((xMin_Loc_UNV-xMinGlob)/xStep) + 1
             maxPos = ceiling((xMax_Loc_UNV-xMinGlob)/xStep) + 1
@@ -1043,19 +1050,19 @@ contains
 
                     if(nDim == 2) then
                         UNV_randField(i,1) = UNV_randField(i,1) +                  &
-                                             (                                     &
-                                             BB_2D(coordPosInt(1)+neighCoord(1,j), &
-                                                   coordPosInt(2)+neighCoord(2,j)) &
-                                             * weight                              &
-                                             )
+                            (                                     &
+                            BB_2D(coordPosInt(1)+neighCoord(1,j), &
+                            coordPosInt(2)+neighCoord(2,j)) &
+                            * weight                              &
+                            )
                     else if (nDim == 3) then
                         UNV_randField(i,1) = UNV_randField(i,1) +                  &
-                                             (                                     &
-                                             BB_3D(coordPosInt(1)+neighCoord(1,j), &
-                                                   coordPosInt(2)+neighCoord(2,j), &
-                                                   coordPosInt(3)+neighCoord(3,j)) &
-                                             * weight                              &
-                                             )
+                            (                                     &
+                            BB_3D(coordPosInt(1)+neighCoord(1,j), &
+                            coordPosInt(2)+neighCoord(2,j), &
+                            coordPosInt(3)+neighCoord(3,j)) &
+                            * weight                              &
+                            )
                     end if
 
                 end do
