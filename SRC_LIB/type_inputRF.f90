@@ -77,8 +77,8 @@ contains
                                 nb_procs, &
                                 nDim, &
                                 meshMod, &
-                                xMaxGlob_in, &
                                 xMinGlob_in, &
+                                xMaxGlob_in, &
                                 pointsPerCorrL, &
                                 procPerDim, &
                                 fieldAvg, &

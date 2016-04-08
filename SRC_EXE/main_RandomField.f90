@@ -107,42 +107,61 @@ program main_RandomField
     if(IPT_Temp%rang == 0) write(*,*)  " "
     if(IPT_Temp%rang == 0) write(*,*)  " "
     if(IPT_Temp%rang == 0) write(*,*)  "-> Initializing Input (IPT)"
-    call init_IPT_RF(&
-        IPT, &
-        log_ID = IPT_Temp%log_ID, &
-        comm = IPT_Temp%comm, &
-        rang = IPT_Temp%rang, &
-        nb_procs = IPT_Temp%nb_procs, &
-        nDim = IPT_Temp%nDim_gen, &
-        meshMod = IPT_Temp%meshMod, &
-        xMaxGlob_in = IPT_Temp%xMaxGlob_in, &
-        xMinGlob_in = IPT_Temp%xMinGlob_in, &
-        pointsPerCorrL = IPT_Temp%pointsPerCorrL, &
-        procPerDim = IPT_Temp%procPerDim, &
-        fieldAvg = IPT_Temp%fieldAvg, &
-        fieldVar = IPT_Temp%fieldVar, &
-        corrL_in = IPT_Temp%corrL_in, &
-        overlap_in = IPT_Temp%overlap_in, &
-        corrMod = IPT_Temp%corrMod, &
-        margiFirst = IPT_Temp%margiFirst, &
-        method = IPT_Temp%method, &
-        Nmc = IPT_Temp%Nmc, &
-        seedStart = IPT_Temp%seedStart, &
-        nFields = IPT_Temp%nFields, &
-        localizationLevel = IPT_Temp%localizationLevel, &
-        writeDataSet = IPT_Temp%writeDataSet, &
-        sameFolder = IPT_Temp%sameFolder, &
-        outputStyle = IPT_Temp%outputStyle, &
-        write_intermediate_files = IPT_Temp%write_intermediate_files, &
-        sampleFields = IPT_Temp%sampleFields, &
-        writeUNVinterpolation = IPT_Temp%writeUNVinterpolation, &
-        outputFolder = IPT_Temp%outputFolder, &
-        outputName = "_NEW_RF", &
-        unv = IPT_Temp%unv, &
-        unv_path = IPT_Temp%unv_path, &
-        monotype = IPT_Temp%monotype, &
-        coordList_local = IPT_Temp%coordList_local, &
-        connectList_local = IPT_Temp%connectList_local)
+
+    if(.true.)then
+        call init_IPT_RF(&
+            IPT, &
+            log_ID = IPT_Temp%log_ID, &
+            comm = IPT_Temp%comm, &
+            rang = IPT_Temp%rang, &
+            nb_procs = IPT_Temp%nb_procs, &
+            nDim = IPT_Temp%nDim_gen, &
+            meshMod = IPT_Temp%meshMod, &
+            xMinGlob_in = IPT_Temp%xMinGlob_in, &
+            xMaxGlob_in = IPT_Temp%xMaxGlob_in, &
+            pointsPerCorrL = IPT_Temp%pointsPerCorrL, &
+            procPerDim = IPT_Temp%procPerDim, &
+            fieldAvg = IPT_Temp%fieldAvg, &
+            fieldVar = IPT_Temp%fieldVar, &
+            corrL_in = IPT_Temp%corrL_in, &
+            overlap_in = IPT_Temp%overlap_in, &
+            corrMod = IPT_Temp%corrMod, &
+            margiFirst = IPT_Temp%margiFirst, &
+            method = IPT_Temp%method, &
+            Nmc = IPT_Temp%Nmc, &
+            seedStart = IPT_Temp%seedStart, &
+            nFields = IPT_Temp%nFields, &
+            localizationLevel = IPT_Temp%localizationLevel, &
+            writeDataSet = IPT_Temp%writeDataSet, &
+            sameFolder = IPT_Temp%sameFolder, &
+            outputStyle = IPT_Temp%outputStyle, &
+            write_intermediate_files = IPT_Temp%write_intermediate_files, &
+            sampleFields = IPT_Temp%sampleFields, &
+            writeUNVinterpolation = IPT_Temp%writeUNVinterpolation, &
+            outputFolder = IPT_Temp%outputFolder, &
+            outputName = "_NEW_RF", &
+            unv = IPT_Temp%unv, &
+            unv_path = IPT_Temp%unv_path, &
+            monotype = IPT_Temp%monotype, &
+            coordList_local = IPT_Temp%coordList_local, &
+            connectList_local = IPT_Temp%connectList_local)
+
+    else
+        call init_IPT_RF_std(&
+                         IPT, &
+                         comm = IPT_Temp%comm, &
+                         nDim = IPT_Temp%nDim_gen, &
+                         xMinGlob_in = IPT_Temp%xMinGlob_in, &
+                         xMaxGlob_in = IPT_Temp%xMaxGlob_in, &
+                         fieldAvg = IPT_Temp%fieldAvg, &
+                         fieldVar = IPT_Temp%fieldVar, &
+                         corrL_in = IPT_Temp%corrL_in, &
+                         corrMod = IPT_Temp%corrMod, &
+                         margiFirst = IPT_Temp%margiFirst, &
+                         seedStart = IPT_Temp%seedStart, &
+                         outputFolder = IPT_Temp%outputFolder, &
+                         outputName = "_NEW_RF")
+    end if
 
     !Generating random fields
     call make_random_field(IPT, times)
