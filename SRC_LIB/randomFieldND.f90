@@ -151,6 +151,9 @@ contains
         double precision :: normalVar, normalAvg
         integer          :: error, code
 
+        normalVar = 1.0D0
+        normalAvg = 0.0D0
+
         select case (margiFirst)
         case(fom_GAUSSIAN)
             normalVar = fieldVar

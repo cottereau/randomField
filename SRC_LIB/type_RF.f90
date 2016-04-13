@@ -19,7 +19,8 @@ module type_RF
         !GENERATION VARIABLES
             !nDim independent
         integer :: nDim = -1!, xNTotal = -1, kNTotal = -1;
-        integer(kind=8) :: kNTotal = -1, kNInit, kNEnd
+        integer(kind=8) :: kNTotal = -1
+        integer :: kNInit, kNEnd
         integer, dimension(:)  , allocatable :: seed
         integer :: seedStart = -1
         double precision   :: fieldAvg = -1, fieldVar = -1;

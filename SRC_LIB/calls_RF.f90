@@ -133,12 +133,12 @@ contains
         double precision, dimension(IPT%nDim) :: gen_GroupRange
         double precision, dimension(IPT%nDim, IPT%nTotalFields) :: subdivisionCoords
         integer         , dimension(IPT%nDim, IPT%nTotalFields) :: subdivisionId
-        double precision      :: t_bef, t_aft
+        double precision      :: t_bef
         integer               :: fieldNumber
         character(len=buf_RF) :: BBoxPath, XMFPath, MONO_FileName
         character(len=buf_RF), dimension(:), allocatable :: MONO_FileNames
         double precision, dimension(IPT%nTotalFields) :: gen_times, temp_gen_times
-        integer :: i, d, countFields, j
+        integer :: i, d, countFields
         integer :: nSamplesInProc
         double precision, dimension(:,:), allocatable, target :: randField_Gen
         double precision, dimension(:,:), allocatable, target :: randField_Group
@@ -148,7 +148,6 @@ contains
         double precision, dimension(:,:), allocatable :: xMinFiles, xMaxFiles
         double precision, dimension(IPT%nDim) :: xMin_Group, xMax_Group
         integer, dimension(IPT%nDim) :: xNStep_Proc, xNStep_Group, origin_Group
-        integer, dimension(IPT%nDim) :: minP, maxP
         double precision, dimension(:, :), pointer :: RF_2D_Group
         double precision, dimension(:, :, :), pointer :: RF_3D_Group
         double precision :: gen_WALL_Time
@@ -272,14 +271,12 @@ contains
                                 call add_RF_to_Group(IPT, randField_Gen, xNStep_Proc, &
                                                 unityPartition, &
                                                 xMinFiles(:, countFields), xMaxFiles(:, countFields), &
-                                                xMin_Group, &
-                                                subdivisionId(:,i), RF_2D_Group=RF_2D_Group)
+                                                xMin_Group, RF_2D_Group=RF_2D_Group)
                            else if(IPT%nDim == 3) then
                                call add_RF_to_Group(IPT, randField_Gen, xNStep_Proc, &
                                                 unityPartition, &
                                                 xMinFiles(:, countFields), xMaxFiles(:, countFields), &
-                                                xMin_Group, &
-                                                subdivisionId(:,i), RF_3D_Group=RF_3D_Group)
+                                                xMin_Group, RF_3D_Group=RF_3D_Group)
                            end if
 
 
