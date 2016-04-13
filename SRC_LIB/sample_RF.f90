@@ -1059,19 +1059,19 @@ contains
 
                     if(nDim == 2) then
                         UNV_randField(i,1) = UNV_randField(i,1) +                  &
-                                             (                                     &
-                                             BB_2D(coordPosInt(1)+neighCoord(1,j), &
-                                                   coordPosInt(2)+neighCoord(2,j)) &
-                                             * weight                              &
-                                             )
+                            (                                     &
+                            BB_2D(coordPosInt(1)+neighCoord(1,j), &
+                            coordPosInt(2)+neighCoord(2,j)) &
+                            * weight                              &
+                            )
                     else if (nDim == 3) then
                         UNV_randField(i,1) = UNV_randField(i,1) +                  &
-                                             (                                     &
-                                             BB_3D(coordPosInt(1)+neighCoord(1,j), &
-                                                   coordPosInt(2)+neighCoord(2,j), &
-                                                   coordPosInt(3)+neighCoord(3,j)) &
-                                             * weight                              &
-                                             )
+                            (                                     &
+                            BB_3D(coordPosInt(1)+neighCoord(1,j), &
+                            coordPosInt(2)+neighCoord(2,j), &
+                            coordPosInt(3)+neighCoord(3,j)) &
+                            * weight                              &
+                            )
                     end if
 
                 end do
