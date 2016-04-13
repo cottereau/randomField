@@ -115,6 +115,13 @@ module type_RF
             RF_a%neighSeed(:,:) = -1
             RF_a%validProc = .true.
 
+            if(associated(RF_a%xPoints))    nullify(RF_a%xPoints)
+            if(associated(RF_a%randField))  nullify(RF_a%randField)
+            if(associated(RF_a%RF_2D))      nullify(RF_a%RF_2D)
+            if(associated(RF_a%RF_3D))      nullify(RF_a%RF_3D)
+            if(associated(RF_a%xPoints_2D)) nullify(RF_a%xPoints_2D)
+            if(associated(RF_a%xPoints_3D)) nullify(RF_a%xPoints_3D)
+
         end subroutine init_RF
 
         !---------------------------------------------------------------------------------

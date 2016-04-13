@@ -51,13 +51,6 @@ contains
         !LOCAL VARIABLES
         integer :: i;
 
-        !logical, dimension(size(MSH%neigh)) :: considerNeighbour
-        !integer, dimension(16) :: testVec
-        !integer :: partitionType = 1
-
-
-        !testVec = [(i, i = 1, 16)]
-
         !Normalization
         call wLog(" ")
         call wLog("->Normalizing Coordinates")

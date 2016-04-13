@@ -254,7 +254,7 @@ program main_RandomField
             character(len=10), dimension(3) :: strings
             character(len=buf_RF) :: results_folder_name
             !    !LOCAL VARIABLES
-            character(len=buf_RF) :: path, logFilePath, log_folder_name
+            character(len=buf_RF) :: logFilePath, log_folder_name
             logical :: folderExist1
 
 

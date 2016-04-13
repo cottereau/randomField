@@ -39,9 +39,8 @@ contains
 
         call CPU_TIME(t_initial)
 
-        if(IPT%rang == 0) write(*,*) "-> Processing INPUTS----------------------------------------"
         call wLog("-> Processing INPUTS----------------------------------------")
-        if(IPT%rang == 0) write(*,*) "-> Processing INPUTS---------------------------rang = ",IPT%rang
+        if(IPT%rang == 0) write(*,*) "-> Processing INPUTS---------------------------"
 
         call validate_input(IPT)
 
@@ -59,7 +58,10 @@ contains
                            IPT%nTotalFields, IPT%coords, IPT%neigh, IPT%op_neigh, IPT%neighShift, &
                            IPT%global)
 
-        write(*,*) "-> AFTER Processing INPUTS---------------------------rang = ",IPT%rang
+
+        if(IPT%rang == 0) write(*,*) "  IPT%loc_Comm = ", IPT%loc_Comm
+        if(IPT%rang == 0) write(*,*) "  IPT%gen_Comm = ", IPT%gen_Comm
+
 
         call wLog("-----LOCALIZATION---------------")
         call wLog("     IPT%loc_group = ")
