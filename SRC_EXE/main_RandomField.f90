@@ -81,12 +81,11 @@ program main_RandomField
 
     call MPI_BARRIER(IPT_Temp%comm, code)
 
-    deleteTEMPinput = .false.
     if(IPT_Temp%application /= 1) then
         if(IPT_Temp%rang == 0) write(*,*)  "     SEM generation"
         call read_main_input("./TEMP_RF_main_input", IPT_Temp)
         call MPI_BARRIER(IPT_Temp%comm, code)
-        call system("rm TEMP_RF_main_input")
+        call system("mv TEMP_RF_main_input "//IPT_Temp%appFolder)
     end if
 
     !Initial allocation---------------------------------------------
