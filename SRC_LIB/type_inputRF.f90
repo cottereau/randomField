@@ -474,14 +474,15 @@ contains
             integer :: app
             integer :: code
 
-
+            write(*,*) "Before Datatable"
+            write(*,*) "path = ", path
             call set_DataTable(path, dataTable)
-
+            write(*,*) "Before Application"
             call read_DataTable(dataTable, "application", app)
             IPT%application = app
 
             if(app == 1) then
-
+                write(*,*) "Native lecture"
                 call read_DataTable(dataTable, "nSamples", IPT%nSamples)
                 allocate(IPT%out_folders(IPT%nSamples))
                 allocate(IPT%out_names(IPT%nSamples))
@@ -535,6 +536,7 @@ contains
             integer :: prop, nprop
             character(len=7), dimension(3) :: propNames=["Density", "Kappa  ", "Mu     "]
             character(len=buf_RF) :: mesh_path, gen_path, absPath
+            character(len=buf_RF) :: out_folder
             double precision, dimension(:,:), allocatable :: fieldVar, fieldAvg
             double precision :: Pspeed, Sspeed, Dens
 
@@ -642,7 +644,7 @@ contains
 
             open (unit = fid , file = string_join_many("TEMP_RF_main_input"), action = 'write')
 
-            write(fid,*)  "$application 1"
+            write(fid,"(A)")  "$application 1"
             write(fid,*) " "
 
             call getcwd(absPath)
@@ -656,10 +658,10 @@ contains
                     do prop = 1, 3
                         randCount = randCount + 1
 
-                        mesh_path = trim(string_join_many(SEM_gen_path,"/input/mesh_",propNames(prop), &
-                                     stringNumb_join("_Mat_", i-1)))
-                        gen_path  = trim(string_join_many(SEM_gen_path,"/input/gen_",propNames(prop), &
-                                     stringNumb_join("_Mat_", i-1)))
+                        mesh_path = trim(string_join_many(SEM_gen_path,"/input/", &
+                                     stringNumb_join("Mat_", i-1),"_",propNames(prop),"_mesh"))
+                        gen_path  = trim(string_join_many(SEM_gen_path,"/input/", &
+                                     stringNumb_join("Mat_", i-1),"_",propNames(prop),"_gen"))
 
                         write(fid,"(A)") trim(string_join_many(stringNumb_join("$mesh_input_", randCount)))//' "'//&
                                          trim(string_join_many(absPath,"/",mesh_path,'"'))
@@ -675,17 +677,25 @@ contains
                                             gen_path,  &
                                             1, [1, 1, 1])
 
-                        write(fid,"(A)") trim(string_join_many(stringNumb_join("$out_folder_", randCount)))//&
-                                          ' "',trim(adjustL(absPath)),"/",trim(adjustL(SEM_gen_path)),'"'
+                        out_folder = trim(string_join_many(stringNumb_join("$out_folder_", randCount)))//&
+                                          ' "'//trim(adjustL(absPath))//"/"//trim(adjustL(SEM_gen_path))//'"'
+                        !out_folder = trim(string_join_many(stringNumb_join("A", randCount)))//&
+                        !             ' "', '"'
+                        !write(*,*) "out_folder = ", out_folder
+                        write(fid,"(A)") trim(adjustL(out_folder))
+                        !write(fid,"(A)") trim(string_join_many(stringNumb_join("$out_folder_", randCount)))//&
+                        !                  ' "',trim(adjustL(absPath)),"/",trim(adjustL(SEM_gen_path)),'"'
+
+
                         write(fid,"(A)") trim(string_join_many(stringNumb_join("$out_name_", randCount)))//' "'//&
-                                     trim(propNames(prop))//&
-                                     trim(stringNumb_join("_Mat_", i-1))//'"'
+                                     trim(stringNumb_join("Mat_", i-1))//"_"//&
+                                     trim(propNames(prop))//'"'
                         write(fid,"(A)") " "
                     end do
                 end if
             end do
 
-            write(fid,*) "$nSamples "//numb2String(randCount)
+            write(fid,"(A)") "$nSamples "//numb2String(randCount)
 
             !write(fid,*) "$$nDim "
 
