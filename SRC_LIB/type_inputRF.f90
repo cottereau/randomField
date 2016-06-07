@@ -152,7 +152,6 @@ contains
             logical, intent(in) :: sampleFields
             logical, intent(in) :: writeUNVinterpolation
 
-            call create_folder(outputFolder, ".", rang, comm)
             !create xmf and h5 folders
             call create_folder("xmf", outputFolder, rang, comm)
             call create_folder("h5", outputFolder, rang, comm)
@@ -675,7 +674,7 @@ contains
                                             fieldAvg(prop, i), fieldVar(prop, i), 4, &
                                             seedStart(i), [5d0, 5d0, 5d0], &
                                             gen_path,  &
-                                            1, [1, 1, 1])
+                                            1, [0, 0, 0])
 
                         out_folder = trim(string_join_many(stringNumb_join("$out_folder_", randCount)))//&
                                           ' "'//trim(adjustL(absPath))//"/"//trim(adjustL(SEM_gen_path))//'"'
@@ -824,11 +823,123 @@ contains
             call read_DataTable(dataTable, "localizationLevel", IPT%localizationLevel)
             call read_DataTable(dataTable, "overlap", IPT%overlap_in)
 
-
-
             deallocate(dataTable)
 
         end subroutine read_generation_input
+
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        !---------------------------------------------------------------------------------
+        subroutine estimate_nFields(IPT)
+
+            implicit none
+            !OUTPUT
+            type(IPT_RF), intent(inout)  :: IPT
+            !LOCAL
+            integer, dimension(IPT%nDim_gen) :: nPoints, nBlocks
+            integer, dimension(IPT%nDim_gen) :: nFieldsIdeal, nBlocksIdeal, nFieldsChosen
+            integer, dimension(IPT%nDim_gen) :: nPointsBase, nPointsOvlp, ratio
+            !double precision, dimension(IPT%nDim_gen) :: nBlocsDble
+            logical :: nFieldsOK
+            integer, dimension(100) :: factors
+            integer :: i, pos, np, np_total, np_start, np_end
+            double precision :: vol_surf_factor, vol_surf_factor_temp
+
+            if(any(IPT%nFields <=0)) then
+
+                if(IPT%rang == 0)  write(*,*) "IPT%nFields will be decided automatically"
+
+                nPointsBase = IPT%pointsPerCorrL * &
+                              ceiling((IPT%xMaxGlob_in - IPT%xMinGlob_in)/IPT%corrL_in)
+                nPointsOvlp = IPT%pointsPerCorrL * &
+                              ceiling(IPT%overlap_in/IPT%corrL_in)
+                nBlocks = 1
+
+                nFieldsOK = .false.
+
+                !write(*,*) "nBlocks = ", nBlocks
+                !write(*,*) "nPointsOvlp = ", nPointsOvlp
+
+                !write(*,*) "BEFORE WHILE"
+
+                do while (.not. nFieldsOK)
+                    nPoints = nPointsBase + (nBlocks - 1)*2*nPointsOvlp
+                    !write(*,*) "nPoints = ", nPoints
+
+                    !nBlocks = ceiling(nPoints/200)
+
+                    ratio = ceiling(dble(nPoints)/dble(nBlocks))
+                    !write(*,*) "ratio = ", ratio
+
+                    where(nPoints/nBlocks > 200) nBlocks = nBlocks + 1
+                    !write(*,*) "nBlocks = ", nBlocks
+
+                    ratio = ceiling(dble(nPoints)/dble(nBlocks))
+
+                    if(all(ratio < 200)) nFieldsOK = .true.
+                end do
+
+                nBlocksIdeal = nBlocks
+
+                if(IPT%rang == 0) then
+                    if(IPT%rang == 0)  write(*,*) "nBlocks (ideal) = ", nBlocksIdeal
+                end if
+
+                np_total = IPT%nb_procs
+                vol_surf_factor_temp = 0D0
+
+                np_start = ceiling(0.9*np_total)
+                np_end   = np_total
+
+                do np = np_start, np_end
+
+
+                    nBlocks = nBlocksIdeal
+
+                    factors = 0
+                    nFieldsIdeal  = 1
+                    !call find_factors(IPT%nb_procs, factors)
+                    call find_factors(np, factors)
+                    !if(IPT%rang == 0) write(*,*) "factors = ", factors
+                    !Adapting to our number of processors
+
+
+                    do i = size(factors), 1, -1
+                        !if(IPT%rang == 0) write(*,*) "i = ", i
+
+                        if(factors(i) == 0) cycle
+
+                        if(all(nBlocks == 1)) exit
+
+                        pos = MAXLOC(nBlocks,1)
+                        nFieldsIdeal(pos) = nFieldsIdeal(pos)*factors(i)
+                        nBlocks(pos) = ceiling(dble(nBlocks(pos))/dble(factors(i)))
+
+                    end do
+
+                    vol_surf_factor_temp = dble(product(nFieldsIdeal))/dble(2*sum(nFieldsIdeal*CSHIFT(nFieldsIdeal, shift=1)))
+
+                    !if(IPT%rang == 0) write(*,*) "nBlocks (ideal) = ", nBlocks
+                    !if(IPT%rang == 0) write(*,*) "nFieldsIdeal (ideal) = ", nFieldsIdeal
+                    !if(IPT%rang == 0) write(*,*) "product(nFieldsIdeal)", product(nFieldsIdeal)
+                    !if(IPT%rang == 0) write(*,*) "sum(nFieldsIdeal**2)", sum(nFieldsIdeal*CSHIFT(nFieldsIdeal, shift=1))
+                    !if(IPT%rang == 0) write(*,*) "Vol/Surf = ", vol_surf_factor_temp
+
+                    if(vol_surf_factor_temp >= vol_surf_factor) then
+                        vol_surf_factor = vol_surf_factor_temp
+                        nFieldsChosen   = nFieldsIdeal
+                    end if
+                end do
+
+                IPT%nFields = nFieldsChosen
+
+                if(IPT%rang == 0) write(*,*) "vol_surf_factor = ", vol_surf_factor
+            end if
+
+            if(IPT%rang == 0) write(*,*) "IPT%nFields = ", IPT%nFields
+
+        end subroutine estimate_nFields
 
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
@@ -1160,5 +1271,31 @@ contains
         call system("chmod a+r "//trim(gen_path))
 
     end subroutine write_gen_file
+
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    !-----------------------------------------------------------------------------------------------
+    subroutine find_factors(n, d)
+        integer, intent(in) :: n
+        integer, dimension(:), intent(out) :: d
+
+        integer :: div, next, rest
+        integer :: i
+
+        i = 1
+        div = 2; next = 3; rest = n
+
+        do while ( rest /= 1 )
+           do while ( mod(rest, div) == 0 )
+              d(i) = div
+              i = i + 1
+              rest = rest / div
+           end do
+           div = next
+           next = next + 2
+        end do
+
+  end subroutine find_factors
 
 end module type_inputRF
