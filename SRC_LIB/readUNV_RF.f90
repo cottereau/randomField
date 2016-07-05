@@ -548,6 +548,10 @@ contains
             read(fileID, fmt=*) line
             lineNb = lineNb + 1
 
+!            call wLog("Line ")
+!            call wLog(lineNb)
+!            call wLog(line)
+
             if(trim(adjustL(line)) == "-1") then
                 call wLog("Line ")
                 call wLog(lineNb)
@@ -588,6 +592,7 @@ contains
         inside = .true.
         nElem = 0
         nElemByType(:) = 0
+        maxConnect = 0
         monoType = .true.
 
         !Jump initials -1
@@ -607,6 +612,11 @@ contains
 
             read(fileID, fmt=*) line
             lineNb = lineNb + 1
+
+
+            call wLog("Line ")
+            call wLog(lineNb)
+            call wLog(line)
 
             !Read the connectivity header information
             if(trim(adjustL(line)) == "-1") then

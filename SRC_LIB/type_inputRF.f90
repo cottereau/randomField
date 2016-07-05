@@ -815,9 +815,10 @@ contains
                     if(IPT%rang==0) write(*,*) "   Mesh UNV"
                     call wLog("    Mesh UNV")
                     call wLog("        file: ")
-                    !call wLog(trim(IPT%unv_path))
                     call read_DataTable(dataTable, "unv_path", IPT%unv_path)
                     call read_DataTable(dataTable, "pointsPerCorrL", IPT%pointsPerCorrL)
+                    !call wLog(trim(IPT%unv_path))
+                    if(IPT%rang==0) write(*,*) "   unv_path = ", IPT%unv_path
                     IPT%unv = .true.
                     call readUNV(IPT%unv_path, IPT%nDim_mesh, IPT%coordList_local, IPT%connectList_local, IPT%monotype, &
                                  IPT%rang, IPT%nb_procs, IPT%coordList, IPT%connectList)

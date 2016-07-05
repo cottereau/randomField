@@ -424,6 +424,12 @@ contains
             !Normalizing and Writing files
             call transform_and_write_output(randField_Group, xNStep_Group, origin_Group, &
                                             IPT, build_times, BBoxPath, XMFPath)
+            call write_HDF5_attributes(BBoxPath, &
+                           IPT%nb_procs, IPT%nDim, IPT%Nmc, IPT%method, IPT%seedStart, &
+                           IPT%corrMod, IPT%margiFirst, &
+                           IPT%localizationLevel, IPT%nFields, &
+                           IPT%xMinGlob, IPT%xMaxGlob, IPT%xStep, IPT%corrL, IPT%overlap, &
+                           IPT%procExtent, kMax_out, kNStep_out)
         end if
 
         if(IPT%write_intermediate_files) then
@@ -469,7 +475,7 @@ contains
             if(IPT%rang == 0) write(*,*) trim(adjustL(IPT%unv_path))
             allocate(UNV_randField(size(IPT%coordList,2),1))
             if(IPT%rang == 0) write(*,*) "  Source:"
-            if(IPT%rang == 0) write(*,*) BBoxPath
+            if(IPT%rang == 0) write(*,*) trim(adjustL(BBoxPath))
             if(IPT%rang == 0) write(*,*) "-> INTERPOLATING TO GIVEN MESH----------------------------------------"
             call wLog("-> INTERPOLATING TO GIVEN MESH----------------------------------------")
             call interpolateToMesh(BBoxPath, IPT%coordList, UNV_randField, IPT%rang)
@@ -545,13 +551,17 @@ contains
             call wLog("BT_stdDev = ")
             call wLog(BT_stdDev)
 
-            call write_HDF5_attributes(BBoxPath, &
-                IPT%nb_procs, IPT%nDim, IPT%Nmc, IPT%method, IPT%seedStart, &
-                IPT%corrMod, IPT%margiFirst, &
-                BT_avg, BT_stdDev, BT_min, BT_max, gen_times, gen_WALL_Time, &
-                IPT%localizationLevel, IPT%nFields, &
-                IPT%xMinGlob, IPT%xMaxGlob, IPT%xStep, IPT%corrL, IPT%overlap, &
-                IPT%procExtent, kMax_out, kNStep_out)
+            call write_HDF5_time_attributes(BBoxPath, &
+                                            BT_avg, BT_stdDev, BT_min, BT_max, &
+                                            gen_times, gen_WALL_Time)
+
+!            call write_HDF5_attributes(BBoxPath, &
+!                IPT%nb_procs, IPT%nDim, IPT%Nmc, IPT%method, IPT%seedStart, &
+!                IPT%corrMod, IPT%margiFirst, &
+!                BT_avg, BT_stdDev, BT_min, BT_max, gen_times, gen_WALL_Time, &
+!                IPT%localizationLevel, IPT%nFields, &
+!                IPT%xMinGlob, IPT%xMaxGlob, IPT%xStep, IPT%corrL, IPT%overlap, &
+!                IPT%procExtent, kMax_out, kNStep_out)
 
             call getcwd(MONO_FileName)
             !write(*,*) "MONO_FileName(len(trim(MONO_FileName)):len(trim(MONO_FileName))) "
