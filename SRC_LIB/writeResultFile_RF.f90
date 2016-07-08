@@ -1642,7 +1642,7 @@ contains
                                      corrMod, margiFirst, &
                                      localizationLevel, nFields, &
                                      xMinGlob, xMaxGlob, xStep, corrL, overlap, &
-                                     procExtent, kMax_out, kNStep_out)
+                                     procExtent, kMax_out, kNStep_out, opened)
         implicit none
         !INPUTS
         character (len=*), intent(in) :: HDF5Path
@@ -1651,6 +1651,7 @@ contains
         double precision, dimension(:), intent(in) :: xMinGlob, xMaxGlob, xStep, corrL, overlap
         double precision, dimension(:), intent(in) :: procExtent, kMax_out
         integer         , dimension(:), intent(in) :: kNStep_out, nFields
+        logical, intent(in) :: opened
 
         !LOCAL
         character(len=50) :: attr_name
@@ -1659,8 +1660,10 @@ contains
         !integer(kind=8) :: sum_xNTotal, sum_kNTotal
         !logical :: indep
 
-        call h5open_f(error) ! Initialize FORTRAN interface.
-        call h5fopen_f(trim(HDF5Path), H5F_ACC_RDWR_F, file_id, error) !Open File
+        if(.not. opened) then
+            call h5open_f(error) ! Initialize FORTRAN interface.
+            call h5fopen_f(trim(HDF5Path), H5F_ACC_RDWR_F, file_id, error) !Open File
+        end if
 
         !BOOL
         !indep = RDF%independent
@@ -1716,9 +1719,10 @@ contains
         attr_name = "kMax_out"
         call write_h5attr_real_vec(file_id, attr_name, kMax_out)
 
-
-        call h5fclose_f(file_id, error)! Close the file.
-        call h5close_f(error) ! Close FORTRAN interface
+        if(.not. opened) then
+            call h5fclose_f(file_id, error)! Close the file.
+            call h5close_f(error) ! Close FORTRAN interface
+        end if
 
     end subroutine write_HDF5_attributes
 
@@ -1738,7 +1742,7 @@ contains
         open (unit = fileId , file = filePath, action = 'write')
 
         write(fileId,"(A)") '1 #Number of Samples'
-        write(fileId,"(A)") '0 #Calculate Correlation Legth'
+        write(fileId,"(A)") '1 #Calculate Correlation Legth'
         write(fileId,"(A)") '1 #Delete Sample In The End'
         write(fileId,"(A)") '"'//trim(adjustL(h5_path))//'"'
 

@@ -56,16 +56,20 @@ contains
         double precision, dimension(:), intent(in) :: xStep
 
         !LOCAL
-        integer :: i
-        integer(kind=8) :: i_long, kNLocal
+        integer :: i, j
+        integer(kind=8) :: i_long, kNLocal, kN_unsigned
         double precision :: kAdjust    = 1.0D0 !"kNStep minimum" multiplier
         double precision :: periodMult = 1.1D0 !"range" multiplier
         double precision :: rAdjust    = 5.0D0 !"kNStep minimum" multiplier (isotropic)
         integer, dimension(RDF%nDim) :: kInitial, kFinal, kNStepLocal
+        double precision, dimension(:,:) , allocatable :: kSign;
+        integer :: countInit, countEnd
 
         if(allocated(RDF%kPoints)) deallocate(RDF%kPoints)
 
         call set_kMaxND(RDF%corrMod, RDF%kMax) !Defining kMax according to corrMod
+        call wLog(" RDF%kMax = ")
+        call wLog(RDF%kMax)
 
         select case (RDF%method)
             case(ISOTROPIC)
@@ -80,61 +84,51 @@ contains
                     call get_Permutation(i, [RDF%kMax(1)], [RDF%kNStep(1)], RDF%kPoints(:, i), snapExtremes = .true.);
                 end do
 
-            case(SHINOZUKA)
+            case(SHINOZUKA, RANDOMIZATION)
+                RDF%kDelta(:) = 2.0D0*PI/(periodMult*RDF%xRange)
                 RDF%kNStep(:)   = 1 + int(kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:)))); !Number of points in k
                 RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1); !Redefining kDelta after ceiling and adjust
-                RDF%kNTotal = product(int(RDF%kNStep,8));
+                allocate(kSign (2**(RDF%nDim-1), RDF%nDim));
+                call set_kSign(kSign) !Set the sign permutations for kVec
 
-                !!write(get_fileId(),*) "RDF%kNStep = ", RDF%kNStep
-                !!write(get_fileId(),*) "RDF%kNTotal = ", RDF%kNTotal
+                kN_unsigned = product(int(RDF%kNStep,8));
+                RDF%kNTotal = kN_unsigned*size(kSign,1)
 
-                allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
+                call wLog(" RDF%kNStep = ")
+                call wLog(RDF%kNStep)
+                call wLog(" RDF%kDelta = ")
+                call wLog(RDF%kDelta)
+                call wLog(" RDF%kNTotal = ")
+                call wLog(RDF%kNTotal)
 
-                do i_long = 1, RDF%kNTotal
-                    call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
-                end do
 
-            case(RANDOMIZATION)
-                RDF%kNStep(:)   = 1 + int(kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:)))); !Number of points in k
-                RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1); !Redefining kDelta after ceiling and adjust
-                RDF%kNTotal = product(int(RDF%kNStep,8));
+                allocate(RDF%kPoints (RDF%nDim, RDF%kNTotal));
 
-                allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
-                call random_number(RDF%kPoints(:,:))
-                do i = 1, RDF%nDim
-                    RDF%kPoints(i,:) = RDF%kPoints(i,:) * RDF%kMax(i)
+                if(RDF%method == SHINOZUKA) then
+                    call setGrid(RDF%kPoints(:,1:kN_unsigned), dble(kInitial)*0d0, RDF%kDelta, RDF%kNStep)
+                else if (RDF%method == RANDOMIZATION) then
+                    call random_number(RDF%kPoints(:,1:kN_unsigned))
+                    do i = 1, RDF%nDim
+                        RDF%kPoints(i,1:kN_unsigned) = RDF%kPoints(i,1:kN_unsigned) * RDF%kMax(i)
+                    end do
+                end if
+
+                !Copy kPoints changing the sign
+                do i = 2, size(kSign,1)
+                    countInit = (i-1)*kN_unsigned + 1
+                    countEnd  = countInit + RDF%kNTotal - 1
+                    do j = 1, size(kSign,2)
+                        RDF%kPoints(j,countInit:countEnd) = RDF%kPoints(j,1:kN_unsigned)*kSign(i,j)
+                    end do
                 end do
 
             case(FFT)
                 RDF%kNStep(:) = find_xNStep(xMaxExt = RDF%xRange, xStep=xStep)
-                !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/((RDF%xRange)**1.0D0) * RDF%kDelta(:) !Redefinition of kMax (divided by 2 because of symmetric plane)
-                !RDF%kMax(:)   = 2.0D0*PI/(periodMult*RDF%xRange)
-                !RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1);
                 RDF%kDelta(:) = 2.0D0*PI/(periodMult*RDF%xRange)
                 RDF%kMax(:)   = ((RDF%kNStep(:) - 1) * RDF%kDelta(:))/1.0D0
-                !RDF%kDelta(:) = RDF%kDelta(:)
-                !RDF%kDelta(:) = RDF%kMax(:)/dble(RDF%kNStep(:))
-                !RDF%kNStep(:) = RDF%xNStep(:);
                 RDF%kNTotal   = product(int(RDF%kNStep,8));
-                !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(2.0D0)) * RDF%kDelta(:)/RDF%corrL(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
-                !RDF%kMax(:)   = (dble(RDF%kNStep(:) - 1)/(1.0D0)) * RDF%kDelta(:)!Redefinition of kMax (divided by 2 because of symmetric plane)
 
-                !if(RDF%independent) then
-                !    call wLog("RDF%kNStep = ")
-                !    call wLog(RDF%kNStep)
-                !    call wLog("RDF%kMax = ")
-                !    call wLog(RDF%kMax)
-                !    call wLog("RDF%kNTotal = ")
-                !    allocate(RDF%kPoints(RDF%nDim, RDF%kNTotal))
-                !    call wLog("shape(RDF%kPoints) = ")
-                !    call wLog(shape(RDF%kPoints))
-                !    call wLog(RDF%kNTotal)
-                !    !call wLog("RDF%kPoints = ")
-                !    do i = 1, RDF%kNTotal
-                !        call get_Permutation(i, RDF%kMax, RDF%kNStep, RDF%kPoints(:, i), snapExtremes = .true.);
-                !        !call wLog(RDF%kPoints(:, i))
-                !    end do
-                !else
+
                     kInitial = 0
                     kInitial(RDF%nDim)=RDF%kNInit-1 !-1 so k starts at 0
                     kFinal = 0
@@ -154,14 +148,11 @@ contains
                     call wLog(shape(RDF%kPoints))
                     call wLog("Making kPoints= ")
                     call setGrid(RDF%kPoints, dble(kInitial)*RDF%kDelta, RDF%kDelta, kNStepLocal)
-                    !do i_long = RDF%kNInit, RDF%kNEnd
-                    !    call get_Permutation(int(i_long), RDF%kMax, RDF%kNStep, &
-                    !                         RDF%kPoints(:, int(i_long-RDF%kNInit+1)), &
-                    !                         snapExtremes = .true.)
-                    !end do
-                !end if
+
 
         end select
+
+        if(allocated(kSign)) deallocate(kSign)
 
     end subroutine set_kPoints
 

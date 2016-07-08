@@ -459,7 +459,6 @@ program main_Stat
             integer(HID_T)  :: new_file_id, old_file_id       !File identifier
             integer :: error
             integer :: i
-            logical :: attr_exists
             character(len=buf_RF) :: newFile = "Sample_Info.h5"
             character(len=buf_RF) :: newFile_Path, newFile_Folder
             character(len=buf_RF) :: command, absPath
