@@ -272,7 +272,7 @@ contains
             if(validProc) then
 
                 write(*,*) "-> VALID proc ", IPT%rang
-                call wLog("-> VALID proc ")
+                call  wLog("-> VALID proc ")
 
                 call MPI_COMM_RANK(validComm, newRang, code)
                 call MPI_COMM_SIZE(validComm, newNbProcs, code)

@@ -204,7 +204,6 @@ program main_RandomField
         if(IPT_Temp%rang == 0) write(*,*) "Reading Inputs        = ", (all_times(2) - all_times(1))/dble(IPT_Temp%nb_procs)
         if(IPT_Temp%rang == 0) write(*,*) "Pre Organization      = ", (all_times(3) - all_times(2))/dble(IPT_Temp%nb_procs)
         if(IPT_Temp%rang == 0) write(*,*) "Generation            = ", (all_times(4) - all_times(3))/dble(IPT_Temp%nb_procs)
-        !if(IPT_Temp%rang == 0) write(*,*) "Localization Int      = ", (all_times(5) - all_times(4))/dble(IPT_Temp%nb_procs)
         if(IPT_Temp%rang == 0) write(*,*) "Localization Ext      = ", (all_times(5) - all_times(4))/dble(IPT_Temp%nb_procs)
         if(IPT_Temp%rang == 0) write(*,*) "Writing Normalization = ", (all_times(6) - all_times(5))/dble(IPT_Temp%nb_procs)
         if(IPT_Temp%rang == 0) write(*,*) "Transforming          = ", (all_times(7) - all_times(6))/dble(IPT_Temp%nb_procs)

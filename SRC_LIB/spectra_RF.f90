@@ -62,8 +62,8 @@ contains
         double precision :: periodMult = 1.1D0 !"range" multiplier
         double precision :: rAdjust    = 5.0D0 !"kNStep minimum" multiplier (isotropic)
         integer, dimension(RDF%nDim) :: kInitial, kFinal, kNStepLocal
-        double precision, dimension(:,:) , allocatable :: kSign;
-        integer :: countInit, countEnd
+        double precision, dimension(:,:) , allocatable :: kSign, kPoints_base;
+        integer(kind=8) :: countInit, countEnd
 
         if(allocated(RDF%kPoints)) deallocate(RDF%kPoints)
 
@@ -86,13 +86,19 @@ contains
 
             case(SHINOZUKA, RANDOMIZATION)
                 RDF%kDelta(:) = 2.0D0*PI/(periodMult*RDF%xRange)
+                write(*,*)" RDF%kDelta = ", RDF%kDelta
                 RDF%kNStep(:)   = 1 + int(kAdjust*(ceiling(RDF%kMax/RDF%kDelta(:)))); !Number of points in k
+                write(*,*)" RDF%kNStep = ", RDF%kNStep
                 RDF%kDelta(:) = (RDF%kMax)/(RDF%kNStep-1); !Redefining kDelta after ceiling and adjust
+                write(*,*)" RDF%kDelta = ", RDF%kDelta
+
                 allocate(kSign (2**(RDF%nDim-1), RDF%nDim));
                 call set_kSign(kSign) !Set the sign permutations for kVec
 
+                write(*,*)" kSign = ", kSign
+
                 kN_unsigned = product(int(RDF%kNStep,8));
-                RDF%kNTotal = kN_unsigned*size(kSign,1)
+                RDF%kNTotal = kN_unsigned*int(size(kSign,1),8)
 
                 call wLog(" RDF%kNStep = ")
                 call wLog(RDF%kNStep)
@@ -101,24 +107,28 @@ contains
                 call wLog(" RDF%kNTotal = ")
                 call wLog(RDF%kNTotal)
 
+                write(*,*)" kN_unsigned = ", kN_unsigned
+                write(*,*)" RDF%kNTotal = ", RDF%kNTotal
+
 
                 allocate(RDF%kPoints (RDF%nDim, RDF%kNTotal));
+                allocate(kPoints_base(RDF%nDim, kN_unsigned));
 
                 if(RDF%method == SHINOZUKA) then
-                    call setGrid(RDF%kPoints(:,1:kN_unsigned), dble(kInitial)*0d0, RDF%kDelta, RDF%kNStep)
+                    call setGrid(kPoints_base(:,:), dble(kInitial)*0d0, RDF%kDelta, RDF%kNStep)
                 else if (RDF%method == RANDOMIZATION) then
-                    call random_number(RDF%kPoints(:,1:kN_unsigned))
+                    call random_number(kPoints_base(:,:))
                     do i = 1, RDF%nDim
-                        RDF%kPoints(i,1:kN_unsigned) = RDF%kPoints(i,1:kN_unsigned) * RDF%kMax(i)
+                        kPoints_base(i,:) = kPoints_base(i,:) * RDF%kMax(i)
                     end do
                 end if
 
                 !Copy kPoints changing the sign
                 do i = 2, size(kSign,1)
                     countInit = (i-1)*kN_unsigned + 1
-                    countEnd  = countInit + RDF%kNTotal - 1
-                    do j = 1, size(kSign,2)
-                        RDF%kPoints(j,countInit:countEnd) = RDF%kPoints(j,1:kN_unsigned)*kSign(i,j)
+                    countEnd  = countInit + kN_unsigned - 1
+                    do j = 1, RDF%nDim
+                        RDF%kPoints(j,countInit:countEnd) = kPoints_base(j,:)*kSign(i,j)
                     end do
                 end do
 
@@ -153,6 +163,7 @@ contains
         end select
 
         if(allocated(kSign)) deallocate(kSign)
+        if(allocated(kPoints_base)) deallocate(kPoints_base)
 
     end subroutine set_kPoints
 
@@ -175,6 +186,8 @@ contains
         corrL(:) = 1.0D0
         if(present(corrL_in)) corrL = corrL_in
 
+        write(*,*) "size(RDF%kPoints,2) = ", size(RDF%kPoints,2)
+
         if(allocated(RDF%SkVec)) deallocate(RDF%SkVec)
         allocate(RDF%SkVec(size(RDF%kPoints,2)))
 
@@ -182,13 +195,13 @@ contains
         call wLog("RDF%corrMod")
         call wLog(RDF%corrMod)
 
-        !write(*,*) "Inside set_SkVec, corrL = ", corrL
+        write(*,*) "Inside set_SkVec, corrL = ", corrL
 
         select case(RDF%corrMod)
 
             case(cm_GAUSSIAN)
                 RDF%SkVec(:) = 1.0D0
-                !write(*,*) "Gaussian Correlation Model"
+                write(*,*) "Gaussian Correlation Model"
                 call wLog("cm_GAUSSIAN")
                 do i = 1, RDF%nDim
                     RDF%SkVec(:) = RDF%SkVec(:) * corrL(i) * exp(-((RDF%kPoints(i,:)**2.0D0) * (corrL(i)**2.0D0))/(4.0d0*pi))

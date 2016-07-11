@@ -81,11 +81,11 @@ contains
         select case (RDF%method)
             case(ISOTROPIC)
                 call wLog(" ISOTROPIC")
-                !if(RDF%rang == 0) write(*,*)"ISOTROPIC"
+                if(RDF%rang == 0) write(*,*)"ISOTROPIC"
                 call gen_Std_Gauss_Isotropic(RDF, MSH)
             case(SHINOZUKA)
                 call wLog(" SHINOZUKA")
-                !if(RDF%rang == 0) write(*,*)"SHINOZUKA"
+                if(RDF%rang == 0) write(*,*)"SHINOZUKA"
                 call gen_Std_Gauss_Shinozuka(RDF, MSH)
             case(RANDOMIZATION)
                 call wLog(" RANDOMIZATION")
@@ -94,7 +94,7 @@ contains
             case(FFT)
                 call wLog(" FFT")
                 write(*,*) "-> FFT ", RDF%rang
-                !if(RDF%rang == 0) write(*,*)"FFT"
+                if(RDF%rang == 0) write(*,*)"FFT"
                 call gen_Std_Gauss_FFT(RDF, MSH)
                 write(*,*) "-> AFTER FFT ", RDF%rang
         end select
