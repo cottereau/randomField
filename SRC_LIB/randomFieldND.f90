@@ -192,7 +192,7 @@ contains
         type(MESH), intent(in) :: MSH
 
         !LOCAL
-        double precision, dimension(:, :), allocatable :: kVec, SkMat;
+        double precision, dimension(:, :), allocatable :: SkMat;
         double precision, dimension(:, :), allocatable :: phiK
         double precision, dimension(:)   , allocatable :: dgemm_mult;
         double precision, dimension(:,:) , allocatable :: k_x_phi;
@@ -230,12 +230,12 @@ contains
 
         call wLog("Calculating fields")
         write(*,*) "Calculating fields"
-        allocate(kVec(RDF%nDim, 1))
 
         write(*,*) "xNTotal     = ", xNTotal
         write(*,*) "RDF%kNTotal = ", RDF%kNTotal
 
         xSlab  = int(dble(RDF%nDim)*1d8/dble(RDF%kNTotal))
+        if(xSlab > xNTotal) xSlab = xNTotal
         xNSlab = ceiling(dble(xNTotal)/dble(xSlab))
         write(*,*) "xSlab     = ", xSlab
         write(*,*) "xNSlab    = ", xNSlab
@@ -245,8 +245,8 @@ contains
         allocate(phiK (xSlab, RDF%kNTotal));
 
         write(*,*) "Calculating fields"
-        write(*,*) "shape(phiK)    = ", shape(phiK)
         write(*,*) "shape(k_x_phi) = ", shape(k_x_phi)
+        write(*,*) "shape(phiK)    = ", shape(phiK)
 
         call wLog(" shape(k_x_phi) = ")
         call wLog(shape(k_x_phi))
@@ -298,7 +298,7 @@ contains
                 call wLog(" First PhiK = ")
                 call wLog(phiK(1,1))
                 call wLog(" Last PhiK = ")
-                call wLog(phiK(1,size(phiK,1)))
+                call wLog(phiK(1,size(phiK,2)))
 
                 write(*,*) "   (phi) construction"
                 k_x_phi(1:xDelta,:) = phiK(1:xDelta,:)
@@ -307,7 +307,7 @@ contains
                 call DGEMM_simple(RDF%xPoints(:,xStart:xEnd), RDF%kPoints, k_x_phi(1:xDelta,:), "T", "N", beta_in = 1d0)
 
                 write(*,*) "   cos(k*x + phi) "
-                k_x_phi(:,1:xDelta-1) =cos(k_x_phi(:,1:xDelta-1))
+                k_x_phi(1:xDelta,:) =cos(k_x_phi(1:xDelta,:))
                 write(*,*) "   sqrt(Sk) "
                 SkMat = sqrt(SkMat)
 
