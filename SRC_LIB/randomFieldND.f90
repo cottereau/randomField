@@ -193,20 +193,20 @@ contains
 
         !LOCAL
         double precision, dimension(:, :), allocatable :: kVec, SkMat;
-        double precision, dimension(:)   , allocatable :: phiK
+        double precision, dimension(:, :), allocatable :: phiK
         double precision, dimension(:)   , allocatable :: dgemm_mult;
-        double precision, dimension(:,:) , allocatable :: k_x;
-        double precision, dimension(:)   , allocatable :: k_x_phi
+        double precision, dimension(:,:) , allocatable :: k_x_phi;
         double precision :: ampMult
-
-        integer :: n, i, m
+        integer(kind=8) :: xSlab, xStart, xEnd, xDelta, xNSlab
+        integer(kind=8) :: m
+        integer :: n, i
         integer(kind=8) :: j
         logical :: randomK
         integer(kind=8) :: xNTotal
 
         !!write(get_fileId(),*) "Inside Shinozuka"
 
-        xNTotal = product(MSH%xNStep)
+        xNTotal = product(int(MSH%xNStep,8))
         randomK = .false.
         if(present(randomK_in)) randomK = randomK_in
         call init_random_seed(RDF%seed)
@@ -228,16 +228,28 @@ contains
         call wLog(" shape(RDF%SkVec) = ")
         call wLog(shape(RDF%SkVec))
 
-        !!write(get_fileId(),*) "Calculating Fields"
+        call wLog("Calculating fields")
+        write(*,*) "Calculating fields"
         allocate(kVec(RDF%nDim, 1))
 
+        write(*,*) "xNTotal     = ", xNTotal
+        write(*,*) "RDF%kNTotal = ", RDF%kNTotal
 
-        allocate(k_x (xNTotal, RDF%kNTotal))
-        allocate(phiK (RDF%kNTotal));
-        !allocate(k_x_phi (xNTotal));
+        xSlab  = int(dble(RDF%nDim)*1d8/dble(RDF%kNTotal))
+        xNSlab = ceiling(dble(xNTotal)/dble(xSlab))
+        write(*,*) "xSlab     = ", xSlab
+        write(*,*) "xNSlab    = ", xNSlab
 
-        call wLog(" shape(k_x) = ")
-        call wLog(shape(k_x))
+
+        allocate(k_x_phi (xSlab, RDF%kNTotal))
+        allocate(phiK (xSlab, RDF%kNTotal));
+
+        write(*,*) "Calculating fields"
+        write(*,*) "shape(phiK)    = ", shape(phiK)
+        write(*,*) "shape(k_x_phi) = ", shape(k_x_phi)
+
+        call wLog(" shape(k_x_phi) = ")
+        call wLog(shape(k_x_phi))
         call wLog(" xNTotal= ")
         call wLog(xNTotal)
         call wLog(" RDF%kNTotal= ")
@@ -263,34 +275,53 @@ contains
 
         do n = 1, RDF%Nmc
 
-            if(.not. RDF%calculate(n)) cycle
-
-            call random_number(phiK(:))
-            phiK(:) = 2.0D0*pi*phiK(:)
-
-            call wLog(" First PhiK = ")
-            call wLog(phiK(1))
-            call wLog(" Last PhiK = ")
-            call wLog(phiK(size(phiK,1)))
+            call random_number(phiK(1,:))
+            phiK(1,:) = 2.0D0*pi*phiK(1,:)
 
             write(*,*) "   (phi) construction"
-            k_x = spread(source=phiK(:), dim =1, ncopies=xNTotal)
+            phiK = spread(source=phiK(1,:), dim =1, ncopies=xSlab)
 
-            write(*,*) "   (k*x + phi) "
-            call DGEMM_simple(RDF%xPoints, RDF%kPoints, k_x(:,:), "T", "N", beta_in = 1d0)
+            do m = 1, xNSlab
 
-            write(*,*) "   cos(k*x + phi) "
-            k_x =cos(k_x)
-            write(*,*) "   sqrt(Sk) "
-            SkMat = sqrt(SkMat)
+                xStart = (m-1)*xSlab + 1
+                xEnd   = xStart + xSlab - 1
+                if(xEnd > xNTotal) xEnd = xNTotal
+                xDelta = xEnd - xStart + 1
 
-            call wLog(" shape(k_x) = ")
-            call wLog(shape(k_x))
-            call wLog(" shape(SkMat) = ")
-            call wLog(shape(SkMat))
-            write(*,*) "   sqrt(Sk)*cos(k*x + phi)"
-            !RDF%randField(:,n:n) = MATMUL(k_x,SkMat)
-            call DGEMM_simple(k_x, SkMat, RDF%randField(:,n:n), "N", "N")
+                write(*,*) "xStart = ", xStart
+                write(*,*) "xEnd   = ", xEnd
+                write(*,*) "xDelta = ", xDelta
+
+                if(.not. RDF%calculate(n)) cycle
+
+
+                call wLog(" First PhiK = ")
+                call wLog(phiK(1,1))
+                call wLog(" Last PhiK = ")
+                call wLog(phiK(1,size(phiK,1)))
+
+                write(*,*) "   (phi) construction"
+                k_x_phi(1:xDelta,:) = phiK(1:xDelta,:)
+
+                write(*,*) "   (k*x + phi) "
+                call DGEMM_simple(RDF%xPoints(:,xStart:xEnd), RDF%kPoints, k_x_phi(1:xDelta,:), "T", "N", beta_in = 1d0)
+
+                write(*,*) "   cos(k*x + phi) "
+                k_x_phi(:,1:xDelta-1) =cos(k_x_phi(:,1:xDelta-1))
+                write(*,*) "   sqrt(Sk) "
+                SkMat = sqrt(SkMat)
+
+                call wLog(" shape(k_x_phi) = ")
+                call wLog(shape(k_x_phi))
+                call wLog(" shape(SkMat) = ")
+                call wLog(shape(SkMat))
+                write(*,*) "   sqrt(Sk)*cos(k*x + phi)"
+                !RDF%randField(:,n:n) = MATMUL(k_x_phi,SkMat)
+                call DGEMM_simple(k_x_phi(1:xDelta, :), SkMat, RDF%randField(xStart:xEnd,n:n), "N", "N")
+
+                if(xEnd == xNTotal) exit
+
+            end do
 
             write(*,*) "   END OF SAMPLE ", n
 
@@ -301,7 +332,6 @@ contains
         if(allocated(dgemm_mult))       deallocate(dgemm_mult)
         if(allocated(phiK))             deallocate(phiK);
         if(allocated(k_x_phi))          deallocate(k_x_phi)
-        if(allocated(k_x))              deallocate(k_x)
         if(allocated(SkMat))            deallocate(SkMat)
 
     end subroutine gen_Std_Gauss_Shinozuka
