@@ -300,7 +300,7 @@ contains
                 call wLog(" Last PhiK = ")
                 call wLog(phiK(1,size(phiK,2)))
 
-                write(*,*) "   (phi) construction"
+                write(*,*) "   (phi) copy"
                 k_x_phi(1:xDelta,:) = phiK(1:xDelta,:)
 
                 write(*,*) "   (k*x + phi) "
