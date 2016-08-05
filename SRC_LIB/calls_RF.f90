@@ -438,7 +438,7 @@ contains
                            IPT%procExtent, kMax_out, kNStep_out, .false.)
         end if
 
-        !if(IPT%write_intermediate_files) then
+        if(IPT%write_intermediate_files) then
             MONO_FileName = string_join_many("RF_",numb2String(IPT%gen_group))
             if(IPT%gen_rang == 0) call write_MONO_proc_result(xMin_Group, xMax_Group, &
                                                           IPT%xStep, IPT%nDim, &
@@ -457,7 +457,7 @@ contains
         if(IPT%rang == 0) call write_XMF_Elements_per_proc(trim(string_join(MONO_FileName,".h5")), xMin_Group, xMax_Group, IPT%xStep, &
                                      IPT%nDim, trim(MONO_FileName), trim(string_join(IPT%outputFolder,"/xmf")), &
                                      "../h5", "RF",IPT%gen_groupMax)
-        !end if
+        end if
 
 
 !        call write_XMF_Elements_per_proc(HDF5_FileName, xMin, xMax, xStep, &

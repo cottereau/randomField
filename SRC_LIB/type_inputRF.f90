@@ -472,14 +472,14 @@ contains
             integer :: i
             integer :: code
 
-            write(*,*) "Before Datatable"
-            write(*,*) "path = ", path
+            !write(*,*) "Before Datatable"
+            if(IPT%rang == 0) write(*,*) "      path = ", path
             call set_DataTable(path, dataTable)
-            write(*,*) "Before Application"
+            if(IPT%rang == 0) write(*,*) "      Before Application"
             call read_DataTable(dataTable, "application", IPT%application)
 
             if(IPT%application == 1) then
-                write(*,*) "Native lecture"
+                if(IPT%rang == 0) write(*,*) "      Native lecture"
                 call read_DataTable(dataTable, "nSamples", IPT%nSamples)
                 allocate(IPT%out_folders(IPT%nSamples))
                 allocate(IPT%out_names(IPT%nSamples))
@@ -495,7 +495,7 @@ contains
                 IPT%outputName = IPT%out_names(1)
 
             else if (IPT%application == 2) then
-                !SEM
+                if(IPT%rang == 0) write(*,*) "     SEM files lecture"
                 call read_DataTable(dataTable, "folder", SEM_gen_path)
                 IPT%appFolder = SEM_gen_path
                 if(IPT%rang == 0) call generateMain_inputSEM(SEM_gen_path)
