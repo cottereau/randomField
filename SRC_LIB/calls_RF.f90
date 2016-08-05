@@ -59,8 +59,8 @@ contains
                            IPT%global)
 
 
-        if(IPT%rang == 0) write(*,*) "  IPT%loc_Comm = ", IPT%loc_Comm
-        if(IPT%rang == 0) write(*,*) "  IPT%gen_Comm = ", IPT%gen_Comm
+        !if(IPT%rang == 0) write(*,*) "  IPT%loc_Comm = ", IPT%loc_Comm
+        !if(IPT%rang == 0) write(*,*) "  IPT%gen_Comm = ", IPT%gen_Comm
 
 
         call wLog("-----LOCALIZATION---------------")
