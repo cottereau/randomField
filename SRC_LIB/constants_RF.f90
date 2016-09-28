@@ -25,6 +25,10 @@ module constants_RF
     integer, parameter :: SCREEN=6
     integer, parameter :: buf_RF=1024 !Buffer for text
 
+    !APPLICATION
+    integer, parameter :: NATIVE = 1
+    integer, parameter :: SEM = 2
+
     integer :: TESTRANK = 0 !ONLY FOR TESTS
     character (len=30), parameter :: mesh_input = "mesh_input"
     character (len=30), parameter :: gen_input  = "gen_input"

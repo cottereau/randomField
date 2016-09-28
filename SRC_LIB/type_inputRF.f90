@@ -69,6 +69,19 @@ module type_inputRF
 
     end type IPT_RF
 
+    type :: property_RF
+        integer :: mat
+        character(len=buf_RF) :: name
+        double precision :: avg_value
+        integer :: corrMod
+        integer, dimension(3) :: corrL
+        integer :: margiF
+        double precision :: CV
+        integer :: seedStart
+        double precision, dimension(3) :: bbox_min, bbox_max
+
+    end type property_RF
+
 contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
@@ -459,26 +472,42 @@ contains
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
         !---------------------------------------------------------------------------------
-        subroutine read_main_input(path, IPT)
+        subroutine read_main_input(IPT)
 
             implicit none
-            !INPUT
-            character(len=*), intent(in) :: path
             !OUTPUT
             type(IPT_RF), intent(inout)  :: IPT
             !LOCAL
             character(len=buf_RF) , dimension(:,:), allocatable :: dataTable;
-            character(len=buf_RF) :: SEM_gen_path
+            character(len=buf_RF) :: SEM_gen_path, path
             integer :: i
             integer :: code
+            logical :: fileExist
+
+            path = "./random.spec"
+            fileExist = fileExist(path)
+
+            if(fileExist) then
+                path = "./domains.txt"
+                fileExist = fileExist(path)
+                if(.not. fileExist) stop "ERROR: ./random.spec file found but domains.txt not (you need to make the mesh before the generating the properties"
+                IPT%application = SEM
+                SEM_gen_path = "./mat"
+            else
+                path = "./RF_main_input"
+                fileExist = fileExist(path)
+                if(fileExist) then
+                    IPT%application = NATIVE
+                else
+                    stop "ERROR: nor ./RF_main_input  or ./random.spec files found"
+                end if
+            end if
 
             !write(*,*) "Before Datatable"
             if(IPT%rang == 0) write(*,*) "      path = ", path
             call set_DataTable(path, dataTable)
-            if(IPT%rang == 0) write(*,*) "      Before Application"
-            call read_DataTable(dataTable, "application", IPT%application)
 
-            if(IPT%application == 1) then
+            if(IPT%application == NATIVE) then
                 if(IPT%rang == 0) write(*,*) "      Native lecture"
                 call read_DataTable(dataTable, "nSamples", IPT%nSamples)
                 allocate(IPT%out_folders(IPT%nSamples))
@@ -494,9 +523,8 @@ contains
 
                 IPT%outputName = IPT%out_names(1)
 
-            else if (IPT%application == 2) then
+            else if (IPT%application == SEM) then
                 if(IPT%rang == 0) write(*,*) "     SEM files lecture"
-                call read_DataTable(dataTable, "folder", SEM_gen_path)
                 IPT%appFolder = SEM_gen_path
                 if(IPT%rang == 0) call generateMain_inputSEM(SEM_gen_path)
                 call MPI_BARRIER(IPT%comm, code)
@@ -566,12 +594,73 @@ contains
             double precision, dimension(:), allocatable :: fieldAvg, fieldVar
             double precision, dimension(:), allocatable :: Pspeed, Sspeed, Dens
             integer, dimension(:), allocatable :: lambdaSwitch
+            integer, dimension(:), allocatable :: nProp_Mat
+            integer :: mat, nSamples, mat_Nb, prop_count
+            type(property_RF), dimension(:), allocatable :: prop
+            integer :: VP_VS_flag
 
             fid_2 = 19
             npml  = 0
             nRand = 0
             randCount = 0
             nprop = 3
+
+            !READING random.spec
+            open (unit = fid_2 , file = "./random.spec", action = 'read', status="old", form="formatted")
+
+                !!1)  Counting number of samples to be generated
+                mat = -1
+                buffer = getLine(fid_2, '#')
+                read(buffer,*) nMat
+                allocate(nProp_Mat(0:nMat-1))
+
+                do mat = 0, nMat - 1
+                    buffer = getLine(fid_2, '#') !Material Number
+                    buffer = getLine(fid_2, '#')
+                    read(buffer,*) nProp_Mat(mat)
+                    do j = 1, nProp_Mat(mat)
+                        buffer = getLine(fid_2, '#')
+                    end do
+                end do
+
+                nSamples = sum(nProp_Mat)
+
+                allocate(prop(0:nSamples-1))
+
+                !!2) Reading Samples Properties
+                rewind(fid_2)
+                prop_count = 0
+
+                buffer = getLine(fid_2, '#') !nMat
+                read(buffer,*) nMat
+                buffer = getLine(fid_2, '#') !Material Number
+
+                do mat = 0, nMat - 1
+                    buffer = getLine(fid_2, '#') !Material Number
+                    read(buffer,*) mat_Nb
+                    buffer = getLine(fid_2, '#') !VP_VS flag
+                    buffer = getLine(fid_2, '#') !Number of Properties
+                    read(buffer,*) VP_VS_flag
+                    if(VP_VS_flag = 1) buffer = getLine(fid_2, '#') !VP VS Value
+                    do j = 1, nProp_Mat(mat)
+                        buffer = getLine(fid_2, '#')
+                        prop(prop_count)%mat = mat_Nb
+
+                        read(buffer,*) prop(prop_count)%avg_value, &
+                                       prop(prop_count)%corrMod,   &
+                                       prop(prop_count)%corrL(1),  &
+                                       prop(prop_count)%corrL(2),  &
+                                       prop(prop_count)%corrL(3),  &
+                                       prop(prop_count)%margiF,    &
+                                       prop(prop_count)%CV,        &
+                                       prop(prop_count)%seedStart
+
+                        prop_count = prop_count + 1
+                    end do
+                end do
+
+            close(fid_2)
+
 
             !READING material.input
             open (unit = fid_2 , file = "./material.input", action = 'read', status="old", form="formatted")
@@ -757,6 +846,8 @@ contains
 
             close(fid)
 
+            if(allocated(prop)) deallocate(prop)
+            if(allocated(nProp_Mat)) deallocate(nProp_Mat)
             if(allocated(materialType)) deallocate(materialType)
             if(allocated(assocMat)) deallocate(assocMat)
             if(allocated(Pspeed)) deallocate(Pspeed)

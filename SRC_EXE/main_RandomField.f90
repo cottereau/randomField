@@ -78,7 +78,7 @@ program main_RandomField
     !Reading Main---------------------------------------------------
     if(IPT_Temp%rang == 0) write(*,*)  "     -> Reading Main Input"
     call wLog("     -> Reading Main Input")
-    call read_main_input("./RF_main_input", IPT_Temp)
+    call read_main_input(IPT_Temp)
 
     if(IPT_Temp%sameFolder) then
         do i =1, IPT_Temp%nSamples
